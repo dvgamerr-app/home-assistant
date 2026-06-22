@@ -1,0 +1,477 @@
+<!doctype html>
+<html lang="th" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Design System · Home Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600&family=Trirong:ital,wght@0,300;0,400;1,300;1,400&display=swap"
+    />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/charts.css/dist/charts.min.css" />
+    <style>
+      /* ============================================================
+         TOKENS — identical to src/styles/global.css
+         ============================================================ */
+      :root {
+        --radius: 0.5rem;
+        --tracking-luxury: 0.28em;
+        --font-serif: 'Trirong', Georgia, 'Times New Roman', serif;
+        --font-sans: 'Noto Sans Thai', ui-sans-serif, system-ui, sans-serif;
+        --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+        --background: oklch(0.978 0.006 85);
+        --foreground: oklch(0.26 0.012 60);
+        --card: oklch(0.995 0.003 85);
+        --card-foreground: oklch(0.26 0.012 60);
+        --primary: oklch(0.42 0.02 65);
+        --primary-foreground: oklch(0.97 0.006 85);
+        --secondary: oklch(0.95 0.008 80);
+        --muted: oklch(0.955 0.006 80);
+        --muted-foreground: oklch(0.52 0.012 70);
+        --accent: oklch(0.74 0.085 70);
+        --accent-foreground: oklch(0.32 0.04 65);
+        --destructive: oklch(0.55 0.14 28);
+        --border: oklch(0.9 0.006 80);
+        --chart-1: oklch(0.62 0.07 150);
+        --chart-2: oklch(0.76 0.1 75);
+        --chart-3: oklch(0.6 0.06 230);
+        --chart-4: oklch(0.58 0.12 30);
+        --chart-5: oklch(0.55 0.04 200);
+      }
+      [data-theme='dark'] {
+        --background: oklch(0.19 0.006 60);
+        --foreground: oklch(0.92 0.006 85);
+        --card: oklch(0.225 0.006 60);
+        --card-foreground: oklch(0.92 0.006 85);
+        --primary: oklch(0.85 0.02 80);
+        --primary-foreground: oklch(0.22 0.01 60);
+        --secondary: oklch(0.28 0.006 60);
+        --muted: oklch(0.28 0.006 60);
+        --muted-foreground: oklch(0.68 0.01 75);
+        --accent: oklch(0.78 0.09 75);
+        --accent-foreground: oklch(0.22 0.02 65);
+        --destructive: oklch(0.62 0.14 28);
+        --border: oklch(0.92 0.01 85 / 10%);
+        --chart-1: oklch(0.68 0.08 150);
+        --chart-2: oklch(0.8 0.1 78);
+        --chart-3: oklch(0.66 0.07 230);
+        --chart-4: oklch(0.64 0.12 32);
+        --chart-5: oklch(0.6 0.05 200);
+      }
+
+      /* ============================================================
+         BASE
+         ============================================================ */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: var(--font-sans);
+        background: var(--background);
+        color: var(--foreground);
+        -webkit-font-smoothing: antialiased;
+        line-height: 1.6;
+      }
+      .wrap {
+        max-width: 1040px;
+        margin: 0 auto;
+        padding: 0 1.5rem;
+      }
+      .eyebrow {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-luxury);
+        color: var(--muted-foreground);
+      }
+      .serif {
+        font-family: var(--font-serif);
+        font-weight: 300;
+      }
+      .mono {
+        font-family: var(--font-mono);
+      }
+      h1.serif {
+        font-size: clamp(2.5rem, 6vw, 4rem);
+        line-height: 1.05;
+      }
+      h2.serif {
+        font-size: 1.5rem;
+        margin-bottom: 0.25rem;
+      }
+      section {
+        padding: 3.5rem 0;
+        border-top: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
+      }
+      .muted {
+        color: var(--muted-foreground);
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+        border-radius: var(--radius);
+        padding: 1.5rem;
+      }
+      .grid {
+        display: grid;
+        gap: 1rem;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        align-items: center;
+      }
+      .legend-dot {
+        width: 0.7rem;
+        height: 0.7rem;
+        border-radius: 2px;
+        display: inline-block;
+      }
+
+      /* header */
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: color-mix(in oklch, var(--background) 85%, transparent);
+        backdrop-filter: blur(8px);
+        border-bottom: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+      }
+      header .wrap {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-block: 1rem;
+      }
+      .toggle {
+        font: inherit;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        cursor: pointer;
+        background: transparent;
+        color: var(--muted-foreground);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.4rem 0.9rem;
+      }
+
+      /* swatches */
+      .swatches {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 0.75rem;
+      }
+      .swatch .chip {
+        height: 60px;
+        border-radius: calc(var(--radius) - 2px);
+        border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+      }
+      .swatch code {
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--muted-foreground);
+        display: block;
+        margin-top: 0.4rem;
+      }
+      .swatch b {
+        font-weight: 500;
+        font-size: 12px;
+      }
+
+      /* type scale */
+      .type-row {
+        display: flex;
+        align-items: baseline;
+        gap: 1.5rem;
+        padding: 0.6rem 0;
+        border-bottom: 1px dashed color-mix(in oklch, var(--border) 60%, transparent);
+      }
+      .type-row span:first-child {
+        width: 90px;
+        flex-shrink: 0;
+        font-family: var(--font-mono);
+        font-size: 11px;
+        color: var(--muted-foreground);
+      }
+
+      /* sample components */
+      .btn {
+        font: inherit;
+        font-size: 13px;
+        border-radius: 999px;
+        padding: 0.55rem 1.3rem;
+        cursor: pointer;
+        border: 1px solid transparent;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: var(--primary-foreground);
+      }
+      .btn-ghost {
+        background: transparent;
+        color: var(--foreground);
+        border-color: var(--border);
+      }
+      .badge {
+        border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+        border-radius: 999px;
+        padding: 0.2rem 0.7rem;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--muted-foreground);
+      }
+      .progress {
+        height: 1px;
+        width: 100%;
+        background: var(--border);
+        margin-top: 0.75rem;
+      }
+      .progress > div {
+        height: 1px;
+        background: var(--accent);
+      }
+      .statvalue {
+        font-family: var(--font-serif);
+        font-weight: 300;
+        font-size: 2rem;
+        line-height: 1;
+      }
+      .chart-frame {
+        height: 220px;
+      }
+      .chart-frame .charts-css {
+        height: 100%;
+        font-size: 0.7rem;
+        --color-1: var(--chart-1);
+        --color-2: var(--chart-4);
+      }
+      .charts-css .data {
+        opacity: 0;
+      }
+      footer {
+        padding: 3rem 0;
+        color: var(--muted-foreground);
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <span class="serif" style="font-size: 1rem">บ้านของคุณกิ่งกาญจน์ · Design System</span>
+        <button class="toggle" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">สลับโหมด</button>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <!-- INTRO -->
+      <section style="border-top: none">
+        <p class="eyebrow">Design System · v0.1</p>
+        <h1 class="serif" style="margin-top: 1rem">
+          ภาษาดีไซน์<br /><span class="serif" style="font-style: italic; opacity: 0.9">ของบ้านอันสงบ</span>
+        </h1>
+        <p class="muted" style="max-width: 38ch; margin-top: 1.5rem">
+          ระบบดีไซน์สำหรับแดชบอร์ด Home Assistant — โทนอบอุ่นแบบ residence, ตัวอักษร serif น้ำหนักเบา, พื้นที่ว่างเยอะ และเส้นบาง ใช้เป็นแหล่งอ้างอิงเดียวสำหรับ token, typography และ component ทั้งหมด
+        </p>
+      </section>
+
+      <!-- COLOR -->
+      <section>
+        <p class="eyebrow">01 — Color</p>
+        <h2 class="serif">โทนสี</h2>
+        <p class="muted" style="margin-bottom: 1.5rem">นิยามด้วย oklch ใน <code class="mono">@theme</code> ของ Tailwind v4 · กดปุ่ม “สลับโหมด” ด้านบนเพื่อดู dark mode</p>
+
+        <p class="eyebrow" style="margin-bottom: 0.75rem">Surfaces &amp; Text</p>
+        <div class="swatches" id="sw-surface"></div>
+
+        <p class="eyebrow" style="margin: 1.75rem 0 0.75rem">Accent &amp; Chart palette</p>
+        <div class="swatches" id="sw-accent"></div>
+      </section>
+
+      <!-- TYPOGRAPHY -->
+      <section>
+        <p class="eyebrow">02 — Typography</p>
+        <h2 class="serif">ตัวอักษร</h2>
+        <p class="muted" style="margin-bottom: 1.5rem">
+          <b style="color: var(--foreground); font-weight: 500">Trirong</b> (serif, ไทย+ละติน) สำหรับหัวข้อและตัวเลขเด่น ·
+          <b style="color: var(--foreground); font-weight: 500">Noto Sans Thai</b> สำหรับเนื้อหา ·
+          <b style="color: var(--foreground); font-weight: 500">IBM Plex Mono</b> สำหรับค่าทางเทคนิค
+        </p>
+
+        <div class="card">
+          <div class="type-row"><span>serif / 4rem</span><span class="serif" style="font-size: 2.6rem">22°</span></div>
+          <div class="type-row"><span>serif italic</span><span class="serif" style="font-size: 1.8rem; font-style: italic">Alexandra</span></div>
+          <div class="type-row"><span>sans / body</span><span>บ้านกำลังทำงานเป็นปกติ แผงโซลาร์ผลิตไฟอยู่</span></div>
+          <div class="type-row"><span>mono / data</span><span class="mono">228.4 V · 50.01 Hz</span></div>
+          <div class="type-row" style="border-bottom: none"><span>eyebrow</span><span class="eyebrow">Outside · Humidity · Breeze</span></div>
+        </div>
+        <p class="muted mono" style="font-size: 11px; margin-top: 0.75rem">tracking-luxury = 0.28em · ใช้กับ label พิมพ์ใหญ่เสมอ</p>
+      </section>
+
+      <!-- SPACING / RADIUS -->
+      <section>
+        <p class="eyebrow">03 — Radius &amp; Lines</p>
+        <h2 class="serif">มุมโค้งและเส้น</h2>
+        <p class="muted" style="margin-bottom: 1.5rem"><code class="mono">--radius: 0.5rem</code> · เส้นคั่นบาง 1px สีจาง (<code class="mono">border/60–70</code>) แทนเงา เพื่อความเรียบหรู</p>
+        <div class="row">
+          <div style="text-align: center">
+            <div style="width: 90px; height: 64px; background: var(--secondary); border: 1px solid var(--border); border-radius: calc(var(--radius) - 4px)"></div>
+            <code class="mono" style="font-size: 11px">sm · 1px</code>
+          </div>
+          <div style="text-align: center">
+            <div style="width: 90px; height: 64px; background: var(--secondary); border: 1px solid var(--border); border-radius: var(--radius)"></div>
+            <code class="mono" style="font-size: 11px">lg · 8px</code>
+          </div>
+          <div style="text-align: center">
+            <div style="width: 90px; height: 64px; background: var(--secondary); border: 1px solid var(--border); border-radius: 999px"></div>
+            <code class="mono" style="font-size: 11px">full · pills</code>
+          </div>
+        </div>
+      </section>
+
+      <!-- COMPONENTS -->
+      <section>
+        <p class="eyebrow">04 — Components</p>
+        <h2 class="serif">คอมโพเนนต์</h2>
+        <p class="muted" style="margin-bottom: 1.5rem">.astro แบบ static + Svelte islands เฉพาะส่วนที่โต้ตอบ (นาฬิกาเรียลไทม์, ปุ่มสลับธีม)</p>
+
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
+          <!-- StatCard -->
+          <div class="card" style="display: flex; flex-direction: column; gap: 1.25rem">
+            <div class="row" style="justify-content: space-between">
+              <span style="color: var(--chart-2)">☀</span>
+              <span class="badge">76% พึ่งตัวเอง</span>
+            </div>
+            <div>
+              <p class="eyebrow">ผลิตไฟวันนี้</p>
+              <p class="statvalue" style="margin-top: 0.4rem">7.5 kWh</p>
+              <p class="muted" style="font-size: 12px; margin-top: 0.4rem">ผลิตมาแล้ว 0.9 ชม.</p>
+            </div>
+          </div>
+
+          <!-- Progress / payback -->
+          <div class="card">
+            <p class="eyebrow">ความคืบหน้าการคืนทุน</p>
+            <p class="statvalue" style="font-size: 3rem; margin-top: 0.5rem">2.1<span style="font-size: 1.25rem; color: var(--muted-foreground)">%</span></p>
+            <div class="progress"><div style="width: 2.1%"></div></div>
+            <p class="muted" style="font-size: 12px; margin-top: 0.75rem">คืนทุนแล้ว ฿5,900 จาก ฿280,000</p>
+          </div>
+
+          <!-- Buttons + badges -->
+          <div class="card" style="display: flex; flex-direction: column; gap: 1rem; justify-content: center">
+            <div class="row">
+              <button class="btn btn-primary">ปุ่มหลัก</button>
+              <button class="btn btn-ghost">ปุ่มรอง</button>
+            </div>
+            <div class="row">
+              <span class="badge">ออนไลน์</span>
+              <span class="badge">กำลังชาร์จ</span>
+              <span class="badge" style="color: var(--destructive); border-color: var(--destructive)">ผิดปกติ</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- CHARTS -->
+      <section>
+        <p class="eyebrow">05 — Charts</p>
+        <h2 class="serif">กราฟ</h2>
+        <p class="muted" style="margin-bottom: 1.5rem">
+          ใช้ <b style="color: var(--foreground); font-weight: 500">Charts.css</b> — กราฟจาก HTML table + CSS ล้วน ไม่มี JS, อ่านได้โดย screen reader · กำหนดสีผ่าน
+          <code class="mono">--color-1…</code> และค่าผ่าน <code class="mono">--size</code> (bar) หรือ <code class="mono">--start/--end</code> (line/area)
+        </p>
+        <div class="card">
+          <div class="chart-frame">
+            <table class="charts-css column multiple stacked show-4-secondary-axes">
+              <tbody>
+                <tr>
+                  <td style="--size: 0.5"><span class="data">a</span></td>
+                  <td style="--size: 0.2"><span class="data">b</span></td>
+                </tr>
+                <tr>
+                  <td style="--size: 0.7"><span class="data">a</span></td>
+                  <td style="--size: 0.1"><span class="data">b</span></td>
+                </tr>
+                <tr>
+                  <td style="--size: 0.6"><span class="data">a</span></td>
+                  <td style="--size: 0.3"><span class="data">b</span></td>
+                </tr>
+                <tr>
+                  <td style="--size: 0.8"><span class="data">a</span></td>
+                  <td style="--size: 0.15"><span class="data">b</span></td>
+                </tr>
+                <tr>
+                  <td style="--size: 0.55"><span class="data">a</span></td>
+                  <td style="--size: 0.25"><span class="data">b</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="row muted" style="margin-top: 1rem; font-size: 12px">
+            <span class="row" style="gap: 0.5rem"><span class="legend-dot" style="background: var(--chart-1)"></span>ใช้ไฟจากโซลาร์</span>
+            <span class="row" style="gap: 0.5rem"><span class="legend-dot" style="background: var(--chart-4)"></span>ซื้อจากการไฟฟ้า</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ICONOGRAPHY + VOICE -->
+      <section>
+        <p class="eyebrow">06 — Iconography &amp; Voice</p>
+        <h2 class="serif">ไอคอนและน้ำเสียง</h2>
+        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 1rem">
+          <div class="card">
+            <p class="eyebrow" style="margin-bottom: 0.75rem">Icons</p>
+            <p class="muted" style="font-size: 13px">
+              <b style="color: var(--foreground); font-weight: 500">Lucide</b> (<code class="mono">@lucide/svelte</code>) · ขนาด 14–20px ·
+              <code class="mono">stroke-width 1.25–1.5</code> เพื่อเส้นบางเข้ากับงานหรู · สีตาม context ผ่าน <code class="mono">text-chart-*</code>
+            </p>
+          </div>
+          <div class="card">
+            <p class="eyebrow" style="margin-bottom: 0.75rem">Voice</p>
+            <p class="muted" style="font-size: 13px">ภาษาไทยสุภาพ กระชับ เน้นความหมายต่อเจ้าของบ้าน (“ประหยัดวันนี้”, “ไม่ได้ซื้อไฟจากการไฟฟ้าเลย”) มากกว่าศัพท์เทคนิคดิบ ตัวเลขมาพร้อมบริบทเสมอ</p>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        Home Assistant Design System · Astro + Svelte 5 + Tailwind v4 + Charts.css · token ตรงกับ
+        <code class="mono">src/styles/global.css</code>
+      </footer>
+    </div>
+
+    <script>
+      // render color swatches from the live CSS variables so this page never drifts from the tokens
+      const surface = [
+        ['background', '--background'],
+        ['foreground', '--foreground'],
+        ['card', '--card'],
+        ['muted', '--muted'],
+        ['muted-foreground', '--muted-foreground'],
+        ['border', '--border'],
+      ]
+      const accent = [
+        ['accent', '--accent'],
+        ['destructive', '--destructive'],
+        ['chart-1 · sage', '--chart-1'],
+        ['chart-2 · brass', '--chart-2'],
+        ['chart-3 · blue', '--chart-3'],
+        ['chart-4 · terracotta', '--chart-4'],
+        ['chart-5 · slate', '--chart-5'],
+      ]
+      const render = (id, list) => {
+        document.getElementById(id).innerHTML = list
+          .map(([name, v]) => `<div class="swatch"><div class="chip" style="background:var(${v})"></div><b>${name}</b><code>${v}</code></div>`)
+          .join('')
+      }
+      render('sw-surface', surface)
+      render('sw-accent', accent)
+    </script>
+  </body>
+</html>
