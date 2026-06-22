@@ -1,0 +1,22 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import Nav from '@/components/Nav.astro'
+import Hero from '@/components/Hero.astro'
+import PaybackCard from '@/components/PaybackCard.astro'
+import EnergyFlow from '@/components/EnergyFlow.astro'
+import Tabs from '@/components/Tabs.astro'
+---
+
+<Layout title="ภาพรวมพลังงานในบ้าน">
+  <Nav />
+  <Hero />
+  <main class="mx-auto max-w-6xl space-y-8 px-6 py-10 md:px-10 md:py-12">
+    <PaybackCard />
+    <EnergyFlow />
+    <Tabs />
+
+    <p class="text-pretty pb-4 text-center text-xs leading-relaxed text-muted-foreground">
+      ค่าไฟคำนวณตามอัตราค่าไฟฟ้าบ้านอยู่อาศัย ประเภท 1.2 แบบขั้นบันไดของการไฟฟ้านครหลวง (MEA) รวมค่า Ft และภาษีมูลค่าเพิ่ม 7% · ตัวเลขเป็นการประมาณการเพื่อใช้อ้างอิงเท่านั้น
+    </p>
+  </main>
+</Layout>
