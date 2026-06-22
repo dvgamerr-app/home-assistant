@@ -1,0 +1,106 @@
+---
+import Sun from '@lucide/svelte/icons/sun'
+import Wallet from '@lucide/svelte/icons/wallet'
+import PiggyBank from '@lucide/svelte/icons/piggy-bank'
+import Leaf from '@lucide/svelte/icons/leaf'
+import StatCard from './StatCard.astro'
+import { MONTHS, LIFETIME } from '@/lib/solar-data'
+import { thb, num } from '@/lib/electricity'
+import { lineScale } from '@/lib/chart'
+
+const current = MONTHS[MONTHS.length - 1]
+const annualSaving = MONTHS.reduce((s, m) => s + m.saved, 0)
+
+const billMax = Math.max(...MONTHS.map((m) => m.billWithoutSolar), 1)
+
+const energyMax = Math.max(...MONTHS.flatMap((m) => [m.generated, m.selfUse]), 1)
+const gen = lineScale(
+  MONTHS.map((m) => m.generated),
+  energyMax,
+)
+const self = lineScale(
+  MONTHS.map((m) => m.selfUse),
+  energyMax,
+)
+---
+
+<div class="space-y-6">
+  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <StatCard label="ผลิตไฟเดือนนี้" value={`${num(current.generated, 0)} kWh`} sub={`ใช้เอง ${num(current.selfUse, 0)} kWh`} accent="brass">
+      <Sun slot="icon" size={18} strokeWidth={1.25} />
+    </StatCard>
+    <StatCard label="ค่าไฟเดือนนี้" value={thb(current.billWithSolar, 0)} sub={`ถ้าไม่มีโซลาร์ ${thb(current.billWithoutSolar, 0)}`} accent="terracotta">
+      <Wallet slot="icon" size={18} strokeWidth={1.25} />
+    </StatCard>
+    <StatCard label="ประหยัดเดือนนี้" value={thb(current.saved, 0)} sub={`รวมทั้งปี ~${thb(annualSaving, 0)}`} accent="sage" trend={`${num((current.saved / current.billWithoutSolar) * 100, 0)}%`}>
+      <PiggyBank slot="icon" size={18} strokeWidth={1.25} />
+    </StatCard>
+    <StatCard label="ลด CO₂ สะสม" value={`${num(LIFETIME.co2ReductionKg, 0)} kg`} sub="เทียบเท่าปลูกต้นไม้หลายสิบต้น" accent="blue">
+      <Leaf slot="icon" size={18} strokeWidth={1.25} />
+    </StatCard>
+  </div>
+
+  <section class="rounded-lg border border-border/70 bg-card p-6">
+    <div class="mb-6">
+      <h2 class="font-serif text-lg font-light text-foreground">ค่าไฟ: จ่ายจริง เทียบกับ ถ้าไม่มีโซลาร์</h2>
+      <p class="mt-1 text-sm text-muted-foreground">คำนวณตามอัตราขั้นบันไดของการไฟฟ้านครหลวง (MEA) รวม Ft และ VAT 7%</p>
+    </div>
+
+    <div class="chart-frame">
+      <table class="charts-css column multiple show-labels show-4-secondary-axes" style="--color-1:var(--chart-4);--color-2:var(--chart-1)">
+        <tbody>
+          {
+            MONTHS.map((m) => (
+              <tr>
+                <th scope="row">{m.month}</th>
+                <td style={`--size:${m.billWithoutSolar / billMax}`}>
+                  <span class="data">{m.billWithoutSolar}</span>
+                </td>
+                <td style={`--size:${m.billWithSolar / billMax}`}>
+                  <span class="data">{m.billWithSolar}</span>
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground">
+      <span class="flex items-center gap-2"><span class="legend-dot" style="background:var(--chart-4)"></span>ถ้าไม่มีโซลาร์</span>
+      <span class="flex items-center gap-2"><span class="legend-dot" style="background:var(--chart-1)"></span>จ่ายจริง</span>
+    </div>
+  </section>
+
+  <section class="rounded-lg border border-border/70 bg-card p-6">
+    <div class="mb-6">
+      <h2 class="font-serif text-lg font-light text-foreground">การผลิตไฟ 12 เดือน</h2>
+      <p class="mt-1 text-sm text-muted-foreground">หน่วยเป็น kWh ต่อเดือน</p>
+    </div>
+
+    <div class="chart-frame">
+      <table class="charts-css area multiple show-labels show-4-secondary-axes" style="--color-1:var(--chart-2);--color-2:var(--chart-1)">
+        <tbody>
+          {
+            MONTHS.map((m, i) => (
+              <tr>
+                <th scope="row">{m.month}</th>
+                <td style={`--start:${gen[i].start};--end:${gen[i].end}`}>
+                  <span class="data">{m.generated}</span>
+                </td>
+                <td style={`--start:${self[i].start};--end:${self[i].end}`}>
+                  <span class="data">{m.selfUse}</span>
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground">
+      <span class="flex items-center gap-2"><span class="legend-dot" style="background:var(--chart-2)"></span>ผลิตได้</span>
+      <span class="flex items-center gap-2"><span class="legend-dot" style="background:var(--chart-1)"></span>ใช้จากโซลาร์</span>
+    </div>
+  </section>
+</div>

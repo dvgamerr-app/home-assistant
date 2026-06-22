@@ -1,0 +1,62 @@
+---
+import BatteryCharging from '@lucide/svelte/icons/battery-charging'
+import BatteryFull from '@lucide/svelte/icons/battery-full'
+import Clock from '@lucide/svelte/icons/clock'
+import Heart from '@lucide/svelte/icons/heart'
+import RefreshCw from '@lucide/svelte/icons/refresh-cw'
+import { BATTERY } from '@/lib/solar-data'
+import { num } from '@/lib/electricity'
+
+const b = BATTERY
+const STATUS = {
+  charging: 'กำลังชาร์จ',
+  discharging: 'กำลังจ่ายไฟ',
+  idle: 'พร้อมใช้งาน',
+} as const
+const statusLabel = STATUS[b.status as keyof typeof STATUS]
+
+const metrics = [
+  { Icon: Clock, label: 'สำรองได้อีก', value: num(b.backupHours, 1), unit: 'ชม.', hint: 'ถ้าไฟดับ' },
+  { Icon: Heart, label: 'สุขภาพแบต', value: `${b.soh}`, unit: '%', hint: 'SOH' },
+  { Icon: RefreshCw, label: 'รอบชาร์จ', value: `${b.cyclePeriod}`, unit: '', hint: 'cycles' },
+]
+---
+
+<section class="rounded-lg border border-border/70 bg-card p-6">
+  <div class="mb-6 flex items-center justify-between">
+    <div class="flex items-center gap-2 text-muted-foreground">
+      {b.status === 'charging' ? <BatteryCharging size={18} strokeWidth={1.25} /> : <BatteryFull size={18} strokeWidth={1.25} />}
+      <h2 class="font-serif text-lg font-light text-foreground">แบตเตอรี่ &amp; ไฟสำรอง</h2>
+    </div>
+    <span class="rounded-full border border-border/70 px-3 py-1 text-[10px] uppercase tracking-luxury text-muted-foreground">{statusLabel}</span>
+  </div>
+
+  <div class="mb-2 flex items-end justify-between">
+    <span class="text-[10px] uppercase tracking-luxury text-muted-foreground">ระดับพลังงานคงเหลือ</span>
+    <span class="font-serif text-3xl font-light text-foreground">{b.soc}<span class="text-lg text-muted-foreground">%</span></span>
+  </div>
+  <div class="h-px w-full bg-border">
+    <div class="h-px bg-accent" style={`width:${b.soc}%`}></div>
+  </div>
+  <p class="mt-3 text-sm text-muted-foreground">
+    เก็บไฟไว้ {num(b.storedKwh, 1)} kWh{b.status === 'charging' ? ' · กำลังเติมเข้าแบตเตอรี่' : ''}
+  </p>
+
+  <div class="mt-6 grid grid-cols-3 gap-3">
+    {
+      metrics.map(({ Icon, label, value, unit, hint }) => (
+        <div class="rounded-md border border-border/60 p-3">
+          <div class="mb-2 flex items-center gap-1.5 text-muted-foreground">
+            <Icon size={14} strokeWidth={1.25} />
+            <span class="text-[10px] uppercase tracking-wider">{label}</span>
+          </div>
+          <p class="font-mono text-lg font-medium leading-none text-foreground">
+            {value}
+            {unit && <span class="ml-1 text-sm font-normal">{unit}</span>}
+          </p>
+          <p class="mt-1.5 text-[11px] text-muted-foreground">{hint}</p>
+        </div>
+      ))
+    }
+  </div>
+</section>

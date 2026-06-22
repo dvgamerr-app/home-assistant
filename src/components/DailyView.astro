@@ -1,0 +1,59 @@
+---
+import Sun from '@lucide/svelte/icons/sun'
+import Plug from '@lucide/svelte/icons/plug'
+import PiggyBank from '@lucide/svelte/icons/piggy-bank'
+import Gauge from '@lucide/svelte/icons/gauge'
+import StatCard from './StatCard.astro'
+import { TODAY, DAY, MONTH_DAYS, CURRENT_MONTH_LABEL } from '@/lib/solar-data'
+import { thb, num } from '@/lib/electricity'
+
+const maxTotal = Math.max(...MONTH_DAYS.map((d) => d.selfUse + d.gridImport), 1)
+---
+
+<div class="space-y-6">
+  <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <StatCard label="ผลิตไฟวันนี้" value={`${num(TODAY.generated, 1)} kWh`} sub={`ผลิตมาแล้ว ${num(TODAY.generationHours, 1)} ชม.`} accent="brass">
+      <Sun slot="icon" size={18} strokeWidth={1.25} />
+    </StatCard>
+    <StatCard label="ใช้ไฟวันนี้" value={`${num(TODAY.consumed, 1)} kWh`} sub={`ใช้จากแสงอาทิตย์ ${num(DAY.selfUse, 1)} kWh`} accent="blue">
+      <Plug slot="icon" size={18} strokeWidth={1.25} />
+    </StatCard>
+    <StatCard label="ประหยัดวันนี้" value={thb(DAY.savedTHB, 0)} sub={`ถ้าไม่มีโซลาร์จ่าย ${thb(DAY.wouldHaveCostTHB, 0)}`} accent="sage" trend={`${num(DAY.selfSufficiency, 0)}% พึ่งตัวเอง`}>
+      <PiggyBank slot="icon" size={18} strokeWidth={1.25} />
+    </StatCard>
+    <StatCard label="ค่าไฟที่ต้องจ่ายวันนี้" value={thb(DAY.gridCostTHB, 0)} sub={`ซื้อจากการไฟฟ้า ${num(TODAY.gridImport, 1)} kWh`} accent="terracotta">
+      <Gauge slot="icon" size={18} strokeWidth={1.25} />
+    </StatCard>
+  </div>
+
+  <section class="rounded-lg border border-border/70 bg-card p-6">
+    <div class="mb-6">
+      <h2 class="font-serif text-lg font-light text-foreground">ไฟที่ใช้แต่ละวัน — จากโซลาร์ เทียบกับ ซื้อ</h2>
+      <p class="mt-1 text-sm text-muted-foreground">เดือน{CURRENT_MONTH_LABEL} · หน่วยเป็น kWh ต่อวัน</p>
+    </div>
+
+    <div class="chart-frame">
+      <table class="charts-css column multiple stacked show-4-secondary-axes" style="--color-1:var(--chart-1);--color-2:var(--chart-4)">
+        <tbody>
+          {
+            MONTH_DAYS.map((d) => (
+              <tr>
+                <td style={`--size:${d.selfUse / maxTotal}`}>
+                  <span class="data">{d.selfUse}</span>
+                </td>
+                <td style={`--size:${d.gridImport / maxTotal}`}>
+                  <span class="data">{d.gridImport}</span>
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground">
+      <span class="flex items-center gap-2"><span class="legend-dot" style="background:var(--chart-1)"></span>ใช้ไฟจากโซลาร์</span>
+      <span class="flex items-center gap-2"><span class="legend-dot" style="background:var(--chart-4)"></span>ซื้อจากการไฟฟ้า</span>
+    </div>
+  </section>
+</div>

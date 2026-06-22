@@ -1,0 +1,46 @@
+---
+import { HOURLY } from '@/lib/solar-data'
+import { lineScale } from '@/lib/chart'
+
+const max = Math.max(...HOURLY.flatMap((h) => [h.pv, h.load]), 1)
+const pv = lineScale(
+  HOURLY.map((h) => h.pv),
+  max,
+)
+const load = lineScale(
+  HOURLY.map((h) => h.load),
+  max,
+)
+---
+
+<section class="rounded-lg border border-border/70 bg-card p-6">
+  <div class="mb-6">
+    <h2 class="font-serif text-lg font-light text-foreground">กราฟกำลังผลิตรายชั่วโมง</h2>
+    <p class="mt-1 text-sm leading-relaxed text-muted-foreground">เทียบกำลังที่แผงผลิตได้กับการใช้ไฟในบ้านตลอด 24 ชั่วโมง — ช่วงที่เส้นทองสูงกว่าเส้นแดงคือช่วงที่ไฟเหลือไปชาร์จแบต</p>
+  </div>
+
+  <div class="chart-frame">
+    <table class="charts-css area multiple show-4-secondary-axes" style="--color-1:var(--chart-2);--color-2:var(--chart-4)">
+      <tbody>
+        {
+          HOURLY.map((h, i) => (
+            <tr>
+              <td style={`--start:${pv[i].start};--end:${pv[i].end}`}>
+                <span class="data">{h.pv}</span>
+              </td>
+              <td style={`--start:${load[i].start};--end:${load[i].end}`}>
+                <span class="data">{h.load}</span>
+              </td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground">
+    <span class="flex items-center gap-2"><span class="legend-dot" style="background:var(--chart-2)"></span>ผลิตจากแผง (kW)</span>
+    <span class="flex items-center gap-2"><span class="legend-dot" style="background:var(--chart-4)"></span>ใช้ในบ้าน (kW)</span>
+    <span class="ml-auto">00:00 → 23:00</span>
+  </div>
+</section>

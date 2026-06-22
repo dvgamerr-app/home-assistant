@@ -1,0 +1,44 @@
+---
+import DailyView from './DailyView.astro'
+import MonthlyView from './MonthlyView.astro'
+// ponytail: CSS-only radio tabs — no JS island needed since both panels are static SSR content.
+---
+
+<div class="tabs">
+  <input type="radio" name="view" id="tab-daily" class="sr-only" checked />
+  <input type="radio" name="view" id="tab-monthly" class="sr-only" />
+
+  <div class="mb-6 flex gap-6 border-b border-border/60">
+    <label for="tab-daily" class="lbl">รายวัน</label>
+    <label for="tab-monthly" class="lbl">รายเดือน</label>
+  </div>
+
+  <div class="panel panel-daily"><DailyView /></div>
+  <div class="panel panel-monthly"><MonthlyView /></div>
+</div>
+
+<style>
+  .lbl {
+    cursor: pointer;
+    padding-bottom: 0.75rem;
+    margin-bottom: -1px;
+    border-bottom: 1px solid transparent;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-luxury);
+    color: var(--muted-foreground);
+    transition: color 0.2s;
+  }
+  .panel {
+    display: none;
+  }
+  #tab-daily:checked ~ * .lbl[for='tab-daily'],
+  #tab-monthly:checked ~ * .lbl[for='tab-monthly'] {
+    color: var(--foreground);
+    border-bottom-color: var(--accent);
+  }
+  #tab-daily:checked ~ .panel-daily,
+  #tab-monthly:checked ~ .panel-monthly {
+    display: block;
+  }
+</style>

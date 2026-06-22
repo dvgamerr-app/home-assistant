@@ -1,0 +1,38 @@
+---
+import Sun from '@lucide/svelte/icons/sun'
+import ThemeToggle from './ThemeToggle.svelte'
+import { SYSTEM } from '@/lib/solar-data'
+
+const firstName = SYSTEM.name.replace(/\s*\d.*$/, '').trim()
+const path = Astro.url.pathname
+const NAV = [
+  { href: '/', label: 'ภาพรวม' },
+  { href: '/analytics', label: 'วิเคราะห์เชิงลึก' },
+]
+---
+
+<header class="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur">
+  <div class="flex items-center justify-between px-6 py-4 md:px-10">
+    <a href="/" class="flex items-center gap-3">
+      <span class="flex size-9 items-center justify-center rounded-full bg-foreground text-background">
+        <Sun size={16} strokeWidth={1.5} />
+      </span>
+      <span class="font-serif text-base font-light tracking-wide">บ้านของ{firstName}</span>
+    </a>
+
+    <nav class="flex items-center gap-5 md:gap-8" aria-label="เมนูหลัก">
+      {
+        NAV.map((item) => (
+          <a
+            href={item.href}
+            aria-current={path === item.href ? 'page' : undefined}
+            class:list={['text-[11px] uppercase tracking-luxury transition-colors', path === item.href ? 'text-foreground' : 'text-muted-foreground hover:text-foreground']}
+          >
+            {item.label}
+          </a>
+        ))
+      }
+      <ThemeToggle client:load />
+    </nav>
+  </div>
+</header>

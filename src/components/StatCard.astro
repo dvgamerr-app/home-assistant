@@ -1,0 +1,32 @@
+---
+interface Props {
+  label: string
+  value: string
+  sub?: string
+  accent?: 'sage' | 'brass' | 'blue' | 'terracotta'
+  trend?: string
+}
+
+const { label, value, sub, accent = 'sage', trend } = Astro.props
+
+const tone: Record<NonNullable<Props['accent']>, string> = {
+  sage: 'text-chart-1',
+  brass: 'text-chart-2',
+  blue: 'text-chart-3',
+  terracotta: 'text-chart-4',
+}
+---
+
+<div class="flex flex-col gap-5 rounded-lg border border-border/70 bg-card p-5">
+  <div class="flex items-center justify-between">
+    <span class={tone[accent]}>
+      <slot name="icon" />
+    </span>
+    {trend && <span class="rounded-full border border-border/70 px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">{trend}</span>}
+  </div>
+  <div class="space-y-1.5">
+    <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">{label}</p>
+    <p class="font-serif text-3xl font-light leading-none text-foreground">{value}</p>
+    {sub && <p class="text-xs leading-relaxed text-muted-foreground">{sub}</p>}
+  </div>
+</div>

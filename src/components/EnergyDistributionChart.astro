@@ -1,0 +1,47 @@
+---
+import { ENERGY_DISTRIBUTION } from '@/lib/solar-data'
+import { pieScale } from '@/lib/chart'
+import { num } from '@/lib/electricity'
+
+const slices = pieScale(ENERGY_DISTRIBUTION.map((d) => d.value))
+const total = ENERGY_DISTRIBUTION.reduce((s, d) => s + d.value, 0)
+const colors = ['var(--chart-2)', 'var(--chart-1)', 'var(--chart-3)']
+---
+
+<section class="rounded-lg border border-border/70 bg-card p-6">
+  <div class="mb-6 flex items-baseline justify-between gap-4">
+    <div>
+      <h2 class="font-serif text-lg font-light text-foreground">ไฟที่ผลิตได้ถูกใช้ไปที่ไหนบ้าง</h2>
+      <p class="mt-1 text-sm leading-relaxed text-muted-foreground">สัดส่วนพลังงานสะสมตั้งแต่ติดตั้ง แบ่งตามปลายทางการใช้งาน</p>
+    </div>
+    <p class="shrink-0 font-serif text-2xl font-light text-foreground">{num(total, 0)}<span class="text-sm text-muted-foreground"> kWh</span></p>
+  </div>
+
+  <div class="mx-auto aspect-square w-full max-w-[240px]">
+    <table class="charts-css pie" style="--color-1:var(--chart-2);--color-2:var(--chart-1);--color-3:var(--chart-3);height:100%;width:100%">
+      <tbody>
+        {
+          ENERGY_DISTRIBUTION.map((d, i) => (
+            <tr>
+              <td style={`--start:${slices[i].start};--size:${slices[i].size}`}>
+                <span class="data">{d.name}</span>
+              </td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="mt-6 space-y-2">
+    {
+      ENERGY_DISTRIBUTION.map((d, i) => (
+        <div class="flex items-center gap-2 text-sm">
+          <span class="legend-dot" style={`background:${colors[i]}`} />
+          <span class="text-muted-foreground">{d.name}</span>
+          <span class="ml-auto font-medium text-foreground">{Math.round((d.value / total) * 100)}%</span>
+        </div>
+      ))
+    }
+  </div>
+</section>

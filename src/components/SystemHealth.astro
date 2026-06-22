@@ -1,0 +1,37 @@
+---
+import Activity from '@lucide/svelte/icons/activity'
+import Gauge from '@lucide/svelte/icons/gauge'
+import Plug from '@lucide/svelte/icons/plug'
+import Timer from '@lucide/svelte/icons/timer'
+import { SYSTEM_HEALTH } from '@/lib/solar-data'
+import { num } from '@/lib/electricity'
+
+const h = SYSTEM_HEALTH
+const items = [
+  { Icon: Gauge, label: 'กำลังทำงาน', value: `${num(h.loadFactorPct, 0)}%`, hint: `จาก ${num(h.ratedPowerKw, 0)} kW`, ok: true },
+  { Icon: Plug, label: 'แรงดันไฟ', value: `${num(h.gridVoltage, 0)} V`, hint: h.gridVoltageOk ? 'ปกติ' : 'ผิดปกติ', ok: h.gridVoltageOk },
+  { Icon: Activity, label: 'ความถี่', value: `${num(h.gridFrequency, 2)} Hz`, hint: h.gridFrequencyOk ? 'ปกติ' : 'ผิดปกติ', ok: h.gridFrequencyOk },
+  { Icon: Timer, label: 'ชั่วโมงทำงานรวม', value: `${num(h.totalGenerationHours, 0)}`, hint: 'ชั่วโมง', ok: true },
+]
+---
+
+<section class="rounded-lg border border-border/70 bg-card p-6">
+  <div class="mb-6 flex items-center gap-2 text-muted-foreground">
+    <Activity size={18} strokeWidth={1.25} />
+    <h2 class="font-serif text-lg font-light text-foreground">สุขภาพระบบ / อินเวอร์เตอร์</h2>
+  </div>
+  <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+    {
+      items.map(({ Icon, label, value, hint, ok }) => (
+        <div class="rounded-md border border-border/60 p-3">
+          <div class="mb-2 flex items-center gap-1.5 text-muted-foreground">
+            <Icon size={14} strokeWidth={1.25} />
+            <span class="text-[10px] uppercase tracking-wider">{label}</span>
+          </div>
+          <p class="font-mono text-lg font-medium leading-none text-foreground">{value}</p>
+          <p class:list={['mt-1.5 text-[11px]', ok ? 'text-chart-1' : 'text-destructive']}>{hint}</p>
+        </div>
+      ))
+    }
+  </div>
+</section>
