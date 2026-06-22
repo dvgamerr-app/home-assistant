@@ -1,0 +1,23 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import LoginForm from '@/components/LoginForm.svelte'
+import { auth } from '@/lib/auth'
+
+const session = await auth.api.getSession({ headers: Astro.request.headers })
+if (session) return Astro.redirect('/')
+---
+
+<Layout title="เข้าสู่ระบบ — บ้าน">
+  <main class="flex min-h-screen items-center justify-center px-6">
+    <div class="w-full max-w-sm space-y-8">
+      <div class="space-y-2 text-center">
+        <h1 class="font-serif text-3xl font-light text-foreground">ยินดีต้อนรับ</h1>
+        <p class="text-sm text-muted-foreground">เข้าสู่ระบบเพื่อดูข้อมูลพลังงานในบ้าน</p>
+      </div>
+
+      <div class="rounded-xl border border-border/70 bg-card p-8">
+        <LoginForm client:load githubEnabled={!!process.env.GITHUB_CLIENT_ID} />
+      </div>
+    </div>
+  </main>
+</Layout>

@@ -1,0 +1,21 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import { auth } from '@/lib/auth'
+
+const session = await auth.api.getSession({ headers: Astro.request.headers })
+const email = session?.user?.email ?? ''
+---
+
+<Layout title="ไม่มีสิทธิ์เข้าถึง — บ้าน">
+  <main class="flex min-h-screen items-center justify-center px-6">
+    <div class="w-full max-w-sm space-y-6 text-center">
+      <h1 class="font-serif text-3xl font-light text-foreground">ไม่มีสิทธิ์เข้าถึง</h1>
+      <p class="text-sm leading-relaxed text-muted-foreground">
+        บัญชี <span class="text-foreground">{email}</span> ไม่ได้รับอนุญาตให้เข้าถึงระบบนี้
+      </p>
+      <form method="POST" action="/api/auth/sign-out">
+        <button type={'submit' as const} class="rounded-md border border-border/70 px-6 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"> ออกจากระบบ </button>
+      </form>
+    </div>
+  </main>
+</Layout>
