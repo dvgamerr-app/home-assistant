@@ -1,0 +1,162 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import Nav from '@/components/Nav.astro'
+import BatteryCard from '@/components/BatteryCard.astro'
+import SystemHealth from '@/components/SystemHealth.astro'
+import PanelStrings from '@/components/PanelStrings.astro'
+import EnergyDistributionChart from '@/components/EnergyDistributionChart.astro'
+import ProductionCurve from '@/components/ProductionCurve.astro'
+import BatterySocChart from '@/components/BatterySocChart.astro'
+import SelfSufficiencyChart from '@/components/SelfSufficiencyChart.astro'
+import DailyView from '@/components/DailyView.astro'
+import StatCard from '@/components/StatCard.astro'
+import Plug from '@lucide/svelte/icons/plug'
+import PiggyBank from '@lucide/svelte/icons/piggy-bank'
+import Gauge from '@lucide/svelte/icons/gauge'
+import Receipt from '@lucide/svelte/icons/receipt'
+import { getAll } from '@/lib/solar-data'
+import { getBills } from '@/lib/db'
+import { thb, num, calculateMonthlyBill } from '@/lib/electricity'
+
+const data = await getAll()
+const bills = await getBills(12)
+
+// Tab 3 — จับคู่บิลกับข้อมูลรายเดือน เพื่อเทียบ "ถ้าไม่มีโซลาร์"
+const MONTH_SHORT_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+const billRows = bills.map((b) => {
+  const monthLabel = MONTH_SHORT_TH[parseInt(b.month.slice(4)) - 1] ?? b.month
+  const estimated = data.months.find((m) => {
+    // months ใช้ format 'ม.ค.' ส่วน bill ใช้ YYYYMM → เทียบ index เดือน
+    const billMonthIdx = parseInt(b.month.slice(4)) - 1
+    return m.month === MONTH_SHORT_TH[billMonthIdx]
+  })
+  const withoutSolar = estimated?.billWithoutSolar ?? calculateMonthlyBill(b.kwh).total
+  const saved = Math.max(0, withoutSolar - b.paid)
+  return { month: monthLabel, kwh: b.kwh, paid: b.paid, withoutSolar, saved }
+})
+const totalSaved = billRows.reduce((s: number, r: (typeof billRows)[0]) => s + r.saved, 0)
+const latestBill = billRows[0]
+---
+
+<Layout title="ระบบไฟฟ้า — บ้าน">
+  <Nav />
+  <main class="mx-auto max-w-6xl space-y-8 px-6 py-10 md:px-10 md:py-12">
+    <header class="space-y-3">
+      <p class="text-[11px] uppercase tracking-luxury text-muted-foreground">ระบบไฟฟ้า</p>
+      <h1 class="font-serif text-4xl font-light leading-tight text-foreground md:text-5xl">ข้อมูลพลังงาน</h1>
+    </header>
+
+    <div class="tabs">
+      <input type={'radio' as const} name="elec-view" id="tab-load" class="sr-only" checked />
+      <input type={'radio' as const} name="elec-view" id="tab-solar" class="sr-only" />
+      <input type={'radio' as const} name="elec-view" id="tab-bill" class="sr-only" />
+
+      <div class="mb-8 flex gap-6 border-b border-border/60">
+        <label for="tab-load" class="lbl">การใช้ไฟในบ้าน</label>
+        <label for="tab-solar" class="lbl">ผลิตไฟ</label>
+        <label for="tab-bill" class="lbl">การจ่ายค่าไฟ</label>
+      </div>
+
+      <!-- Tab 1: การใช้ไฟในบ้าน -->
+      <div class="panel panel-load">
+        <DailyView today={data.today} day={data.day} monthDays={data.monthDays} monthLabel={data.monthLabel} />
+      </div>
+
+      <!-- Tab 2: ผลิตไฟ -->
+      <div class="panel panel-solar space-y-6">
+        <div class="grid gap-6 lg:grid-cols-2">
+          <BatteryCard battery={data.battery} />
+          <SystemHealth systemHealth={data.systemHealth} />
+          <PanelStrings pvStrings={data.pvStrings} system={data.system} />
+          <EnergyDistributionChart energyDistribution={data.energyDistribution} />
+        </div>
+        <ProductionCurve hourly={data.hourly} />
+        <div class="grid gap-6 lg:grid-cols-2">
+          <BatterySocChart hourlySoc={data.hourlySoc} />
+          <SelfSufficiencyChart months={data.months} />
+        </div>
+      </div>
+
+      <!-- Tab 3: การจ่ายค่าไฟ -->
+      <div class="panel panel-bill space-y-6">
+        <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard label="จ่ายค่าไฟเดือนล่าสุด" value={thb(latestBill?.paid ?? 0, 0)} sub={`ใช้ไฟ ${num(latestBill?.kwh ?? 0, 0)} หน่วย`} accent="terracotta">
+            <Receipt slot="icon" size={18} strokeWidth={1.25} />
+          </StatCard>
+          <StatCard label="ถ้าไม่มีโซลาร์" value={thb(latestBill?.withoutSolar ?? 0, 0)} sub="ประมาณการตามอัตรา MEA" accent="blue">
+            <Plug slot="icon" size={18} strokeWidth={1.25} />
+          </StatCard>
+          <StatCard label="ประหยัดเดือนล่าสุด" value={thb(latestBill?.saved ?? 0, 0)} sub="" accent="sage">
+            <PiggyBank slot="icon" size={18} strokeWidth={1.25} />
+          </StatCard>
+          <StatCard label="ประหยัดสะสม (MEA)" value={thb(totalSaved, 0)} sub={`ใน ${billRows.length} เดือน`} accent="brass">
+            <Gauge slot="icon" size={18} strokeWidth={1.25} />
+          </StatCard>
+        </div>
+
+        <section class="rounded-lg border border-border/70 bg-card">
+          <div class="border-b border-border/60 px-6 py-4">
+            <h2 class="font-serif text-lg font-light text-foreground">บิลค่าไฟ (MEA) รายเดือน</h2>
+            <p class="mt-1 text-sm text-muted-foreground">ข้อมูลจริงจากการไฟฟ้านครหลวง · เทียบกับประมาณการถ้าไม่มีโซลาร์</p>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="border-b border-border/40 text-left text-[10px] uppercase tracking-luxury text-muted-foreground">
+                  <th class="px-6 py-3">เดือน</th>
+                  <th class="px-4 py-3 text-right">หน่วย (kWh)</th>
+                  <th class="px-4 py-3 text-right">จ่ายจริง</th>
+                  <th class="px-4 py-3 text-right">ถ้าไม่มีโซลาร์</th>
+                  <th class="px-6 py-3 text-right">ประหยัด</th>
+                </tr>
+              </thead>
+              <tbody>
+                {
+                  billRows.map((r) => (
+                    <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
+                      <td class="px-6 py-3 text-muted-foreground">{r.month}</td>
+                      <td class="px-4 py-3 text-right tabular-nums">{num(r.kwh, 0)}</td>
+                      <td class="px-4 py-3 text-right tabular-nums text-foreground">{thb(r.paid, 0)}</td>
+                      <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(r.withoutSolar, 0)}</td>
+                      <td class="px-6 py-3 text-right tabular-nums text-chart-1">{thb(r.saved, 0)}</td>
+                    </tr>
+                  ))
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <p class="text-pretty pb-4 text-center text-xs leading-relaxed text-muted-foreground">ค่าไฟประมาณการคำนวณตามอัตราค่าไฟฟ้าบ้านอยู่อาศัย ประเภท 1.2 แบบขั้นบันไดของ MEA รวมค่า Ft และ VAT 7%</p>
+  </main>
+</Layout>
+
+<style>
+  .lbl {
+    cursor: pointer;
+    padding-bottom: 0.75rem;
+    margin-bottom: -1px;
+    border-bottom: 1px solid transparent;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-luxury);
+    color: var(--muted-foreground);
+    transition: color 0.2s;
+  }
+  .panel {
+    display: none;
+  }
+  #tab-load:checked ~ * .lbl[for='tab-load'],
+  #tab-solar:checked ~ * .lbl[for='tab-solar'],
+  #tab-bill:checked ~ * .lbl[for='tab-bill'] {
+    color: var(--foreground);
+    border-bottom-color: var(--accent);
+  }
+  #tab-load:checked ~ .panel-load,
+  #tab-solar:checked ~ .panel-solar,
+  #tab-bill:checked ~ .panel-bill {
+    display: block;
+  }
+</style>
