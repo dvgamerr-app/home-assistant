@@ -1,14 +1,15 @@
 ---
-import Sun from '@lucide/svelte/icons/sun'
-import BatteryCharging from '@lucide/svelte/icons/battery-charging'
-import Zap from '@lucide/svelte/icons/zap'
 import LiveClock from './LiveClock.svelte'
-import { LIVE, SYSTEM } from '@/lib/solar-data'
+import LiveStats from './LiveStats.svelte'
 import { num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
 
-const firstName = SYSTEM.name.replace(/\s*\d.*$/, '').trim()
-const charging = LIVE.batteryPowerKw < 0
-const buyingNothing = LIVE.gridPowerKw < 0.05
+const { live, system } = Astro.props as Pick<SolarData, 'live' | 'system'>
+const firstName = system.name.replace(/\s*\d.*$/, '').trim()
+const charging = live.batteryPowerKw < 0
+const buyingNothing = live.gridPowerKw < 0.05
+const socketPort = import.meta.env.SOCKET_PORT ?? '3000'
+const socketUrl = `${Astro.url.protocol}//${Astro.url.hostname}:${socketPort}`
 ---
 
 <section class="border-b border-border/60 px-6 py-12 md:px-10 md:py-16">
@@ -22,38 +23,12 @@ const buyingNothing = LIVE.gridPowerKw < 0.05
         <span class="italic text-foreground/90">{firstName}</span>
       </h1>
       <p class="max-w-md text-pretty text-sm leading-relaxed text-muted-foreground">
-        บ้านกำลังทำงานเป็นปกติ แผงโซลาร์ผลิตไฟอยู่ {num(LIVE.pvPowerKw, 2)} กิโลวัตต์{charging ? ' และพลังงานส่วนเกินกำลังชาร์จเข้าแบตเตอรี่' : ''}{
+        บ้านกำลังทำงานเป็นปกติ แผงโซลาร์ผลิตไฟอยู่ {num(live.pvPowerKw, 2)} กิโลวัตต์{charging ? ' และพลังงานส่วนเกินกำลังชาร์จเข้าแบตเตอรี่' : ''}{
           buyingNothing ? ' — ขณะนี้ไม่ได้ซื้อไฟจากการไฟฟ้าเลย' : ''
         }
       </p>
     </div>
 
-    <dl class="grid grid-cols-3 gap-6 md:gap-10">
-      <div class="flex flex-col gap-2">
-        <div class="flex items-center gap-2 text-muted-foreground">
-          <Sun size={16} strokeWidth={1.25} />
-          <dt class="text-[10px] uppercase tracking-luxury">ผลิตตอนนี้</dt>
-        </div>
-        <dd class="font-serif text-3xl font-light text-foreground md:text-4xl">
-          {num(LIVE.pvPowerKw, 1)}<span class="align-top text-base text-muted-foreground"> kW</span>
-        </dd>
-      </div>
-      <div class="flex flex-col gap-2">
-        <div class="flex items-center gap-2 text-muted-foreground">
-          <BatteryCharging size={16} strokeWidth={1.25} />
-          <dt class="text-[10px] uppercase tracking-luxury">แบตเตอรี่</dt>
-        </div>
-        <dd class="font-serif text-3xl font-light text-foreground md:text-4xl">{LIVE.batterySoc}<span class="align-top text-base text-muted-foreground">%</span></dd>
-      </div>
-      <div class="flex flex-col gap-2">
-        <div class="flex items-center gap-2 text-muted-foreground">
-          <Zap size={16} strokeWidth={1.25} />
-          <dt class="text-[10px] uppercase tracking-luxury">ซื้อไฟ</dt>
-        </div>
-        <dd class="font-serif text-3xl font-light text-foreground md:text-4xl">
-          {num(LIVE.gridPowerKw, 1)}<span class="align-top text-base text-muted-foreground"> kW</span>
-        </dd>
-      </div>
-    </dl>
+    <LiveStats client:load socketUrl={socketUrl} pvPowerKw={live.pvPowerKw} batterySoc={live.batterySoc} gridPowerKw={live.gridPowerKw} />
   </div>
 </section>

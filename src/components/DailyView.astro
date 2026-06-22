@@ -4,9 +4,15 @@ import Plug from '@lucide/svelte/icons/plug'
 import PiggyBank from '@lucide/svelte/icons/piggy-bank'
 import Gauge from '@lucide/svelte/icons/gauge'
 import StatCard from './StatCard.astro'
-import { TODAY, DAY, MONTH_DAYS, CURRENT_MONTH_LABEL } from '@/lib/solar-data'
 import { thb, num } from '@/lib/electricity'
 
+interface Props {
+  today: { generated: number; consumed: number; gridImport: number; generationHours: number }
+  day: { selfUse: number; savedTHB: number; gridCostTHB: number; wouldHaveCostTHB: number; selfSufficiency: number }
+  monthDays: Array<{ day: string; selfUse: number; gridImport: number; generated: number; consumed: number; saved: number }>
+  monthLabel: string
+}
+const { today: TODAY, day: DAY, monthDays: MONTH_DAYS, monthLabel: CURRENT_MONTH_LABEL } = Astro.props
 const maxTotal = Math.max(...MONTH_DAYS.map((d) => d.selfUse + d.gridImport), 1)
 ---
 

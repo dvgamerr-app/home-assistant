@@ -4,10 +4,10 @@ import BatteryFull from '@lucide/svelte/icons/battery-full'
 import Clock from '@lucide/svelte/icons/clock'
 import Heart from '@lucide/svelte/icons/heart'
 import RefreshCw from '@lucide/svelte/icons/refresh-cw'
-import { BATTERY } from '@/lib/solar-data'
 import { num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
 
-const b = BATTERY
+const { battery: b } = Astro.props as Pick<SolarData, 'battery'>
 const STATUS = {
   charging: 'กำลังชาร์จ',
   discharging: 'กำลังจ่ายไฟ',

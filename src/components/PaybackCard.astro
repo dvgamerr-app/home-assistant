@@ -2,16 +2,17 @@
 import TrendingUp from '@lucide/svelte/icons/trending-up'
 import CalendarClock from '@lucide/svelte/icons/calendar-clock'
 import Coins from '@lucide/svelte/icons/coins'
-import { SYSTEM, PAYBACK } from '@/lib/solar-data'
 import { thb, num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
 
-const years = Math.floor(PAYBACK.yearsToPayback)
-const months = Math.round((PAYBACK.yearsToPayback - years) * 12)
-const pct = Math.min(100, PAYBACK.progressPct)
+const { system, payback } = Astro.props as Pick<SolarData, 'system' | 'payback'>
+const years = Math.floor(payback.yearsToPayback)
+const months = Math.round((payback.yearsToPayback - years) * 12)
+const pct = Math.min(100, payback.progressPct)
 
 const metrics = [
-  { Icon: Coins, label: 'ประหยัดเฉลี่ย/เดือน', value: thb(PAYBACK.monthlyAvgSaving, 0), tone: 'text-chart-2' },
-  { Icon: TrendingUp, label: 'ประหยัดต่อปี', value: thb(PAYBACK.annualSaving, 0), tone: 'text-chart-1' },
+  { Icon: Coins, label: 'ประหยัดเฉลี่ย/เดือน', value: thb(payback.monthlyAvgSaving, 0), tone: 'text-chart-2' },
+  { Icon: TrendingUp, label: 'ประหยัดต่อปี', value: thb(payback.annualSaving, 0), tone: 'text-chart-1' },
   { Icon: CalendarClock, label: 'คืนทุนครบในอีก', value: `${years} ปี ${months} เดือน`, tone: 'text-chart-3' },
 ]
 ---
@@ -22,9 +23,9 @@ const metrics = [
       <TrendingUp size={16} strokeWidth={1.25} />
       <h2 class="text-[10px] uppercase tracking-luxury">ความคืบหน้าการคืนทุน</h2>
     </div>
-    <p class="mt-4 font-serif text-5xl font-light text-foreground md:text-6xl">{num(PAYBACK.progressPct, 1)}<span class="text-2xl text-muted-foreground">%</span></p>
+    <p class="mt-4 font-serif text-5xl font-light text-foreground md:text-6xl">{num(payback.progressPct, 1)}<span class="text-2xl text-muted-foreground">%</span></p>
     <p class="mt-2 text-sm text-muted-foreground">
-      คืนทุนแล้ว {thb(PAYBACK.totalSavedToDate, 0)} จากเงินลงทุน {thb(SYSTEM.investmentTHB, 0)}
+      คืนทุนแล้ว {thb(payback.totalSavedToDate, 0)} จากเงินลงทุน {thb(system.investmentTHB, 0)}
     </p>
     <div class="mt-6 h-px w-full bg-border">
       <div class="h-px bg-accent" style={`width:${pct}%`}></div>

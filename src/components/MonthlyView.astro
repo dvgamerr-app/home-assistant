@@ -4,24 +4,40 @@ import Wallet from '@lucide/svelte/icons/wallet'
 import PiggyBank from '@lucide/svelte/icons/piggy-bank'
 import Leaf from '@lucide/svelte/icons/leaf'
 import StatCard from './StatCard.astro'
-import { MONTHS, LIFETIME } from '@/lib/solar-data'
 import { thb, num } from '@/lib/electricity'
 import { lineScale } from '@/lib/chart'
 
-const current = MONTHS[MONTHS.length - 1]
-const annualSaving = MONTHS.reduce((s, m) => s + m.saved, 0)
-
-const billMax = Math.max(...MONTHS.map((m) => m.billWithoutSolar), 1)
-
-const energyMax = Math.max(...MONTHS.flatMap((m) => [m.generated, m.selfUse]), 1)
+interface MonthEntry {
+  month: string
+  generated: number
+  consumed: number
+  selfUse: number
+  gridImport: number
+  billWithSolar: number
+  billWithoutSolar: number
+  saved: number
+}
+interface Props {
+  months: MonthEntry[]
+  lifetime: { generated: number; gridImport: number; generationTime: number; co2ReductionKg: number }
+}
+const { months, lifetime: LIFETIME } = Astro.props
+const current = months[months.length - 1] ?? { generated: 0, selfUse: 0, billWithSolar: 0, billWithoutSolar: 0, saved: 0, month: '' }
+const annualSaving = months.reduce((s: number, m: MonthEntry) => s + m.saved, 0)
+const billMax = Math.max(...months.map((m: MonthEntry) => m.billWithoutSolar), 1)
+const energyMax = Math.max(...months.map((m: MonthEntry) => Math.max(m.generated, m.selfUse)), 1)
 const gen = lineScale(
-  MONTHS.map((m) => m.generated),
+  months.map((m: MonthEntry) => m.generated),
   energyMax,
 )
 const self = lineScale(
-  MONTHS.map((m) => m.selfUse),
+  months.map((m: MonthEntry) => m.selfUse),
   energyMax,
 )
+
+// pre-compute chart rows in frontmatter to avoid implicit-any in JSX callbacks
+const billRows = months.map((m: MonthEntry) => ({ month: m.month, withoutSolar: m.billWithoutSolar, withSolar: m.billWithSolar, billMax }))
+const energyRows = months.map((m: MonthEntry, i: number) => ({ month: m.month, generated: m.generated, selfUse: m.selfUse, gen: gen[i], self: self[i] }))
 ---
 
 <div class="space-y-6">
@@ -50,14 +66,14 @@ const self = lineScale(
       <table class="charts-css column multiple show-labels show-4-secondary-axes" style="--color-1:var(--chart-4);--color-2:var(--chart-1)">
         <tbody>
           {
-            MONTHS.map((m) => (
+            billRows.map((r) => (
               <tr>
-                <th scope="row">{m.month}</th>
-                <td style={`--size:${m.billWithoutSolar / billMax}`}>
-                  <span class="data">{m.billWithoutSolar}</span>
+                <th scope="row">{r.month}</th>
+                <td style={`--size:${r.withoutSolar / r.billMax}`}>
+                  <span class="data">{r.withoutSolar}</span>
                 </td>
-                <td style={`--size:${m.billWithSolar / billMax}`}>
-                  <span class="data">{m.billWithSolar}</span>
+                <td style={`--size:${r.withSolar / r.billMax}`}>
+                  <span class="data">{r.withSolar}</span>
                 </td>
               </tr>
             ))
@@ -82,14 +98,14 @@ const self = lineScale(
       <table class="charts-css area multiple show-labels show-4-secondary-axes" style="--color-1:var(--chart-2);--color-2:var(--chart-1)">
         <tbody>
           {
-            MONTHS.map((m, i) => (
+            energyRows.map((r) => (
               <tr>
-                <th scope="row">{m.month}</th>
-                <td style={`--start:${gen[i].start};--end:${gen[i].end}`}>
-                  <span class="data">{m.generated}</span>
+                <th scope="row">{r.month}</th>
+                <td style={`--start:${r.gen.start};--end:${r.gen.end}`}>
+                  <span class="data">{r.generated}</span>
                 </td>
-                <td style={`--start:${self[i].start};--end:${self[i].end}`}>
-                  <span class="data">{m.selfUse}</span>
+                <td style={`--start:${r.self.start};--end:${r.self.end}`}>
+                  <span class="data">{r.selfUse}</span>
                 </td>
               </tr>
             ))

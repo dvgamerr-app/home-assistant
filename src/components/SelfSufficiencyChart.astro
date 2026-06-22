@@ -1,8 +1,9 @@
 ---
-import { MONTHS } from '@/lib/solar-data'
 import { lineScale } from '@/lib/chart'
+import type { SolarData } from '@/lib/solar-data'
 
-const data = MONTHS.map((m) => ({ month: m.month, ratio: Math.round((m.selfUse / m.consumed) * 100) }))
+const { months: MONTHS } = Astro.props as Pick<SolarData, 'months'>
+const data = MONTHS.map((m) => ({ month: m.month, ratio: m.consumed > 0 ? Math.round((m.selfUse / m.consumed) * 100) : 0 }))
 const r = lineScale(
   data.map((d) => d.ratio),
   100,

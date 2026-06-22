@@ -1,10 +1,11 @@
 ---
 import SunMedium from '@lucide/svelte/icons/sun-medium'
-import { PV_STRINGS, SYSTEM } from '@/lib/solar-data'
 import { num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
 
+const { pvStrings: PV_STRINGS, system } = Astro.props as Pick<SolarData, 'pvStrings' | 'system'>
 const totalPower = PV_STRINGS.reduce((s, p) => s + p.power, 0)
-const perStringMax = SYSTEM.ratedPowerKw / PV_STRINGS.length
+const perStringMax = system.ratedPowerKw / PV_STRINGS.length
 ---
 
 <section class="rounded-lg border border-border/70 bg-card p-6">

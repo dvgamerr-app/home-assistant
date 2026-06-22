@@ -3,15 +3,16 @@ import Sun from '@lucide/svelte/icons/sun'
 import Home from '@lucide/svelte/icons/house'
 import BatteryCharging from '@lucide/svelte/icons/battery-charging'
 import Zap from '@lucide/svelte/icons/zap'
-import { LIVE } from '@/lib/solar-data'
 import { num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
 
-const charging = LIVE.batteryPowerKw < 0
+const { live } = Astro.props as Pick<SolarData, 'live'>
+const charging = live.batteryPowerKw < 0
 const nodes = [
-  { Icon: Sun, label: 'แผงโซลาร์', value: `${num(LIVE.pvPowerKw, 2)} kW`, tone: 'text-chart-2' },
-  { Icon: BatteryCharging, label: charging ? 'แบตเตอรี่ · กำลังชาร์จ' : 'แบตเตอรี่ · จ่ายไฟ', value: `${LIVE.batterySoc}%`, tone: 'text-chart-1' },
-  { Icon: Home, label: 'โหลดในบ้าน', value: `${num(LIVE.loadPowerKw, 2)} kW`, tone: 'text-chart-3' },
-  { Icon: Zap, label: 'การไฟฟ้า (กริด)', value: `${num(LIVE.gridPowerKw, 2)} kW`, tone: 'text-muted-foreground' },
+  { Icon: Sun, label: 'แผงโซลาร์', value: `${num(live.pvPowerKw, 2)} kW`, tone: 'text-chart-2' },
+  { Icon: BatteryCharging, label: charging ? 'แบตเตอรี่ · กำลังชาร์จ' : 'แบตเตอรี่ · จ่ายไฟ', value: `${live.batterySoc}%`, tone: 'text-chart-1' },
+  { Icon: Home, label: 'โหลดในบ้าน', value: `${num(live.loadPowerKw, 2)} kW`, tone: 'text-chart-3' },
+  { Icon: Zap, label: 'การไฟฟ้า (กริด)', value: `${num(live.gridPowerKw, 2)} kW`, tone: 'text-muted-foreground' },
 ]
 ---
 
@@ -41,8 +42,8 @@ const nodes = [
   </div>
 
   <p class="mt-8 border-t border-border/60 pt-5 text-sm leading-relaxed text-muted-foreground">
-    ตอนนี้แผงผลิตได้ <strong class="font-medium text-foreground">{num(LIVE.pvPowerKw, 2)} kW</strong> บ้านใช้ไฟ
-    <strong class="font-medium text-foreground">{num(LIVE.loadPowerKw, 2)} kW</strong> พลังงานส่วนเกินกำลังชาร์จเข้าแบตเตอรี่ ({num(Math.abs(LIVE.batteryPowerKw), 2)} kW) — ขณะนี้<strong
+    ตอนนี้แผงผลิตได้ <strong class="font-medium text-foreground">{num(live.pvPowerKw, 2)} kW</strong> บ้านใช้ไฟ
+    <strong class="font-medium text-foreground">{num(live.loadPowerKw, 2)} kW</strong> พลังงานส่วนเกินกำลังชาร์จเข้าแบตเตอรี่ ({num(Math.abs(live.batteryPowerKw), 2)} kW) — ขณะนี้<strong
       class="font-medium text-foreground">ไม่ได้ซื้อไฟจากการไฟฟ้าเลย</strong
     >
   </p>

@@ -1,38 +1,83 @@
 ---
-import Sun from '@lucide/svelte/icons/sun'
+import Search from '@lucide/svelte/icons/search'
+import Bell from '@lucide/svelte/icons/bell'
+import Settings from '@lucide/svelte/icons/settings'
 import ThemeToggle from './ThemeToggle.svelte'
-import { SYSTEM } from '@/lib/solar-data'
+import LogoutButton from './LogoutButton.svelte'
+import { auth } from '@/lib/auth'
 
-const firstName = SYSTEM.name.replace(/\s*\d.*$/, '').trim()
+const session = await auth.api.getSession({ headers: Astro.request.headers })
+const user = session?.user
+const displayName = user?.name?.trim() || user?.email?.split('@')[0] || 'ผู้ใช้'
+const parts = displayName.split(/\s+/).filter(Boolean)
+const initials = (parts.length > 1 ? parts[0][0] + parts[1][0] : displayName.slice(0, 2)).toUpperCase()
+
 const path = Astro.url.pathname
+// real routes are wired; Rooms/Scenes/Security are shell placeholders (luxury home-hub framing)
 const NAV = [
-  { href: '/', label: 'ภาพรวม' },
-  { href: '/analytics', label: 'วิเคราะห์เชิงลึก' },
+  { label: 'Overview', href: '/' },
+  { label: 'Rooms', href: '#' },
+  { label: 'Scenes', href: '#' },
+  { label: 'Energy', href: '/electricity' },
+  { label: 'Security', href: '#' },
 ]
+const isActive = (href: string) => (href === '/' ? path === '/' : href !== '#' && path.startsWith(href))
+// literal const avoids string-widening from the custom LibraryManagedAttributes in env.d.ts
+const btn = 'button' as const
 ---
 
-<header class="sticky top-0 z-20 border-b border-border/60 bg-background/80 backdrop-blur">
-  <div class="flex items-center justify-between px-6 py-4 md:px-10">
+<header class="flex items-center justify-between border-b border-border/60 px-6 py-5 md:px-10">
+  <div class="flex items-center gap-10">
     <a href="/" class="flex items-center gap-3">
-      <span class="flex size-9 items-center justify-center rounded-full bg-foreground text-background">
-        <Sun size={16} strokeWidth={1.5} />
+      <span aria-hidden={true} class="flex h-8 w-8 items-center justify-center rounded-full border border-foreground/80">
+        <span class="font-serif text-sm leading-none tracking-tight text-foreground">KK</span>
       </span>
-      <span class="font-serif text-base font-light tracking-wide">บ้านของ{firstName}</span>
+      <span class="font-serif text-xl tracking-wide">OurKK</span>
     </a>
 
-    <nav class="flex items-center gap-5 md:gap-8" aria-label="เมนูหลัก">
+    <nav aria-label="Primary" class="hidden items-center gap-8 md:flex">
       {
         NAV.map((item) => (
           <a
             href={item.href}
-            aria-current={path === item.href ? 'page' : undefined}
-            class:list={['text-[11px] uppercase tracking-luxury transition-colors', path === item.href ? 'text-foreground' : 'text-muted-foreground hover:text-foreground']}
+            aria-current={isActive(item.href) ? ('page' as const) : undefined}
+            class={`text-xs uppercase tracking-luxury transition-colors ${isActive(item.href) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
           >
             {item.label}
           </a>
         ))
       }
-      <ThemeToggle client:load />
     </nav>
+  </div>
+
+  <div class="flex items-center gap-2">
+    {/* ponytail: Search/Bell/Settings are shell placeholders — wire them when those features exist */}
+    <button type={btn} aria-label="Search" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+      <Search size={16} strokeWidth={1.25} />
+    </button>
+    <button
+      type={btn}
+      aria-label="Notifications"
+      class="relative flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+    >
+      <Bell size={16} strokeWidth={1.25} />
+      <span class="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent"></span>
+    </button>
+    <button type={btn} aria-label="Settings" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+      <Settings size={16} strokeWidth={1.25} />
+    </button>
+    <ThemeToggle client:load />
+
+    <div class="ml-3 hidden items-center gap-3 border-l border-border/60 pl-4 md:flex">
+      <div class="text-right">
+        <p class="max-w-35 truncate text-xs font-medium leading-none text-foreground">{displayName}</p>
+        <p class="mt-1 text-[10px] uppercase tracking-luxury text-muted-foreground">Owner</p>
+      </div>
+      <div aria-hidden={true} class="flex h-9 w-9 items-center justify-center rounded-full bg-foreground text-[11px] uppercase tracking-widest text-primary-foreground">
+        {initials}
+      </div>
+    </div>
+
+    <LogoutButton client:load />
   </div>
 </header>

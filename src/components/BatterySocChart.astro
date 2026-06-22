@@ -1,7 +1,8 @@
 ---
-import { HOURLY_SOC } from '@/lib/solar-data'
 import { lineScale } from '@/lib/chart'
+import type { SolarData } from '@/lib/solar-data'
 
+const { hourlySoc: HOURLY_SOC } = Astro.props as Pick<SolarData, 'hourlySoc'>
 const soc = lineScale(
   HOURLY_SOC.map((r) => r.soc),
   100,

@@ -3,10 +3,10 @@ import Activity from '@lucide/svelte/icons/activity'
 import Gauge from '@lucide/svelte/icons/gauge'
 import Plug from '@lucide/svelte/icons/plug'
 import Timer from '@lucide/svelte/icons/timer'
-import { SYSTEM_HEALTH } from '@/lib/solar-data'
 import { num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
 
-const h = SYSTEM_HEALTH
+const { systemHealth: h } = Astro.props as Pick<SolarData, 'systemHealth'>
 const items = [
   { Icon: Gauge, label: 'กำลังทำงาน', value: `${num(h.loadFactorPct, 0)}%`, hint: `จาก ${num(h.ratedPowerKw, 0)} kW`, ok: true },
   { Icon: Plug, label: 'แรงดันไฟ', value: `${num(h.gridVoltage, 0)} V`, hint: h.gridVoltageOk ? 'ปกติ' : 'ผิดปกติ', ok: h.gridVoltageOk },

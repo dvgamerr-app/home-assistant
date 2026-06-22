@@ -14,7 +14,7 @@
   type="button"
   onclick={toggle}
   aria-label="สลับโหมดสว่าง / มืด"
-  class="flex size-9 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-accent hover:text-foreground"
+  class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
 >
   <Moon class="block dark:hidden" size={16} strokeWidth={1.5} />
   <Sun class="hidden dark:block" size={16} strokeWidth={1.5} />

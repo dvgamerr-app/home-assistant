@@ -1,8 +1,9 @@
 ---
-import { ENERGY_DISTRIBUTION } from '@/lib/solar-data'
 import { pieScale } from '@/lib/chart'
 import { num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
 
+const { energyDistribution: ENERGY_DISTRIBUTION } = Astro.props as Pick<SolarData, 'energyDistribution'>
 const slices = pieScale(ENERGY_DISTRIBUTION.map((d) => d.value))
 const total = ENERGY_DISTRIBUTION.reduce((s, d) => s + d.value, 0)
 const colors = ['var(--chart-2)', 'var(--chart-1)', 'var(--chart-3)']

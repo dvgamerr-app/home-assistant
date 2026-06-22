@@ -4,19 +4,44 @@ import Nav from '@/components/Nav.astro'
 import Hero from '@/components/Hero.astro'
 import PaybackCard from '@/components/PaybackCard.astro'
 import EnergyFlow from '@/components/EnergyFlow.astro'
-import Tabs from '@/components/Tabs.astro'
+import StatCard from '@/components/StatCard.astro'
+import Sun from '@lucide/svelte/icons/sun'
+import Plug from '@lucide/svelte/icons/plug'
+import PiggyBank from '@lucide/svelte/icons/piggy-bank'
+import Gauge from '@lucide/svelte/icons/gauge'
+import { getAll } from '@/lib/solar-data'
+import { thb, num } from '@/lib/electricity'
+
+const data = await getAll()
 ---
 
 <Layout title="ภาพรวมพลังงานในบ้าน">
   <Nav />
-  <Hero />
+  <Hero live={data.live} system={data.system} />
   <main class="mx-auto max-w-6xl space-y-8 px-6 py-10 md:px-10 md:py-12">
-    <PaybackCard />
-    <EnergyFlow />
-    <Tabs />
+    <PaybackCard system={data.system} payback={data.payback} />
+    <EnergyFlow live={data.live} />
+
+    <section class="space-y-4">
+      <p class="text-[11px] uppercase tracking-luxury text-muted-foreground">สรุปวันนี้</p>
+      <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="ผลิตไฟวันนี้" value={`${num(data.today.generated, 1)} kWh`} sub={`พึ่งตัวเอง ${num(data.day.selfSufficiency, 0)}%`} accent="brass">
+          <Sun slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard label="ใช้ไฟวันนี้" value={`${num(data.today.consumed, 1)} kWh`} sub={`จากโซลาร์ ${num(data.day.selfUse, 1)} kWh`} accent="blue">
+          <Plug slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard label="ประหยัดวันนี้" value={thb(data.day.savedTHB, 0)} sub={`ถ้าไม่มีโซลาร์ ${thb(data.day.wouldHaveCostTHB, 0)}`} accent="sage">
+          <PiggyBank slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard label="ซื้อจากการไฟฟ้า" value={`${num(data.today.gridImport, 1)} kWh`} sub={thb(data.day.gridCostTHB, 0)} accent="terracotta">
+          <Gauge slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+      </div>
+    </section>
 
     <p class="text-pretty pb-4 text-center text-xs leading-relaxed text-muted-foreground">
-      ค่าไฟคำนวณตามอัตราค่าไฟฟ้าบ้านอยู่อาศัย ประเภท 1.2 แบบขั้นบันไดของการไฟฟ้านครหลวง (MEA) รวมค่า Ft และภาษีมูลค่าเพิ่ม 7% · ตัวเลขเป็นการประมาณการเพื่อใช้อ้างอิงเท่านั้น
+      ค่าไฟคำนวณตามอัตราค่าไฟฟ้าบ้านอยู่อาศัย ประเภท 1.2 แบบขั้นบันไดของการไฟฟ้านครหลวง (MEA) รวมค่า Ft และภาษีมูลค่าเพิ่ม 7%
     </p>
   </main>
 </Layout>

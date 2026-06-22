@@ -1,8 +1,9 @@
 ---
-import { HOURLY } from '@/lib/solar-data'
 import { lineScale } from '@/lib/chart'
+import type { SolarData } from '@/lib/solar-data'
 
-const max = Math.max(...HOURLY.flatMap((h) => [h.pv, h.load]), 1)
+const { hourly: HOURLY } = Astro.props as Pick<SolarData, 'hourly'>
+const max = Math.max(...HOURLY.map((h) => Math.max(h.pv, h.load)), 1)
 const pv = lineScale(
   HOURLY.map((h) => h.pv),
   max,
