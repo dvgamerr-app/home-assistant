@@ -20,13 +20,12 @@ const { today: TODAY, day: DAY, monthDays: MONTH_DAYS, monthLabel: CURRENT_MONTH
 // SVG stacked bar: [selfUse, gridImport] per day
 const VW = 560,
   VH = 280,
-  ML = 36,
+  ML = 4,
   MT = 8,
   MR = 8,
   MB = 24
 const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
-const ph = py1 - py0,
-  pw = px1 - px0
+const ph = py1 - py0
 
 const maxTotal = Math.max(...MONTH_DAYS.map((d) => d.selfUse + d.gridImport), 1)
 
@@ -45,12 +44,9 @@ const gridLines = [0.25, 0.5, 0.75].map((f) => ({
   label: num(+(f * maxTotal).toFixed(1), 1),
 }))
 
-// x-axis: every day, centered under each bar group
-const groupW = pw / MONTH_DAYS.length
-const xLabels = MONTH_DAYS.map((d, i) => ({
-  x: +(px0 + (i + 0.5) * groupW).toFixed(1),
-  label: d.day,
-}))
+// x-axis: HTML grid aligned to plot area (preserveAspectRatio:none stretches SVG text)
+const padLeft = +((ML / VW) * 100).toFixed(2)
+const padRight = +((MR / VW) * 100).toFixed(2)
 
 const segColors = ['var(--chart-1)', 'var(--chart-4)']
 ---
@@ -72,29 +68,29 @@ const segColors = ['var(--chart-1)', 'var(--chart-4)']
   </div>
 
   <ChartCard title="ไฟที่ใช้แต่ละวัน — จากโซลาร์ เทียบกับ ซื้อ" subtitle={`เดือน${CURRENT_MONTH_LABEL} · หน่วยเป็น kWh ต่อวัน`}>
-    <div class="chart-frame relative">
-      <div class="pointer-events-none absolute inset-0" aria-hidden={true}>
+    <div class="flex items-start gap-1">
+      <div class="relative shrink-0" style="width:1.75rem;height:280px">
         {
           gridLines.map((g) => (
-            <span class="absolute left-0 w-8 -translate-y-1/2 pr-1 text-right text-[11px] leading-none text-muted-foreground" style={`top:${((g.y / VH) * 100).toFixed(2)}%`}>
+            <span class="absolute right-0 text-right text-[9px] leading-none text-muted-foreground" style={`top:${((g.y / VH) * 100).toFixed(2)}%;transform:translateY(-50%)`}>
               {g.label}
             </span>
           ))
         }
       </div>
-      <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
-        {gridLines.map((g) => <line x1={px0} x2={px1} y1={g.y} y2={g.y} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
-        {bars.map((segs) => segs.map((seg, j) => (seg.h > 0 ? <rect x={seg.x} y={seg.y} width={seg.w} height={seg.h} rx={seg.rx} fill={segColors[j]} fill-opacity="0.85" /> : null)))}
-        <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5"></line>
-        <line x1={px0} x2={px0} y1={py0} y2={py1} stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5"></line>
-        {
-          xLabels.map((t) => (
-            <text x={t.x} y={py1 + 16} text-anchor="middle" font-size="10" fill="var(--muted-foreground)">
-              {t.label}
-            </text>
-          ))
-        }
-      </svg>
+      <div class="min-w-0 flex-1">
+        <div class="chart-frame">
+          <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
+            {gridLines.map((g) => <line x1={px0} x2={px1} y1={g.y} y2={g.y} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
+            {bars.map((segs) => segs.map((seg, j) => (seg.h > 0 ? <rect x={seg.x} y={seg.y} width={seg.w} height={seg.h} rx={seg.rx} fill={segColors[j]} fill-opacity="0.85" /> : null)))}
+            <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5"></line>
+            <line x1={px0} x2={px0} y1={py0} y2={py1} stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5"></line>
+          </svg>
+        </div>
+        <div class="mt-1 grid text-[9px] text-muted-foreground" style={`grid-template-columns:repeat(${MONTH_DAYS.length},1fr);padding-left:${padLeft}%;padding-right:${padRight}%`}>
+          {MONTH_DAYS.map((d) => <span class="truncate text-center">{d.day}</span>)}
+        </div>
+      </div>
     </div>
 
     <LegendRow

@@ -12,13 +12,20 @@ const currentSoc = HOURLY_SOC[HOURLY_SOC.length - 1]?.soc ?? 0
 const minSoc = nonZero.length > 0 ? Math.min(...nonZero.map((r) => r.soc)) : 0
 const maxSoc = nonZero.length > 0 ? Math.max(...nonZero.map((r) => r.soc)) : 0
 
-const [VW, VH, ML, MT, MR, MB] = [560, 160, 32, 8, 8, 24]
+const [VW, VH, ML, MT, MR, MB] = [560, 160, 4, 8, 8, 24]
 const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
 const ph = py1 - py0
 
 const linePath = svgLine(vals, px0, py0, px1, py1)
 const fillPath = svgArea(vals, px0, py0, px1, py1)
 const gridYs = [0.25, 0.5, 0.75].map((f) => +(py0 + (1 - f) * ph).toFixed(1))
+
+// HTML axis labels — outside SVG to avoid preserveAspectRatio stretch
+const gridPct = [0.75, 0.5, 0.25].map((f) => +(((MT + (1 - f) * ph) / VH) * 100).toFixed(2))
+const padLeft = +((ML / VW) * 100).toFixed(2)
+const padRight = +((MR / VW) * 100).toFixed(2)
+const xLabels = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const yLabels = ['75%', '50%', '25%']
 ---
 
 <ChartCard eyebrow="แบตเตอรี่" title="ระดับพลังงานสำรองระหว่างวัน" class="flex flex-col overflow-hidden">
@@ -39,24 +46,40 @@ const gridYs = [0.25, 0.5, 0.75].map((f) => +(py0 + (1 - f) * ph).toFixed(1))
     </div>
   </div>
 
-  <div class="mt-5 h-40 w-full">
-    <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
-      <defs>
-        <linearGradient id="soc-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="var(--chart-1)" stop-opacity="0.35"></stop>
-          <stop offset="100%" stop-color="var(--chart-1)" stop-opacity="0"></stop>
-        </linearGradient>
-        <clipPath id="soc-clip"><rect x={px0} y={py0} width={px1 - px0} height={ph}></rect></clipPath>
-      </defs>
-      {gridYs.map((y) => <line x1={px0} x2={px1} y1={y} y2={y} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
-      <g clip-path="url(#soc-clip)">
-        <path d={fillPath} fill="url(#soc-grad)"></path>
-        <path d={linePath} fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap={'round' as const}></path>
-      </g>
-    </svg>
+  <div class="mt-5 flex items-start gap-1">
+    <div class="relative h-40 shrink-0" style="width:1.75rem">
+      {
+        yLabels.map((l, i) => (
+          <span class="absolute right-0 text-right text-[9px] leading-none text-muted-foreground" style={`top:${gridPct[i]}%;transform:translateY(-50%)`}>
+            {l}
+          </span>
+        ))
+      }
+    </div>
+    <div class="min-w-0 flex-1">
+      <div class="h-40 w-full">
+        <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
+          <defs>
+            <linearGradient id="soc-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--chart-1)" stop-opacity="0.35"></stop>
+              <stop offset="100%" stop-color="var(--chart-1)" stop-opacity="0"></stop>
+            </linearGradient>
+            <clipPath id="soc-clip"><rect x={px0} y={py0} width={px1 - px0} height={ph}></rect></clipPath>
+          </defs>
+          <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
+          <line x1={px0} x2={px0} y1={py0} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
+          {gridYs.map((y) => <line x1={px0} x2={px1} y1={y} y2={y} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
+          <g clip-path="url(#soc-clip)">
+            <path d={fillPath} fill="url(#soc-grad)"></path>
+            <path d={linePath} fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap={'round' as const}></path>
+          </g>
+        </svg>
+      </div>
+      <div class="mt-1 flex justify-between text-[9px] text-muted-foreground" style={`padding-left:${padLeft}%;padding-right:${padRight}%`}>
+        {xLabels.map((l) => <span>{l}</span>)}
+      </div>
+    </div>
   </div>
 
-  <LegendRow class="mt-4" items={[{ label: 'ระดับแบตเตอรี่ (%)', color: 'var(--chart-1)' }]}>
-    <span class="ml-auto">00:00 → 23:00</span>
-  </LegendRow>
+  <LegendRow class="mt-3" items={[{ label: 'ระดับแบตเตอรี่ (%)', color: 'var(--chart-1)' }]} />
 </ChartCard>

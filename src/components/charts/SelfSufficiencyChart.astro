@@ -15,7 +15,7 @@ const nonZero = data.filter((d) => d.ratio > 0)
 const avgRatio = nonZero.length > 0 ? Math.round(nonZero.reduce((s, d) => s + d.ratio, 0) / nonZero.length) : 0
 const bestMonth = nonZero.reduce((b, d) => (d.ratio > b.ratio ? d : b), nonZero[0] ?? { month: '-', ratio: 0 })
 
-const [VW, VH, ML, MT, MR, MB] = [560, 160, 32, 8, 8, 24]
+const [VW, VH, ML, MT, MR, MB] = [560, 160, 4, 8, 8, 24]
 const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
 const ph = py1 - py0
 
@@ -23,8 +23,11 @@ const linePath = svgLine(vals, px0, py0, px1, py1)
 const fillPath = svgArea(vals, px0, py0, px1, py1)
 const gridYs = [0.25, 0.5, 0.75].map((f) => +(py0 + (1 - f) * ph).toFixed(1))
 
-const labelPl = `${((ML / VW) * 100).toFixed(2)}%`
-const labelPr = `${((MR / VW) * 100).toFixed(2)}%`
+// HTML axis labels — outside SVG to avoid preserveAspectRatio stretch
+const gridPct = [0.75, 0.5, 0.25].map((f) => +(((MT + (1 - f) * ph) / VH) * 100).toFixed(2))
+const padLeft = +((ML / VW) * 100).toFixed(2)
+const padRight = +((MR / VW) * 100).toFixed(2)
+const yLabels = ['75%', '50%', '25%']
 ---
 
 <ChartCard eyebrow="รายเดือน" title="การพึ่งพาตัวเองรายเดือน" class="flex flex-col overflow-hidden">
@@ -45,25 +48,39 @@ const labelPr = `${((MR / VW) * 100).toFixed(2)}%`
     </div>
   </div>
 
-  <div class="mt-5 h-40 w-full">
-    <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
-      <defs>
-        <linearGradient id="self-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="var(--chart-1)" stop-opacity="0.35"></stop>
-          <stop offset="100%" stop-color="var(--chart-1)" stop-opacity="0"></stop>
-        </linearGradient>
-        <clipPath id="self-clip"><rect x={px0} y={py0} width={px1 - px0} height={ph}></rect></clipPath>
-      </defs>
-      {gridYs.map((y) => <line x1={px0} x2={px1} y1={y} y2={y} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
-      <g clip-path="url(#self-clip)">
-        <path d={fillPath} fill="url(#self-grad)"></path>
-        <path d={linePath} fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap={'round' as const}></path>
-      </g>
-    </svg>
-  </div>
-
-  <div class="mt-1 flex justify-between text-[9px] tracking-wider text-muted-foreground" style={`padding-left:${labelPl};padding-right:${labelPr}`}>
-    {data.map((d) => <span>{d.month}</span>)}
+  <div class="mt-5 flex items-start gap-1">
+    <div class="relative h-40 shrink-0" style="width:1.75rem">
+      {
+        yLabels.map((l, i) => (
+          <span class="absolute right-0 text-right text-[9px] leading-none text-muted-foreground" style={`top:${gridPct[i]}%;transform:translateY(-50%)`}>
+            {l}
+          </span>
+        ))
+      }
+    </div>
+    <div class="min-w-0 flex-1">
+      <div class="h-40 w-full">
+        <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
+          <defs>
+            <linearGradient id="self-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--chart-1)" stop-opacity="0.35"></stop>
+              <stop offset="100%" stop-color="var(--chart-1)" stop-opacity="0"></stop>
+            </linearGradient>
+            <clipPath id="self-clip"><rect x={px0} y={py0} width={px1 - px0} height={ph}></rect></clipPath>
+          </defs>
+          <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
+          <line x1={px0} x2={px0} y1={py0} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
+          {gridYs.map((y) => <line x1={px0} x2={px1} y1={y} y2={y} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
+          <g clip-path="url(#self-clip)">
+            <path d={fillPath} fill="url(#self-grad)"></path>
+            <path d={linePath} fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap={'round' as const}></path>
+          </g>
+        </svg>
+      </div>
+      <div class="mt-1 flex justify-between text-[9px] tracking-wider text-muted-foreground" style={`padding-left:${padLeft}%;padding-right:${padRight}%`}>
+        {data.map((d) => <span>{d.month}</span>)}
+      </div>
+    </div>
   </div>
 
   <LegendRow class="mt-3" items={[{ label: 'พึ่งพาตัวเอง (%)', color: 'var(--chart-1)' }]} />

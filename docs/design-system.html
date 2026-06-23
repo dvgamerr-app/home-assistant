@@ -378,12 +378,25 @@
           SVG smooth bezier area — เส้นโค้ง cubic bezier (cardinal spline) · gradient fill · dashed gridlines · คำนวณ server-side ใน Astro frontmatter ไม่ต้องใช้ charting lib ·
           column/bar และ pie ก็ใช้ SVG เช่นกัน — ไม่มี charting library
         </p>
+        <p class="muted" style="margin-bottom:1.5rem;font-size:12px">
+          <b style="color:var(--foreground);font-weight:500">Axis label pattern</b> — Y-axis และ X-axis เป็น HTML ทั้งคู่ ไม่ใช้ SVG <code class="mono">&lt;text&gt;</code>
+          เพราะ <code class="mono">preserveAspectRatio="none"</code> จะทำให้ตัวอักษรยึดตามกว้างหน้าจอ ·
+          Y-axis: <code class="mono">div[relative h-40 width:1.75rem]</code> + <code class="mono">span[absolute right-0]</code> top % คำนวณจาก <code class="mono">(MT + (1−f)×ph) / VH × 100</code> ·
+          X-axis: <code class="mono">flex justify-between</code> ใต้ SVG, <code class="mono">padding-right: MR/VW%</code> (ML=0 แล้ว) ·
+          SVG ตั้ง <code class="mono">ML=0</code> เพราะ Y label อยู่ใน HTML column แทน
+        </p>
 
         <!-- stacked bar demo -->
         <div class="card" style="margin-bottom:1rem">
-          <p class="eyebrow" style="margin-bottom:0.75rem">Stacked bar · DailyView / MonthlyView</p>
-          <div class="chart-frame">
-            <svg id="bar-demo-svg" width="100%" height="100%" viewBox="0 0 560 220" preserveAspectRatio="none"></svg>
+          <p class="eyebrow" style="margin-bottom:0.75rem">Stacked bar · DailyView</p>
+          <div style="display:flex;align-items:flex-start;gap:4px">
+            <div id="bar-y-axis" style="position:relative;width:1.75rem;height:220px;flex-shrink:0"></div>
+            <div style="flex:1;min-width:0">
+              <div class="chart-frame">
+                <svg id="bar-demo-svg" width="100%" height="100%" viewBox="0 0 560 220" preserveAspectRatio="none"></svg>
+              </div>
+              <div id="bar-x-axis" style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted-foreground);margin-top:4px;padding-right:1.43%"></div>
+            </div>
           </div>
           <div class="row muted" style="margin-top:1rem;font-size:12px;gap:1.5rem">
             <span class="row" style="gap:0.5rem"><span class="legend-dot" style="background:var(--chart-1)"></span>ใช้ไฟจากโซลาร์</span>
@@ -413,8 +426,14 @@
               <p class="muted" style="font-size:0.85rem;font-family:var(--font-serif);font-weight:300">00:00 → 23:00</p>
             </div>
           </div>
-          <div style="height:160px;width:100%">
-            <svg id="chart-demo-svg" width="100%" height="100%" viewBox="0 0 560 160" preserveAspectRatio="none"></svg>
+          <div style="display:flex;align-items:flex-start;gap:4px">
+            <div id="line-y-axis" style="position:relative;width:1.75rem;height:160px;flex-shrink:0"></div>
+            <div style="flex:1;min-width:0">
+              <div style="height:160px;width:100%">
+                <svg id="chart-demo-svg" width="100%" height="100%" viewBox="0 0 560 160" preserveAspectRatio="none"></svg>
+              </div>
+              <div id="line-x-axis" style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted-foreground);margin-top:4px;padding-right:1.43%"></div>
+            </div>
           </div>
           <div class="row muted" style="margin-top:1rem;font-size:12px;gap:1.5rem">
             <span class="row" style="gap:0.5rem"><span class="legend-dot" style="background:var(--chart-2)"></span>ผลิตจากแผง (kW)</span>
@@ -480,7 +499,7 @@
         const selfData  = [1.2,2.1,3.4,4.5,5.2,6.1,5.8,5.0,4.2,3.1,2.0,1.5,1.8,2.4,3.6,4.8,5.5,6.2,5.9,5.1,4.0,2.8,1.6,0.9,1.1,2.0,3.2,4.4,5.0,4.5]
         const gridData  = [1.8,1.5,1.2,0.8,0.6,0.4,0.5,0.7,0.9,1.2,1.5,1.8,1.6,1.3,1.0,0.7,0.5,0.3,0.4,0.6,0.9,1.3,1.7,2.0,1.9,1.6,1.2,0.8,0.5,0.7]
         const data = selfData.map((s, i) => [s, gridData[i]])
-        const [VW,VH,ML,MT,MR,MB] = [560,220,8,12,8,4]
+        const [VW,VH,ML,MT,MR,MB] = [560,220,4,12,8,4]
         const [px0,py0,px1,py1] = [ML,MT,VW-MR,VH-MB]
         const n = data.length
         const maxTotal = Math.max(...data.map(d => d[0]+d[1]))
@@ -500,6 +519,20 @@
 
         const lines = gridYs.map(y => `<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')
         document.getElementById('bar-demo-svg').innerHTML = lines + bars
+
+        // Y-axis HTML labels
+        const yEl = document.getElementById('bar-y-axis')
+        gridYs.forEach((y, i) => {
+          const pct = (y / VH * 100).toFixed(2)
+          const label = ((i === 0 ? 0.25 : i === 1 ? 0.5 : 0.75) * maxTotal).toFixed(1)
+          yEl.innerHTML += `<span style="position:absolute;right:0;top:${pct}%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">${label}</span>`
+        })
+
+        // X-axis HTML labels (every 5th day label)
+        const xEl = document.getElementById('bar-x-axis')
+        xEl.style.display = 'grid'
+        xEl.style.gridTemplateColumns = `repeat(${n},1fr)`
+        xEl.innerHTML = Array.from({length: n}, (_, i) => `<span style="text-align:center;overflow:hidden">${i+1}</span>`).join('')
       })()
 
       // SVG smooth bezier chart demo
@@ -524,7 +557,7 @@
 
         const pvData  = [0,0,0.04,0.14,0.34,0.55,0.70,0.78,0.80,0.76,0.65,0.50,0.40,0.35,0.28,0.18,0.08,0.02,0,0,0,0,0,0]
         const loadData= [0.25,0.22,0.20,0.18,0.20,0.30,0.38,0.35,0.40,0.42,0.45,0.50,0.48,0.45,0.42,0.45,0.50,0.55,0.60,0.55,0.45,0.38,0.32,0.28]
-        const [VW,VH,ML,MT,MR,MB] = [560,160,32,8,8,24]
+        const [VW,VH,ML,MT,MR,MB] = [560,160,4,8,8,24]
         const [px0,py0,px1,py1] = [ML,MT,VW-MR,VH-MB]
         const ph = py1-py0
 
@@ -547,12 +580,25 @@
             <clipPath id="ds-clip"><rect x="${px0}" y="${py0}" width="${px1-px0}" height="${ph}"/></clipPath>
           </defs>
           ${gridYs.map(y => `<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')}
+          <line x1="${px0}" x2="${px1}" y1="${py1}" y2="${py1}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"/>
           <g clip-path="url(#ds-clip)">
             <path d="${pvFill}" fill="url(#ds-pv)"/>
             <path d="${pvLine}" fill="none" stroke="var(--chart-2)" stroke-width="1.5" stroke-linecap="round"/>
             <path d="${ldFill}" fill="url(#ds-load)"/>
             <path d="${ldLine}" fill="none" stroke="var(--chart-4)" stroke-width="1.5" stroke-linecap="round"/>
           </g>`
+
+        // Y-axis HTML labels
+        const yEl = document.getElementById('line-y-axis')
+        gridYs.forEach((y, i) => {
+          const pct = (y / VH * 100).toFixed(2)
+          const label = (i === 0 ? '25%' : i === 1 ? '50%' : '75%')
+          yEl.innerHTML += `<span style="position:absolute;right:0;top:${pct}%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">${label}</span>`
+        })
+
+        // X-axis HTML labels (all 24 hours)
+        const xEl = document.getElementById('line-x-axis')
+        xEl.innerHTML = Array.from({length:24}, (_,i) => `<span>${String(i).padStart(2,'0')}</span>`).join('')
       })()
     </script>
   </body>

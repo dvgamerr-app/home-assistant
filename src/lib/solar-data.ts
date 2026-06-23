@@ -86,8 +86,11 @@ export async function getAll() {
   // rate ยังใช้สำหรับ chart รายวัน (marginal เพียงพอสำหรับ relative comparison)
   const rate = marginalRate(monthlyGridKwh || 320)
 
-  // ── Month days ────────────────────────────────────────────────────────────
-  const formattedMonthDays = monthDays.map((d) => {
+  // ── Month days — fill all days of month with zeros for missing dates ────────
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const dayMap = new Map(monthDays.map((d) => [d.day, d]))
+  const formattedMonthDays = Array.from({ length: daysInMonth }, (_, i) => {
+    const d = dayMap.get(i + 1) ?? { day: i + 1, generated: 0, consumed: 0, gridImport: 0 }
     const selfUse = Math.max(0, d.consumed - d.gridImport)
     return {
       day: String(d.day),

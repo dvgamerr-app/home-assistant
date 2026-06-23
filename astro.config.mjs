@@ -6,11 +6,13 @@ import bun from '@nurodev/astro-bun'
 import { spawn } from 'child_process'
 
 /** @type {import('vite').Plugin} */
+let socketProc = null
 const socketServer = {
   name: 'socket-server',
   configureServer() {
-    const proc = spawn('bun', ['server/socket.mjs'], { stdio: 'inherit' })
-    process.on('exit', () => proc.kill())
+    if (socketProc) socketProc.kill()
+    socketProc = spawn('bun', ['server/socket.mjs'], { stdio: 'inherit' })
+    process.on('exit', () => socketProc?.kill())
   },
 }
 
