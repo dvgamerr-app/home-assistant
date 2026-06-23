@@ -1,0 +1,89 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import Nav from '@/components/Nav.astro'
+import ElectricityNav from '@/components/ElectricityNav.astro'
+import StatCard from '@/components/StatCard.astro'
+import Plug from '@lucide/svelte/icons/plug'
+import PiggyBank from '@lucide/svelte/icons/piggy-bank'
+import Gauge from '@lucide/svelte/icons/gauge'
+import Receipt from '@lucide/svelte/icons/receipt'
+import { getAll } from '@/lib/solar-data'
+import { thb, num } from '@/lib/electricity'
+
+const data = await getAll()
+
+const MONTH_SHORT_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+const billRows = data.bills.map((b) => ({
+  month: MONTH_SHORT_TH[parseInt(b.month.slice(4)) - 1] ?? b.month,
+  kwh: b.kwh,
+  paid: b.paid,
+  withoutSolar: b.withoutSolar,
+  saved: b.savedTHB,
+}))
+const totalSaved = billRows.reduce((s: number, r: (typeof billRows)[0]) => s + r.saved, 0)
+const latestBill = billRows[0]
+---
+
+<Layout title="การจ่ายค่าไฟ — บ้าน">
+  <Nav />
+  <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
+    <header class="space-y-3">
+      <p class="text-[11px] uppercase tracking-luxury text-muted-foreground">ระบบไฟฟ้า</p>
+      <h1 class="font-serif text-4xl font-light leading-tight text-foreground md:text-5xl">ข้อมูลพลังงาน</h1>
+    </header>
+
+    <ElectricityNav active="bill" />
+
+    <div class="space-y-6">
+      <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard label="จ่ายค่าไฟเดือนล่าสุด" value={thb(latestBill?.paid ?? 0, 0)} sub={`ใช้ไฟ ${num(latestBill?.kwh ?? 0, 0)} หน่วย`} accent="terracotta">
+          <Receipt slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard label="ถ้าไม่มีโซลาร์" value={thb(latestBill?.withoutSolar ?? 0, 0)} sub="ประมาณการตามอัตรา MEA" accent="blue">
+          <Plug slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard label="ประหยัดเดือนล่าสุด" value={thb(latestBill?.saved ?? 0, 0)} sub="" accent="sage">
+          <PiggyBank slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard label="ประหยัดสะสม (MEA)" value={thb(totalSaved, 0)} sub={`ใน ${billRows.length} เดือน`} accent="brass">
+          <Gauge slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+      </div>
+
+      <section class="rounded-lg border border-border/70 bg-card">
+        <div class="border-b border-border/60 px-6 py-4">
+          <h2 class="font-serif text-lg font-light text-foreground">บิลค่าไฟ (MEA) รายเดือน</h2>
+          <p class="mt-1 text-sm text-muted-foreground">ข้อมูลจริงจากการไฟฟ้านครหลวง · เทียบกับประมาณการถ้าไม่มีโซลาร์</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-border/40 text-left text-[10px] uppercase tracking-luxury text-muted-foreground">
+                <th class="px-6 py-3">เดือน</th>
+                <th class="px-4 py-3 text-right">หน่วย (kWh)</th>
+                <th class="px-4 py-3 text-right">จ่ายจริง</th>
+                <th class="px-4 py-3 text-right">ถ้าไม่มีโซลาร์</th>
+                <th class="px-6 py-3 text-right">ประหยัด</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                billRows.map((r) => (
+                  <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
+                    <td class="px-6 py-3 text-muted-foreground">{r.month}</td>
+                    <td class="px-4 py-3 text-right tabular-nums">{num(r.kwh, 0)}</td>
+                    <td class="px-4 py-3 text-right tabular-nums text-foreground">{thb(r.paid, 0)}</td>
+                    <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(r.withoutSolar, 0)}</td>
+                    <td class="px-6 py-3 text-right tabular-nums text-chart-1">{thb(r.saved, 0)}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <p class="text-pretty pb-4 text-center text-xs leading-relaxed text-muted-foreground">ค่าไฟประมาณการคำนวณตามอัตราค่าไฟฟ้าบ้านอยู่อาศัย ประเภท 1.2 แบบขั้นบันไดของ MEA รวมค่า Ft และ VAT 7%</p>
+  </main>
+</Layout>

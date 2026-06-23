@@ -6,13 +6,14 @@ import ChartCard from '@/components/ui/ChartCard.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
 
 const { hourly: HOURLY } = Astro.props as Pick<SolarData, 'hourly'>
-const max = Math.max(...HOURLY.map((h) => Math.max(h.pv, h.load)), 1)
+const maxValue = Math.max(...HOURLY.map((h) => Math.max(h.pv, h.load)), 1)
+const max = maxValue * 1.12
 const pvVals = HOURLY.map((h) => h.pv / max)
 const loadVals = HOURLY.map((h) => h.load / max)
 const peakPv = Math.max(...HOURLY.map((h) => h.pv))
 const peakLoad = Math.max(...HOURLY.map((h) => h.load))
 
-const [VW, VH, ML, MT, MR, MB] = [560, 160, 4, 8, 8, 24]
+const [VW, VH, ML, MT, MR, MB] = [560, 220, 4, 18, 8, 28]
 const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
 const ph = py1 - py0
 
@@ -49,7 +50,7 @@ const yLabels = [0.75, 0.5, 0.25].map((f) => `${num(max * f, 1)}`)
   </div>
 
   <div class="mt-5 flex items-start gap-1">
-    <div class="relative h-40 shrink-0" style="width:1.75rem">
+    <div class="relative h-56 shrink-0 md:h-60" style="width:1.75rem">
       {
         yLabels.map((l, i) => (
           <span class="absolute right-0 text-right text-[9px] leading-none text-muted-foreground" style={`top:${gridPct[i]}%;transform:translateY(-50%)`}>
@@ -59,7 +60,7 @@ const yLabels = [0.75, 0.5, 0.25].map((f) => `${num(max * f, 1)}`)
       }
     </div>
     <div class="min-w-0 flex-1">
-      <div class="h-40 w-full">
+      <div class="h-56 w-full md:h-60">
         <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
           <defs>
             <linearGradient id="pv-grad" x1="0" y1="0" x2="0" y2="1">

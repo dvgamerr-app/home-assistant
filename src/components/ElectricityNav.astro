@@ -1,0 +1,40 @@
+---
+type Props = { active: 'load' | 'solar' | 'bill' }
+const { active } = Astro.props
+const tabs = [
+  { id: 'load', label: 'การใช้ไฟในบ้าน', href: '/electricity/load' },
+  { id: 'solar', label: 'ผลิตไฟ', href: '/electricity/solar' },
+  { id: 'bill', label: 'การจ่ายค่าไฟ', href: '/electricity/bill' },
+]
+---
+
+<div class="mb-8 flex gap-6 border-b border-border/60">
+  {
+    tabs.map((t) => (
+      <a href={t.href} class:list={['lbl', { active: t.id === active }]}>
+        {t.label}
+      </a>
+    ))
+  }
+</div>
+
+<style>
+  .lbl {
+    padding-bottom: 0.75rem;
+    margin-bottom: -1px;
+    border-bottom: 1px solid transparent;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: var(--tracking-luxury);
+    color: var(--muted-foreground);
+    text-decoration: none;
+    transition: color 0.2s;
+  }
+  .lbl:hover {
+    color: var(--foreground);
+  }
+  .lbl.active {
+    color: var(--foreground);
+    border-bottom-color: var(--accent);
+  }
+</style>

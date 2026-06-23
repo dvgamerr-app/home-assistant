@@ -11,21 +11,23 @@ const nonZero = HOURLY_SOC.filter((r) => r.soc > 0)
 const currentSoc = HOURLY_SOC[HOURLY_SOC.length - 1]?.soc ?? 0
 const minSoc = nonZero.length > 0 ? Math.min(...nonZero.map((r) => r.soc)) : 0
 const maxSoc = nonZero.length > 0 ? Math.max(...nonZero.map((r) => r.soc)) : 0
+const displaySoc = (value: number) => (value >= 99.5 ? 100 : Math.round(value))
 
-const [VW, VH, ML, MT, MR, MB] = [560, 160, 4, 8, 8, 24]
+const [VW, VH, ML, MT, MR, MB] = [560, 220, 4, 18, 8, 28]
 const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
 const ph = py1 - py0
 
 const linePath = svgLine(vals, px0, py0, px1, py1)
 const fillPath = svgArea(vals, px0, py0, px1, py1)
-const gridYs = [0.25, 0.5, 0.75].map((f) => +(py0 + (1 - f) * ph).toFixed(1))
+const yTicks = [1, 0.75, 0.5, 0.25]
+const gridYs = yTicks.map((f) => +(py0 + (1 - f) * ph).toFixed(1))
 
 // HTML axis labels — outside SVG to avoid preserveAspectRatio stretch
-const gridPct = [0.75, 0.5, 0.25].map((f) => +(((MT + (1 - f) * ph) / VH) * 100).toFixed(2))
+const gridPct = yTicks.map((f) => +(((MT + (1 - f) * ph) / VH) * 100).toFixed(2))
 const padLeft = +((ML / VW) * 100).toFixed(2)
 const padRight = +((MR / VW) * 100).toFixed(2)
 const xLabels = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
-const yLabels = ['75%', '50%', '25%']
+const yLabels = ['100%', '75%', '50%', '25%']
 ---
 
 <ChartCard eyebrow="แบตเตอรี่" title="ระดับพลังงานสำรองระหว่างวัน" class="flex flex-col overflow-hidden">
@@ -33,21 +35,21 @@ const yLabels = ['75%', '50%', '25%']
     <div class="space-y-1">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ล่าสุด</p>
       <p class="font-serif text-4xl font-light leading-none">
-        {currentSoc}<span class="ml-1 text-base text-muted-foreground">%</span>
+        {displaySoc(currentSoc)}<span class="ml-1 text-base text-muted-foreground">%</span>
       </p>
     </div>
     <div class="space-y-1">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ต่ำสุดวันนี้</p>
-      <p class="font-serif text-2xl font-light leading-none text-muted-foreground">{minSoc}%</p>
+      <p class="font-serif text-2xl font-light leading-none text-muted-foreground">{displaySoc(minSoc)}%</p>
     </div>
     <div class="ml-auto space-y-1 text-right">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">สูงสุดวันนี้</p>
-      <p class="font-serif text-lg text-foreground">{maxSoc}%</p>
+      <p class="font-serif text-lg text-foreground">{displaySoc(maxSoc)}%</p>
     </div>
   </div>
 
   <div class="mt-5 flex items-start gap-1">
-    <div class="relative h-40 shrink-0" style="width:1.75rem">
+    <div class="relative h-56 shrink-0 md:h-60" style="width:1.75rem">
       {
         yLabels.map((l, i) => (
           <span class="absolute right-0 text-right text-[9px] leading-none text-muted-foreground" style={`top:${gridPct[i]}%;transform:translateY(-50%)`}>
@@ -57,7 +59,7 @@ const yLabels = ['75%', '50%', '25%']
       }
     </div>
     <div class="min-w-0 flex-1">
-      <div class="h-40 w-full">
+      <div class="h-56 w-full md:h-60">
         <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
           <defs>
             <linearGradient id="soc-grad" x1="0" y1="0" x2="0" y2="1">

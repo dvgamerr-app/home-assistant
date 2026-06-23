@@ -103,19 +103,22 @@ export async function getAll() {
   })
 
   // ── Monthly history ───────────────────────────────────────────────────────
+  // ponytail: build paid-lookup once, reused by months + billsEnhanced
+  const billPaidMap = new Map(bills.map((b) => [b.month, b.paid]))
   const months = rawMonths.map((m) => {
     const selfUse = Math.max(0, m.consumed - m.gridImport)
-    const bill = calculateMonthlyBill(m.gridImport)
-    const billFull = calculateMonthlyBill(m.consumed)
+    const billWithoutSolar = calculateMonthlyBill(m.consumed).total
+    // prefer actual MEA paid; fall back to calculated estimate
+    const billWithSolar = billPaidMap.get(m.month.replace('-', '')) ?? calculateMonthlyBill(m.gridImport).total
     return {
       month: thMonth(m.month),
       generated: Math.round(m.generated),
       consumed: Math.round(m.consumed),
       selfUse: Math.round(selfUse),
       gridImport: Math.round(m.gridImport),
-      billWithSolar: bill.total,
-      billWithoutSolar: billFull.total,
-      saved: billFull.total - bill.total,
+      billWithSolar,
+      billWithoutSolar,
+      saved: billWithoutSolar - billWithSolar,
     }
   })
 
@@ -165,6 +168,14 @@ export async function getAll() {
     progressPct: (totalSavedToDate / SYSTEM.investmentTHB) * 100,
   }
 
+  // ── Bills — "ถ้าไม่มีโซลาร์" = consumed จาก inverter (fallback MEA) ─────────
+  const rawMonthConsumedMap = new Map(rawMonths.map((m) => [m.month.replace('-', ''), m.consumed]))
+  const billsEnhanced = bills.map((b) => {
+    const totalConsumed = rawMonthConsumedMap.get(b.month) ?? b.kwh + b.unitUsedSolar
+    const withoutSolar = calculateMonthlyBill(totalConsumed).total
+    return { ...b, consumed: totalConsumed, withoutSolar, savedTHB: Math.max(0, withoutSolar - b.paid) }
+  })
+
   return {
     system: { ...SYSTEM, ratedPowerKw: live.powerRating || SYSTEM.ratedPowerKw },
     live,
@@ -181,7 +192,7 @@ export async function getAll() {
     energyDistribution,
     lifetime,
     payback,
-    bills,
+    bills: billsEnhanced,
   }
 }
 

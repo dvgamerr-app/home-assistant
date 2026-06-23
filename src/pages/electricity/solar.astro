@@ -1,0 +1,41 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import Nav from '@/components/Nav.astro'
+import ElectricityNav from '@/components/ElectricityNav.astro'
+import BatteryCard from '@/components/BatteryCard.astro'
+import SystemHealth from '@/components/SystemHealth.astro'
+import PanelStrings from '@/components/PanelStrings.astro'
+import EnergyDistributionChart from '@/components/charts/EnergyDistributionChart.astro'
+import ProductionCurve from '@/components/charts/ProductionCurve.astro'
+import BatterySocChart from '@/components/charts/BatterySocChart.astro'
+import SelfSufficiencyChart from '@/components/charts/SelfSufficiencyChart.astro'
+import { getAll } from '@/lib/solar-data'
+
+const data = await getAll()
+---
+
+<Layout title="ผลิตไฟ — บ้าน">
+  <Nav />
+  <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
+    <header class="space-y-3">
+      <p class="text-[11px] uppercase tracking-luxury text-muted-foreground">ระบบไฟฟ้า</p>
+      <h1 class="font-serif text-4xl font-light leading-tight text-foreground md:text-5xl">ข้อมูลพลังงาน</h1>
+    </header>
+
+    <ElectricityNav active="solar" />
+
+    <div class="space-y-6">
+      <div class="grid gap-6 lg:grid-cols-2">
+        <BatteryCard battery={data.battery} />
+        <SystemHealth systemHealth={data.systemHealth} />
+        <PanelStrings pvStrings={data.pvStrings} system={data.system} />
+        <EnergyDistributionChart energyDistribution={data.energyDistribution} />
+      </div>
+      <ProductionCurve hourly={data.hourly} />
+      <div class="grid gap-6 lg:grid-cols-2">
+        <BatterySocChart hourlySoc={data.hourlySoc} />
+        <SelfSufficiencyChart months={data.months} />
+      </div>
+    </div>
+  </main>
+</Layout>

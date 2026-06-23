@@ -21,13 +21,14 @@ const ph = py1 - py0
 
 const linePath = svgLine(vals, px0, py0, px1, py1)
 const fillPath = svgArea(vals, px0, py0, px1, py1)
-const gridYs = [0.25, 0.5, 0.75].map((f) => +(py0 + (1 - f) * ph).toFixed(1))
+const yTicks = [1, 0.75, 0.5, 0.25]
+const gridYs = yTicks.map((f) => +(py0 + (1 - f) * ph).toFixed(1))
 
 // HTML axis labels — outside SVG to avoid preserveAspectRatio stretch
-const gridPct = [0.75, 0.5, 0.25].map((f) => +(((MT + (1 - f) * ph) / VH) * 100).toFixed(2))
+const gridPct = yTicks.map((f) => +(((MT + (1 - f) * ph) / VH) * 100).toFixed(2))
 const padLeft = +((ML / VW) * 100).toFixed(2)
 const padRight = +((MR / VW) * 100).toFixed(2)
-const yLabels = ['75%', '50%', '25%']
+const yLabels = ['100%', '75%', '50%', '25%']
 ---
 
 <ChartCard eyebrow="รายเดือน" title="การพึ่งพาตัวเองรายเดือน" class="flex flex-col overflow-hidden">
