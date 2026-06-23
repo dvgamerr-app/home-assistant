@@ -1,0 +1,23 @@
+---
+interface Props {
+  eyebrow?: string
+  title?: string
+  subtitle?: string
+  class?: string
+}
+const { eyebrow, title, subtitle, class: cls } = Astro.props
+const isBig = Boolean(eyebrow && !subtitle)
+---
+
+<section class:list={['rounded-lg border border-border/70 bg-card p-6', cls]}>
+  {
+    (eyebrow || title || subtitle) && (
+      <div class:list={[isBig ? 'mb-4 space-y-1' : 'mb-6']}>
+        {eyebrow && <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">{eyebrow}</p>}
+        {title && <h2 class:list={['font-serif font-light text-foreground', isBig ? 'text-2xl' : 'text-lg']}>{title}</h2>}
+        {subtitle && <p class="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+      </div>
+    )
+  }
+  <slot />
+</section>

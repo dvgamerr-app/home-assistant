@@ -1,12 +1,14 @@
 <script>
+  import { untrack } from 'svelte'
   import { onMount } from 'svelte'
   import { io } from 'socket.io-client'
   import { num } from '@/lib/electricity'
 
-  let { socketUrl, pvPowerKw: initPv, batterySoc: initSoc, gridPowerKw: initGrid } = $props()
-  let pv = $state(initPv)
-  let soc = $state(initSoc)
-  let grid = $state(initGrid)
+  let { socketUrl, pvPowerKw, batterySoc, gridPowerKw } = $props()
+  // ponytail: untrack = intentional initial-value-only capture; socket overrides these
+  let pv = $state(untrack(() => pvPowerKw))
+  let soc = $state(untrack(() => batterySoc))
+  let grid = $state(untrack(() => gridPowerKw))
 
   onMount(() => {
     const socket = io(socketUrl, { transports: ['websocket'] })

@@ -1,0 +1,19 @@
+---
+interface Props {
+  items: { label: string; color: string }[]
+  class?: string
+}
+const { items, class: cls } = Astro.props
+---
+
+<div class:list={['flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground', cls]}>
+  {
+    items.map((item) => (
+      <span class="flex items-center gap-2">
+        <span class="legend-dot" style={`background:${item.color}`} />
+        {item.label}
+      </span>
+    ))
+  }
+  <slot />
+</div>

@@ -10,7 +10,6 @@
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600&family=Trirong:ital,wght@0,300;0,400;1,300;1,400&display=swap"
     />
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/charts.css/dist/charts.min.css" />
     <style>
       /* ============================================================
          TOKENS — identical to src/styles/global.css
@@ -245,15 +244,7 @@
       }
       .chart-frame {
         height: 220px;
-      }
-      .chart-frame .charts-css {
-        height: 100%;
-        font-size: 0.7rem;
-        --color-1: var(--chart-1);
-        --color-2: var(--chart-4);
-      }
-      .charts-css .data {
-        opacity: 0;
+        overflow: hidden;
       }
       footer {
         padding: 3rem 0;
@@ -384,39 +375,50 @@
         <p class="eyebrow">05 — Charts</p>
         <h2 class="serif">กราฟ</h2>
         <p class="muted" style="margin-bottom: 1.5rem">
-          ใช้ <b style="color: var(--foreground); font-weight: 500">Charts.css</b> — กราฟจาก HTML table + CSS ล้วน ไม่มี JS, อ่านได้โดย screen reader · กำหนดสีผ่าน
-          <code class="mono">--color-1…</code> และค่าผ่าน <code class="mono">--size</code> (bar) หรือ <code class="mono">--start/--end</code> (line/area)
+          SVG smooth bezier area — เส้นโค้ง cubic bezier (cardinal spline) · gradient fill · dashed gridlines · คำนวณ server-side ใน Astro frontmatter ไม่ต้องใช้ charting lib ·
+          column/bar และ pie ก็ใช้ SVG เช่นกัน — ไม่มี charting library
         </p>
-        <div class="card">
+
+        <!-- stacked bar demo -->
+        <div class="card" style="margin-bottom:1rem">
+          <p class="eyebrow" style="margin-bottom:0.75rem">Stacked bar · DailyView / MonthlyView</p>
           <div class="chart-frame">
-            <table class="charts-css column multiple stacked show-4-secondary-axes">
-              <tbody>
-                <tr>
-                  <td style="--size: 0.5"><span class="data">a</span></td>
-                  <td style="--size: 0.2"><span class="data">b</span></td>
-                </tr>
-                <tr>
-                  <td style="--size: 0.7"><span class="data">a</span></td>
-                  <td style="--size: 0.1"><span class="data">b</span></td>
-                </tr>
-                <tr>
-                  <td style="--size: 0.6"><span class="data">a</span></td>
-                  <td style="--size: 0.3"><span class="data">b</span></td>
-                </tr>
-                <tr>
-                  <td style="--size: 0.8"><span class="data">a</span></td>
-                  <td style="--size: 0.15"><span class="data">b</span></td>
-                </tr>
-                <tr>
-                  <td style="--size: 0.55"><span class="data">a</span></td>
-                  <td style="--size: 0.25"><span class="data">b</span></td>
-                </tr>
-              </tbody>
-            </table>
+            <svg id="bar-demo-svg" width="100%" height="100%" viewBox="0 0 560 220" preserveAspectRatio="none"></svg>
           </div>
-          <div class="row muted" style="margin-top: 1rem; font-size: 12px">
-            <span class="row" style="gap: 0.5rem"><span class="legend-dot" style="background: var(--chart-1)"></span>ใช้ไฟจากโซลาร์</span>
-            <span class="row" style="gap: 0.5rem"><span class="legend-dot" style="background: var(--chart-4)"></span>ซื้อจากการไฟฟ้า</span>
+          <div class="row muted" style="margin-top:1rem;font-size:12px;gap:1.5rem">
+            <span class="row" style="gap:0.5rem"><span class="legend-dot" style="background:var(--chart-1)"></span>ใช้ไฟจากโซลาร์</span>
+            <span class="row" style="gap:0.5rem"><span class="legend-dot" style="background:var(--chart-4)"></span>ซื้อจากการไฟฟ้า</span>
+          </div>
+        </div>
+
+        <!-- area line card design -->
+        <div class="card" style="display:flex;flex-direction:column;gap:0">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem">
+            <div style="display:flex;flex-direction:column;gap:0.35rem">
+              <span class="eyebrow">พลังงาน</span>
+              <h3 class="serif" style="font-size:1.4rem;margin:0;font-weight:300">กราฟกำลังผลิตรายชั่วโมง</h3>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:2rem;border-bottom:1px solid color-mix(in oklch,var(--border) 60%,transparent);padding-bottom:1.25rem;margin-bottom:1.25rem">
+            <div>
+              <p class="eyebrow" style="margin-bottom:0.25rem">พีคโซลาร์</p>
+              <p class="statvalue">6.2<span style="font-size:1rem;color:var(--muted-foreground);margin-left:0.25rem">kW</span></p>
+            </div>
+            <div>
+              <p class="eyebrow" style="margin-bottom:0.25rem">พีคโหลด</p>
+              <p class="statvalue" style="font-size:1.5rem;color:var(--chart-4)">↑ 3.8</p>
+            </div>
+            <div style="margin-left:auto;text-align:right">
+              <p class="eyebrow" style="margin-bottom:0.25rem">ตลอดวัน</p>
+              <p class="muted" style="font-size:0.85rem;font-family:var(--font-serif);font-weight:300">00:00 → 23:00</p>
+            </div>
+          </div>
+          <div style="height:160px;width:100%">
+            <svg id="chart-demo-svg" width="100%" height="100%" viewBox="0 0 560 160" preserveAspectRatio="none"></svg>
+          </div>
+          <div class="row muted" style="margin-top:1rem;font-size:12px;gap:1.5rem">
+            <span class="row" style="gap:0.5rem"><span class="legend-dot" style="background:var(--chart-2)"></span>ผลิตจากแผง (kW)</span>
+            <span class="row" style="gap:0.5rem"><span class="legend-dot" style="background:var(--chart-4)"></span>ใช้ในบ้าน (kW)</span>
           </div>
         </div>
       </section>
@@ -441,7 +443,7 @@
       </section>
 
       <footer>
-        Home Assistant Design System · Astro + Svelte 5 + Tailwind v4 + Charts.css · token ตรงกับ
+        Home Assistant Design System · Astro + Svelte 5 + Tailwind v4 · token ตรงกับ
         <code class="mono">src/styles/global.css</code>
       </footer>
     </div>
@@ -472,6 +474,86 @@
       }
       render('sw-surface', surface)
       render('sw-accent', accent)
+
+      // Stacked bar chart demo
+      ;(function () {
+        const selfData  = [1.2,2.1,3.4,4.5,5.2,6.1,5.8,5.0,4.2,3.1,2.0,1.5,1.8,2.4,3.6,4.8,5.5,6.2,5.9,5.1,4.0,2.8,1.6,0.9,1.1,2.0,3.2,4.4,5.0,4.5]
+        const gridData  = [1.8,1.5,1.2,0.8,0.6,0.4,0.5,0.7,0.9,1.2,1.5,1.8,1.6,1.3,1.0,0.7,0.5,0.3,0.4,0.6,0.9,1.3,1.7,2.0,1.9,1.6,1.2,0.8,0.5,0.7]
+        const data = selfData.map((s, i) => [s, gridData[i]])
+        const [VW,VH,ML,MT,MR,MB] = [560,220,8,12,8,4]
+        const [px0,py0,px1,py1] = [ML,MT,VW-MR,VH-MB]
+        const n = data.length
+        const maxTotal = Math.max(...data.map(d => d[0]+d[1]))
+        const groupW = (px1-px0)/n
+        const barW = groupW*0.85
+        const ph = py1-py0
+        const gridYs = [0.25,0.5,0.75].map(f => py0+(1-f)*ph)
+
+        let bars = ''
+        data.forEach(([s,g], i) => {
+          const x = px0 + i*groupW + (groupW-barW)/2
+          const sh = (s/maxTotal)*ph, gh = (g/maxTotal)*ph
+          const hasG = gh > 0.5
+          bars += `<rect x="${x.toFixed(1)}" y="${(py1-sh-gh).toFixed(1)}" width="${barW.toFixed(1)}" height="${sh.toFixed(1)}" rx="${hasG?0:1.5}" fill="var(--chart-1)" fill-opacity="0.85"/>`
+          if (hasG) bars += `<rect x="${x.toFixed(1)}" y="${(py1-gh).toFixed(1)}" width="${barW.toFixed(1)}" height="${gh.toFixed(1)}" rx="1.5" fill="var(--chart-4)" fill-opacity="0.8"/>`
+        })
+
+        const lines = gridYs.map(y => `<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')
+        document.getElementById('bar-demo-svg').innerHTML = lines + bars
+      })()
+
+      // SVG smooth bezier chart demo
+      ;(function () {
+        const clamp = (v) => Math.max(0, Math.min(1, v))
+        function smoothPath(values, xMin, yMin, xMax, yMax, tension = 0.4) {
+          const n = values.length
+          if (n < 2) return ''
+          const pts = values.map((v, i) => ({
+            x: xMin + (i / (n - 1)) * (xMax - xMin),
+            y: yMin + (1 - clamp(v)) * (yMax - yMin),
+          }))
+          let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`
+          for (let i = 1; i < n; i++) {
+            const p0 = pts[Math.max(i - 2, 0)], p1 = pts[i - 1], p2 = pts[i], p3 = pts[Math.min(i + 1, n - 1)]
+            const cp1x = p1.x + (p2.x - p0.x) * tension, cp1y = p1.y + (p2.y - p0.y) * tension
+            const cp2x = p2.x - (p3.x - p1.x) * tension, cp2y = p2.y - (p3.y - p1.y) * tension
+            d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
+          }
+          return d
+        }
+
+        const pvData  = [0,0,0.04,0.14,0.34,0.55,0.70,0.78,0.80,0.76,0.65,0.50,0.40,0.35,0.28,0.18,0.08,0.02,0,0,0,0,0,0]
+        const loadData= [0.25,0.22,0.20,0.18,0.20,0.30,0.38,0.35,0.40,0.42,0.45,0.50,0.48,0.45,0.42,0.45,0.50,0.55,0.60,0.55,0.45,0.38,0.32,0.28]
+        const [VW,VH,ML,MT,MR,MB] = [560,160,32,8,8,24]
+        const [px0,py0,px1,py1] = [ML,MT,VW-MR,VH-MB]
+        const ph = py1-py0
+
+        const pvLine  = smoothPath(pvData,  px0,py0,px1,py1)
+        const pvFill  = pvLine  + ` L ${px1},${py1} L ${px0},${py1} Z`
+        const ldLine  = smoothPath(loadData, px0,py0,px1,py1)
+        const ldFill  = ldLine  + ` L ${px1},${py1} L ${px0},${py1} Z`
+        const gridYs  = [0.25,0.5,0.75].map(f => py0 + (1-f)*ph)
+
+        document.getElementById('chart-demo-svg').innerHTML = `
+          <defs>
+            <linearGradient id="ds-pv"   x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stop-color="var(--chart-2)" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="var(--chart-2)" stop-opacity="0"/>
+            </linearGradient>
+            <linearGradient id="ds-load" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%"   stop-color="var(--chart-4)" stop-opacity="0.2"/>
+              <stop offset="100%" stop-color="var(--chart-4)" stop-opacity="0"/>
+            </linearGradient>
+            <clipPath id="ds-clip"><rect x="${px0}" y="${py0}" width="${px1-px0}" height="${ph}"/></clipPath>
+          </defs>
+          ${gridYs.map(y => `<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')}
+          <g clip-path="url(#ds-clip)">
+            <path d="${pvFill}" fill="url(#ds-pv)"/>
+            <path d="${pvLine}" fill="none" stroke="var(--chart-2)" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="${ldFill}" fill="url(#ds-load)"/>
+            <path d="${ldLine}" fill="none" stroke="var(--chart-4)" stroke-width="1.5" stroke-linecap="round"/>
+          </g>`
+      })()
     </script>
   </body>
 </html>

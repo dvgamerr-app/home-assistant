@@ -4,6 +4,9 @@ import Plug from '@lucide/svelte/icons/plug'
 import PiggyBank from '@lucide/svelte/icons/piggy-bank'
 import Gauge from '@lucide/svelte/icons/gauge'
 import StatCard from './StatCard.astro'
+import ChartCard from './ui/ChartCard.astro'
+import LegendRow from './ui/LegendRow.astro'
+import { svgStackedBars } from '@/lib/chart'
 import { thb, num } from '@/lib/electricity'
 
 interface Props {
@@ -13,7 +16,43 @@ interface Props {
   monthLabel: string
 }
 const { today: TODAY, day: DAY, monthDays: MONTH_DAYS, monthLabel: CURRENT_MONTH_LABEL } = Astro.props
+
+// SVG stacked bar: [selfUse, gridImport] per day
+const VW = 560,
+  VH = 280,
+  ML = 36,
+  MT = 8,
+  MR = 8,
+  MB = 24
+const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
+const ph = py1 - py0,
+  pw = px1 - px0
+
 const maxTotal = Math.max(...MONTH_DAYS.map((d) => d.selfUse + d.gridImport), 1)
+
+const bars = svgStackedBars(
+  MONTH_DAYS.map((d) => [d.selfUse, d.gridImport]),
+  px0,
+  py0,
+  px1,
+  py1,
+  0.15,
+)
+
+// y-axis: 3 grid lines with kWh labels
+const gridLines = [0.25, 0.5, 0.75].map((f) => ({
+  y: +(py0 + (1 - f) * ph).toFixed(1),
+  label: num(+(f * maxTotal).toFixed(1), 1),
+}))
+
+// x-axis: every day, centered under each bar group
+const groupW = pw / MONTH_DAYS.length
+const xLabels = MONTH_DAYS.map((d, i) => ({
+  x: +(px0 + (i + 0.5) * groupW).toFixed(1),
+  label: d.day,
+}))
+
+const segColors = ['var(--chart-1)', 'var(--chart-4)']
 ---
 
 <div class="space-y-6">
@@ -32,34 +71,38 @@ const maxTotal = Math.max(...MONTH_DAYS.map((d) => d.selfUse + d.gridImport), 1)
     </StatCard>
   </div>
 
-  <section class="rounded-lg border border-border/70 bg-card p-6">
-    <div class="mb-6">
-      <h2 class="font-serif text-lg font-light text-foreground">ไฟที่ใช้แต่ละวัน — จากโซลาร์ เทียบกับ ซื้อ</h2>
-      <p class="mt-1 text-sm text-muted-foreground">เดือน{CURRENT_MONTH_LABEL} · หน่วยเป็น kWh ต่อวัน</p>
+  <ChartCard title="ไฟที่ใช้แต่ละวัน — จากโซลาร์ เทียบกับ ซื้อ" subtitle={`เดือน${CURRENT_MONTH_LABEL} · หน่วยเป็น kWh ต่อวัน`}>
+    <div class="chart-frame relative">
+      <div class="pointer-events-none absolute inset-0" aria-hidden={true}>
+        {
+          gridLines.map((g) => (
+            <span class="absolute left-0 w-8 -translate-y-1/2 pr-1 text-right text-[11px] leading-none text-muted-foreground" style={`top:${((g.y / VH) * 100).toFixed(2)}%`}>
+              {g.label}
+            </span>
+          ))
+        }
+      </div>
+      <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
+        {gridLines.map((g) => <line x1={px0} x2={px1} y1={g.y} y2={g.y} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
+        {bars.map((segs) => segs.map((seg, j) => (seg.h > 0 ? <rect x={seg.x} y={seg.y} width={seg.w} height={seg.h} rx={seg.rx} fill={segColors[j]} fill-opacity="0.85" /> : null)))}
+        <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5"></line>
+        <line x1={px0} x2={px0} y1={py0} y2={py1} stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5"></line>
+        {
+          xLabels.map((t) => (
+            <text x={t.x} y={py1 + 16} text-anchor="middle" font-size="10" fill="var(--muted-foreground)">
+              {t.label}
+            </text>
+          ))
+        }
+      </svg>
     </div>
 
-    <div class="chart-frame">
-      <table class="charts-css column multiple stacked show-4-secondary-axes" style="--color-1:var(--chart-1);--color-2:var(--chart-4)">
-        <tbody>
-          {
-            MONTH_DAYS.map((d) => (
-              <tr>
-                <td style={`--size:${d.selfUse / maxTotal}`}>
-                  <span class="data">{d.selfUse}</span>
-                </td>
-                <td style={`--size:${d.gridImport / maxTotal}`}>
-                  <span class="data">{d.gridImport}</span>
-                </td>
-              </tr>
-            ))
-          }
-        </tbody>
-      </table>
-    </div>
-
-    <div class="mt-5 flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground">
-      <span class="flex items-center gap-2"><span class="legend-dot" style="background:var(--chart-1)"></span>ใช้ไฟจากโซลาร์</span>
-      <span class="flex items-center gap-2"><span class="legend-dot" style="background:var(--chart-4)"></span>ซื้อจากการไฟฟ้า</span>
-    </div>
-  </section>
+    <LegendRow
+      class="mt-5"
+      items={[
+        { label: 'ใช้ไฟจากโซลาร์', color: 'var(--chart-1)' },
+        { label: 'ซื้อจากการไฟฟ้า', color: 'var(--chart-4)' },
+      ]}
+    />
+  </ChartCard>
 </div>

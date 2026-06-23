@@ -117,51 +117,14 @@
   }
 }
 
-/* ---------- Charts.css refinements (luxury, muted, thin) ---------- */
-/* charts.css reads --color-1..--color-10 on the table for dataset fills. */
-.charts-css {
-  font-family: var(--font-sans);
-  color: var(--muted-foreground);
-  font-size: 0.7rem;
-  --color-1: var(--chart-1);
-  --color-2: var(--chart-2);
-  --color-3: var(--chart-3);
-  --color-4: var(--chart-4);
-}
-
-/* hide the per-cell data labels by default — the surrounding card explains the numbers */
-.charts-css .data {
-  opacity: 0;
-}
-
-/* subtle grid + axis lines */
-.charts-css.show-primary-axis {
-  --primary-axis-color: var(--border);
-}
-.charts-css.show-secondary-axes,
-.charts-css.show-1-secondary-axes,
-.charts-css.show-2-secondary-axes,
-.charts-css.show-3-secondary-axes,
-.charts-css.show-4-secondary-axes,
-.charts-css.show-5-secondary-axes {
-  --secondary-axes-color: color-mix(in oklch, var(--border) 70%, transparent);
-}
-
-.charts-css.column,
-.charts-css.bar {
-  --bar-radius: 4px 4px 0 0;
-}
-
-/* fixed-height chart frame */
+/* fixed-height chart frame for bar/column SVG charts */
 .chart-frame {
   height: 280px;
+  overflow: hidden;
 }
 .chart-frame.tall {
   height: 320px;
-}
-.chart-frame > .charts-css {
-  height: 100%;
-  max-width: 100%;
+  overflow: hidden;
 }
 
 /* small swatch for hand-rolled legends */

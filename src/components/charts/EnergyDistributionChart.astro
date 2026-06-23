@@ -1,0 +1,64 @@
+---
+import { num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
+import ChartCard from '@/components/ui/ChartCard.astro'
+
+const { energyDistribution: ENERGY_DISTRIBUTION } = Astro.props as Pick<SolarData, 'energyDistribution'>
+const total = ENERGY_DISTRIBUTION.reduce((s, d) => s + d.value, 0) || 1
+const colors = ['var(--chart-2)', 'var(--chart-1)', 'var(--chart-3)']
+
+const R = 90,
+  SW = 30
+const C = 2 * Math.PI * R
+
+let acc = 0
+const slices = ENERGY_DISTRIBUTION.map((d, i) => {
+  const f = d.value / total
+  const dashoffset = (-acc * C).toFixed(2)
+  acc += f
+  return {
+    label: d.name,
+    color: colors[i],
+    dasharray: `${(f * C).toFixed(2)} ${C.toFixed(2)}`,
+    dashoffset,
+    pct: Math.round(f * 100),
+  }
+})
+---
+
+<ChartCard>
+  <div class="mb-6 flex items-baseline justify-between gap-4">
+    <div>
+      <h2 class="font-serif text-lg font-light text-foreground">ไฟที่ผลิตได้ถูกใช้ไปที่ไหนบ้าง</h2>
+      <p class="mt-1 text-sm leading-relaxed text-muted-foreground">สัดส่วนพลังงานสะสมตั้งแต่ติดตั้ง แบ่งตามปลายทางการใช้งาน</p>
+    </div>
+    <p class="shrink-0 font-serif text-2xl font-light text-foreground">{num(total, 0)}<span class="text-sm text-muted-foreground"> kWh</span></p>
+  </div>
+
+  <div class="mx-auto aspect-square w-full max-w-60">
+    <svg viewBox="0 0 240 240" width="100%" height="100%">
+      <circle cx="120" cy="120" r={R} fill="none" stroke="var(--border)" stroke-opacity="0.35" stroke-width={SW}></circle>
+      <g transform="rotate(-90 120 120)">
+        {
+          slices.map((s) => (
+            <circle cx="120" cy="120" r={R} fill="none" stroke={s.color} stroke-width={SW} stroke-dasharray={s.dasharray} stroke-dashoffset={s.dashoffset} stroke-linecap={'butt' as const} />
+          ))
+        }
+      </g>
+      <text x="120" y="114" text-anchor="middle" font-family="var(--font-serif)" font-weight="300" font-size="26" fill="var(--foreground)">{num(total, 0)}</text>
+      <text x="120" y="134" text-anchor="middle" font-family="var(--font-sans)" font-size="11" letter-spacing="0.1em" fill="var(--muted-foreground)">kWh</text>
+    </svg>
+  </div>
+
+  <div class="mt-6 space-y-2">
+    {
+      slices.map((s) => (
+        <div class="flex items-center gap-2 text-sm">
+          <span class="legend-dot" style={`background:${s.color}`} />
+          <span class="text-muted-foreground">{s.label}</span>
+          <span class="ml-auto font-medium text-foreground">{s.pct}%</span>
+        </div>
+      ))
+    }
+  </div>
+</ChartCard>

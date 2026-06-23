@@ -1,0 +1,62 @@
+---
+import { svgLine, svgArea } from '@/lib/chart'
+import type { SolarData } from '@/lib/solar-data'
+import ChartCard from '@/components/ui/ChartCard.astro'
+import LegendRow from '@/components/ui/LegendRow.astro'
+
+const { hourlySoc: HOURLY_SOC } = Astro.props as Pick<SolarData, 'hourlySoc'>
+const vals = HOURLY_SOC.map((r) => r.soc / 100)
+
+const nonZero = HOURLY_SOC.filter((r) => r.soc > 0)
+const currentSoc = HOURLY_SOC[HOURLY_SOC.length - 1]?.soc ?? 0
+const minSoc = nonZero.length > 0 ? Math.min(...nonZero.map((r) => r.soc)) : 0
+const maxSoc = nonZero.length > 0 ? Math.max(...nonZero.map((r) => r.soc)) : 0
+
+const [VW, VH, ML, MT, MR, MB] = [560, 160, 32, 8, 8, 24]
+const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
+const ph = py1 - py0
+
+const linePath = svgLine(vals, px0, py0, px1, py1)
+const fillPath = svgArea(vals, px0, py0, px1, py1)
+const gridYs = [0.25, 0.5, 0.75].map((f) => +(py0 + (1 - f) * ph).toFixed(1))
+---
+
+<ChartCard eyebrow="แบตเตอรี่" title="ระดับพลังงานสำรองระหว่างวัน" class="flex flex-col overflow-hidden">
+  <div class="flex items-end gap-8 border-b border-border/60 pb-5">
+    <div class="space-y-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ล่าสุด</p>
+      <p class="font-serif text-4xl font-light leading-none">
+        {currentSoc}<span class="ml-1 text-base text-muted-foreground">%</span>
+      </p>
+    </div>
+    <div class="space-y-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ต่ำสุดวันนี้</p>
+      <p class="font-serif text-2xl font-light leading-none text-muted-foreground">{minSoc}%</p>
+    </div>
+    <div class="ml-auto space-y-1 text-right">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">สูงสุดวันนี้</p>
+      <p class="font-serif text-lg text-foreground">{maxSoc}%</p>
+    </div>
+  </div>
+
+  <div class="mt-5 h-40 w-full">
+    <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
+      <defs>
+        <linearGradient id="soc-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--chart-1)" stop-opacity="0.35"></stop>
+          <stop offset="100%" stop-color="var(--chart-1)" stop-opacity="0"></stop>
+        </linearGradient>
+        <clipPath id="soc-clip"><rect x={px0} y={py0} width={px1 - px0} height={ph}></rect></clipPath>
+      </defs>
+      {gridYs.map((y) => <line x1={px0} x2={px1} y1={y} y2={y} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
+      <g clip-path="url(#soc-clip)">
+        <path d={fillPath} fill="url(#soc-grad)"></path>
+        <path d={linePath} fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap={'round' as const}></path>
+      </g>
+    </svg>
+  </div>
+
+  <LegendRow class="mt-4" items={[{ label: 'ระดับแบตเตอรี่ (%)', color: 'var(--chart-1)' }]}>
+    <span class="ml-auto">00:00 → 23:00</span>
+  </LegendRow>
+</ChartCard>

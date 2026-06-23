@@ -1,0 +1,74 @@
+---
+import { svgLine, svgArea } from '@/lib/chart'
+import { num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
+import ChartCard from '@/components/ui/ChartCard.astro'
+import LegendRow from '@/components/ui/LegendRow.astro'
+
+const { hourly: HOURLY } = Astro.props as Pick<SolarData, 'hourly'>
+const max = Math.max(...HOURLY.map((h) => Math.max(h.pv, h.load)), 1)
+const pvVals = HOURLY.map((h) => h.pv / max)
+const loadVals = HOURLY.map((h) => h.load / max)
+const peakPv = Math.max(...HOURLY.map((h) => h.pv))
+const peakLoad = Math.max(...HOURLY.map((h) => h.load))
+
+const [VW, VH, ML, MT, MR, MB] = [560, 160, 32, 8, 8, 24]
+const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
+const ph = py1 - py0
+
+const pvLine = svgLine(pvVals, px0, py0, px1, py1)
+const pvFill = svgArea(pvVals, px0, py0, px1, py1)
+const loadLine = svgLine(loadVals, px0, py0, px1, py1)
+const loadFill = svgArea(loadVals, px0, py0, px1, py1)
+const gridYs = [0.25, 0.5, 0.75].map((f) => +(py0 + (1 - f) * ph).toFixed(1))
+---
+
+<ChartCard eyebrow="พลังงาน" title="กราฟกำลังผลิตรายชั่วโมง" class="flex flex-col overflow-hidden">
+  <div class="flex items-end gap-8 border-b border-border/60 pb-5">
+    <div class="space-y-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">พีคโซลาร์</p>
+      <p class="font-serif text-4xl font-light leading-none">
+        {num(peakPv, 2)}<span class="ml-1 text-base text-muted-foreground">kW</span>
+      </p>
+    </div>
+    <div class="space-y-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">พีคโหลด</p>
+      <p class="font-serif text-2xl font-light leading-none" style="color:var(--chart-4)">↑ {num(peakLoad, 2)}</p>
+    </div>
+    <div class="ml-auto space-y-1 text-right">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ตลอดวัน</p>
+      <p class="font-serif text-base text-muted-foreground">00:00 → 23:00</p>
+    </div>
+  </div>
+
+  <div class="mt-5 h-40 w-full">
+    <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
+      <defs>
+        <linearGradient id="pv-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--chart-2)" stop-opacity="0.35"></stop>
+          <stop offset="100%" stop-color="var(--chart-2)" stop-opacity="0"></stop>
+        </linearGradient>
+        <linearGradient id="load-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--chart-4)" stop-opacity="0.2"></stop>
+          <stop offset="100%" stop-color="var(--chart-4)" stop-opacity="0"></stop>
+        </linearGradient>
+        <clipPath id="pv-clip"><rect x={px0} y={py0} width={px1 - px0} height={ph}></rect></clipPath>
+      </defs>
+      {gridYs.map((y) => <line x1={px0} x2={px1} y1={y} y2={y} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
+      <g clip-path="url(#pv-clip)">
+        <path d={pvFill} fill="url(#pv-grad)"></path>
+        <path d={pvLine} fill="none" stroke="var(--chart-2)" stroke-width="1.5" stroke-linecap={'round' as const}></path>
+        <path d={loadFill} fill="url(#load-grad)"></path>
+        <path d={loadLine} fill="none" stroke="var(--chart-4)" stroke-width="1.5" stroke-linecap={'round' as const}></path>
+      </g>
+    </svg>
+  </div>
+
+  <LegendRow
+    class="mt-4"
+    items={[
+      { label: 'ผลิตจากแผง (kW)', color: 'var(--chart-2)' },
+      { label: 'ใช้ในบ้าน (kW)', color: 'var(--chart-4)' },
+    ]}
+  />
+</ChartCard>
