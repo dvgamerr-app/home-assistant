@@ -148,8 +148,8 @@ export async function getAll() {
   const selfUsedLife = Math.round(lifetime.generated * selfUseRatio)
   const exportedLife = Math.max(0, lifetime.generated - selfUsedLife)
   const energyDistribution = [
-    { name: 'ใช้ในบ้านทันที', value: selfUsedLife, key: 'selfUse' },
-    { name: 'ส่งออก/เหลือเกิน', value: exportedLife, key: 'export' },
+    { name: 'ใช้เองในบ้าน', value: selfUsedLife, key: 'selfUse' },
+    { name: 'เหลือทิ้ง', value: exportedLife, key: 'clipped' },
   ]
 
   // ── Payback — ใช้ solar_record (inverter data) เพราะ mea_electric ไม่มี unitUsedSolar ──
@@ -175,6 +175,13 @@ export async function getAll() {
     return { ...b, consumed: totalConsumed, withoutSolar, savedTHB: Math.max(0, withoutSolar - b.paid) }
   })
 
+  // ── Month picker — เดือนที่มีข้อมูลจริงใน DB ────────────────────────────────
+  const monthPicker = rawMonths.map((m) => {
+    const y = parseInt(m.month.slice(0, 4))
+    const mo = parseInt(m.month.slice(5))
+    return { value: m.month.replace('-', ''), label: `${MONTH_SHORT_TH[mo - 1]} ${String(y + 543).slice(-2)}` }
+  })
+
   return {
     system: { ...SYSTEM, ratedPowerKw: live.powerRating || SYSTEM.ratedPowerKw },
     live,
@@ -185,6 +192,7 @@ export async function getAll() {
     day,
     monthDays: formattedMonthDays,
     monthLabel,
+    monthPicker,
     months,
     hourly: fullHourly,
     hourlySoc,
@@ -196,3 +204,43 @@ export async function getAll() {
 }
 
 export type SolarData = Awaited<ReturnType<typeof getAll>>
+
+/** ข้อมูลรายวัน + สรุปรวมของเดือนที่กำหนด (สำหรับ month picker) */
+export async function getMonthLoad(year: number, month: number) {
+  const monthDays = await getMonthDays(year, month)
+
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const dayMap = new Map(monthDays.map((d) => [d.day, d]))
+  const monthlyGridKwh = monthDays.reduce((s, d) => s + d.gridImport, 0)
+  const rate = marginalRate(monthlyGridKwh || 320)
+
+  const days = Array.from({ length: daysInMonth }, (_, i) => {
+    const d = dayMap.get(i + 1) ?? { day: i + 1, generated: 0, consumed: 0, gridImport: 0 }
+    const selfUse = Math.max(0, d.consumed - d.gridImport)
+    return { day: String(d.day), generated: d.generated, consumed: d.consumed, selfUse, gridImport: d.gridImport, saved: +(selfUse * rate).toFixed(1) }
+  })
+
+  const raw = days.reduce((a, d) => ({ generated: a.generated + d.generated, consumed: a.consumed + d.consumed, gridImport: a.gridImport + d.gridImport, selfUse: a.selfUse + d.selfUse }), {
+    generated: 0,
+    consumed: 0,
+    gridImport: 0,
+    selfUse: 0,
+  })
+  const billActual = calculateMonthlyBill(raw.gridImport)
+  const billNoSolar = calculateMonthlyBill(raw.consumed)
+
+  return {
+    days,
+    label: `${MONTH_LONG_TH[month - 1]} ${year + 543}`,
+    labelShort: `${MONTH_SHORT_TH[month - 1]} ${String(year + 543).slice(-2)}`,
+    totals: {
+      ...raw,
+      savedTHB: Math.max(0, billNoSolar.total - billActual.total),
+      gridCostTHB: billActual.total,
+      wouldHaveCostTHB: billNoSolar.total,
+      selfSufficiency: raw.consumed > 0 ? (raw.selfUse / raw.consumed) * 100 : 0,
+    },
+  }
+}
+
+export type MonthLoad = Awaited<ReturnType<typeof getMonthLoad>>

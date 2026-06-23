@@ -21,14 +21,14 @@ const pvLine = svgLine(pvVals, px0, py0, px1, py1)
 const pvFill = svgArea(pvVals, px0, py0, px1, py1)
 const loadLine = svgLine(loadVals, px0, py0, px1, py1)
 const loadFill = svgArea(loadVals, px0, py0, px1, py1)
-const gridYs = [0.25, 0.5, 0.75].map((f) => +(py0 + (1 - f) * ph).toFixed(1))
 
-// HTML axis labels — outside SVG to avoid preserveAspectRatio stretch
-const gridPct = [0.75, 0.5, 0.25].map((f) => +(((MT + (1 - f) * ph) / VH) * 100).toFixed(2))
+const yTicks = [1, 0.75, 0.5, 0.25]
+const gridYs = yTicks.map((f) => +(py0 + (1 - f) * ph).toFixed(1))
+const gridPct = yTicks.map((f) => +(((MT + (1 - f) * ph) / VH) * 100).toFixed(2))
+const xLabels = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+const yLabels = yTicks.map((f) => num(max * f, 1))
 const padLeft = +((ML / VW) * 100).toFixed(2)
 const padRight = +((MR / VW) * 100).toFixed(2)
-const xLabels = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
-const yLabels = [0.75, 0.5, 0.25].map((f) => `${num(max * f, 1)}`)
 ---
 
 <ChartCard eyebrow="พลังงาน" title="กราฟกำลังผลิตรายชั่วโมง" class="flex flex-col overflow-hidden">
@@ -50,10 +50,13 @@ const yLabels = [0.75, 0.5, 0.25].map((f) => `${num(max * f, 1)}`)
   </div>
 
   <div class="mt-5 flex items-start gap-1">
-    <div class="relative h-56 shrink-0 md:h-60" style="width:1.75rem">
+    <div class="relative h-56 shrink-0 overflow-visible md:h-60" style="width:1.75rem">
       {
         yLabels.map((l, i) => (
-          <span class="absolute right-0 text-right text-[9px] leading-none text-muted-foreground" style={`top:${gridPct[i]}%;transform:translateY(-50%)`}>
+          <span
+            class:list={['absolute right-0 text-right text-[9px] leading-none', i === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
+            style={`top:${gridPct[i]}%;transform:translateY(-50%)`}
+          >
             {l}
           </span>
         ))
@@ -75,13 +78,27 @@ const yLabels = [0.75, 0.5, 0.25].map((f) => `${num(max * f, 1)}`)
           </defs>
           <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
           <line x1={px0} x2={px0} y1={py0} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
-          {gridYs.map((y) => <line x1={px0} x2={px1} y1={y} y2={y} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
+          {gridYs.map((y, i) => <line x1={px0} x2={px1} y1={y} y2={y} stroke="var(--border)" stroke-opacity={i === 0 ? '0.4' : '0.8'} stroke-width="0.5" stroke-dasharray="2 4" />)}
           <g clip-path="url(#pv-clip)">
             <path d={pvFill} fill="url(#pv-grad)"></path>
             <path d={pvLine} fill="none" stroke="var(--chart-2)" stroke-width="1.5" stroke-linecap={'round' as const}></path>
             <path d={loadFill} fill="url(#load-grad)"></path>
             <path d={loadLine} fill="none" stroke="var(--chart-4)" stroke-width="1.5" stroke-linecap={'round' as const}></path>
           </g>
+          <line class="pv-crosshair" x1="0" x2="0" y1={py0} y2={py1} stroke="var(--foreground)" stroke-opacity="0.2" stroke-width="0.5" visibility="hidden"></line>
+          <rect
+            class="pv-overlay"
+            x={px0}
+            y={py0}
+            width={px1 - px0}
+            height={ph}
+            fill="transparent"
+            style="cursor:crosshair"
+            data-px0={px0}
+            data-px1={px1}
+            data-vw={VW}
+            data-pv={JSON.stringify(HOURLY.map((h) => h.pv))}
+            data-load={JSON.stringify(HOURLY.map((h) => h.load))}></rect>
         </svg>
       </div>
       <div class="mt-1 flex justify-between text-[9px] text-muted-foreground" style={`padding-left:${padLeft}%;padding-right:${padRight}%`}>
@@ -98,3 +115,67 @@ const yLabels = [0.75, 0.5, 0.25].map((f) => `${num(max * f, 1)}`)
     ]}
   />
 </ChartCard>
+
+<div class="pv-chart-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:140px">
+  <p class="pv-tip-hour mb-2 text-[10px] uppercase tracking-luxury text-muted-foreground"></p>
+  <div class="space-y-1.5">
+    <div class="flex items-center justify-between gap-4">
+      <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-2)"></span>โซลาร์
+      </span>
+      <span class="pv-tip-pv font-mono text-[11px] text-foreground"></span>
+    </div>
+    <div class="flex items-center justify-between gap-4">
+      <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-4)"></span>โหลด
+      </span>
+      <span class="pv-tip-load font-mono text-[11px] text-foreground"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+  {
+    const overlay = document.querySelector<SVGRectElement>('.pv-overlay')
+    const svg = overlay?.closest('svg') as SVGSVGElement | null
+    const crosshair = document.querySelector<SVGLineElement>('.pv-crosshair')
+    const tip = document.querySelector<HTMLElement>('.pv-chart-tip')
+    if (svg && overlay && tip && crosshair) {
+      const d = overlay.dataset
+      const px0 = +d.px0!,
+        px1 = +d.px1!,
+        vw = +d.vw!
+      const pvData: number[] = JSON.parse(d.pv!)
+      const loadData: number[] = JSON.parse(d.load!)
+      const n = pvData.length
+      const hourEl = tip.querySelector('.pv-tip-hour')!
+      const pvEl = tip.querySelector('.pv-tip-pv')!
+      const loadEl = tip.querySelector('.pv-tip-load')!
+
+      svg.addEventListener('mousemove', (e) => {
+        const r = svg.getBoundingClientRect()
+        const sx = ((e.clientX - r.left) / r.width) * vw
+        if (sx < px0 || sx > px1) {
+          tip.classList.add('hidden')
+          crosshair.setAttribute('visibility', 'hidden')
+          return
+        }
+        const idx = Math.max(0, Math.min(n - 1, Math.round(((sx - px0) / (px1 - px0)) * (n - 1))))
+        const cx = n > 1 ? (px0 + (idx / (n - 1)) * (px1 - px0)).toFixed(1) : String(px0)
+        crosshair.setAttribute('x1', cx)
+        crosshair.setAttribute('x2', cx)
+        crosshair.setAttribute('visibility', 'visible')
+        hourEl.textContent = String(idx).padStart(2, '0') + ':00 น.'
+        pvEl.textContent = pvData[idx].toFixed(2) + ' kW'
+        loadEl.textContent = loadData[idx].toFixed(2) + ' kW'
+        tip.classList.remove('hidden')
+        tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 160) + 'px'
+        tip.style.top = Math.max(e.clientY - 70, 8) + 'px'
+      })
+      svg.addEventListener('mouseleave', () => {
+        tip.classList.add('hidden')
+        crosshair.setAttribute('visibility', 'hidden')
+      })
+    }
+  }
+</script>

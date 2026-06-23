@@ -3,9 +3,34 @@ import Layout from '@/layouts/Layout.astro'
 import Nav from '@/components/Nav.astro'
 import ElectricityNav from '@/components/ElectricityNav.astro'
 import DailyView from '@/components/DailyView.astro'
-import { getAll } from '@/lib/solar-data'
+import { getAll, getMonthLoad } from '@/lib/solar-data'
 
-const data = await getAll()
+const now = new Date()
+const curYear = now.getFullYear()
+const curMonth = now.getMonth() + 1
+
+const mParam = Astro.url.searchParams.get('m')
+let selYear = curYear,
+  selMonth = curMonth
+if (mParam && /^\d{6}$/.test(mParam)) {
+  selYear = parseInt(mParam.slice(0, 4))
+  selMonth = Math.max(1, Math.min(12, parseInt(mParam.slice(4, 6))))
+}
+const isCurrentMonth = selYear === curYear && selMonth === curMonth
+const selectedMonthStr = `${selYear}${String(selMonth).padStart(2, '0')}`
+
+// prev month of selected
+const prevDate = new Date(selYear, selMonth - 2, 1)
+const prevYear = prevDate.getFullYear()
+const prevMonth = prevDate.getMonth() + 1
+
+const [data, selMonthData, prevMonthData] = await Promise.all([getAll(), isCurrentMonth ? Promise.resolve(null) : getMonthLoad(selYear, selMonth), getMonthLoad(prevYear, prevMonth)])
+
+// เดือนที่มีข้อมูลจริงใน DB (จาก getMonths(12) ใน getAll)
+const availableMonths = data.monthPicker
+
+const monthDays = isCurrentMonth ? data.monthDays : selMonthData!.days
+const monthLabel = isCurrentMonth ? data.monthLabel : selMonthData!.label
 ---
 
 <Layout title="การใช้ไฟในบ้าน — บ้าน">
@@ -18,6 +43,16 @@ const data = await getAll()
 
     <ElectricityNav active="load" />
 
-    <DailyView today={data.today} day={data.day} monthDays={data.monthDays} monthLabel={data.monthLabel} />
+    <DailyView
+      today={data.today}
+      day={data.day}
+      monthDays={monthDays}
+      monthLabel={monthLabel}
+      isCurrentMonth={isCurrentMonth}
+      selMonthTotals={selMonthData?.totals}
+      prevMonthSummary={prevMonthData}
+      availableMonths={availableMonths}
+      selectedMonth={selectedMonthStr}
+    />
   </main>
 </Layout>

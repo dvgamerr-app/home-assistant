@@ -23,8 +23,6 @@ const linePath = svgLine(vals, px0, py0, px1, py1)
 const fillPath = svgArea(vals, px0, py0, px1, py1)
 const yTicks = [1, 0.75, 0.5, 0.25]
 const gridYs = yTicks.map((f) => +(py0 + (1 - f) * ph).toFixed(1))
-
-// HTML axis labels — outside SVG to avoid preserveAspectRatio stretch
 const gridPct = yTicks.map((f) => +(((MT + (1 - f) * ph) / VH) * 100).toFixed(2))
 const padLeft = +((ML / VW) * 100).toFixed(2)
 const padRight = +((MR / VW) * 100).toFixed(2)
@@ -50,10 +48,13 @@ const yLabels = ['100%', '75%', '50%', '25%']
   </div>
 
   <div class="mt-5 flex items-start gap-1">
-    <div class="relative h-40 shrink-0" style="width:1.75rem">
+    <div class="relative h-40 shrink-0 overflow-visible" style="width:1.75rem">
       {
         yLabels.map((l, i) => (
-          <span class="absolute right-0 text-right text-[9px] leading-none text-muted-foreground" style={`top:${gridPct[i]}%;transform:translateY(-50%)`}>
+          <span
+            class:list={['absolute right-0 text-right text-[9px] leading-none', i === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
+            style={`top:${gridPct[i]}%;transform:translateY(-50%)`}
+          >
             {l}
           </span>
         ))
@@ -71,11 +72,25 @@ const yLabels = ['100%', '75%', '50%', '25%']
           </defs>
           <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
           <line x1={px0} x2={px0} y1={py0} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
-          {gridYs.map((y) => <line x1={px0} x2={px1} y1={y} y2={y} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
+          {gridYs.map((y, i) => <line x1={px0} x2={px1} y1={y} y2={y} stroke="var(--border)" stroke-opacity={i === 0 ? '0.4' : '0.8'} stroke-width="0.5" stroke-dasharray="2 4" />)}
           <g clip-path="url(#self-clip)">
             <path d={fillPath} fill="url(#self-grad)"></path>
             <path d={linePath} fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap={'round' as const}></path>
           </g>
+          <line class="self-crosshair" x1="0" x2="0" y1={py0} y2={py1} stroke="var(--foreground)" stroke-opacity="0.2" stroke-width="0.5" visibility="hidden"></line>
+          <rect
+            class="self-overlay"
+            x={px0}
+            y={py0}
+            width={px1 - px0}
+            height={ph}
+            fill="transparent"
+            style="cursor:crosshair"
+            data-px0={px0}
+            data-px1={px1}
+            data-vw={VW}
+            data-ratios={JSON.stringify(data.map((d) => d.ratio))}
+            data-months={JSON.stringify(data.map((d) => d.month))}></rect>
         </svg>
       </div>
       <div class="mt-1 flex justify-between text-[9px] tracking-wider text-muted-foreground" style={`padding-left:${padLeft}%;padding-right:${padRight}%`}>
@@ -86,3 +101,57 @@ const yLabels = ['100%', '75%', '50%', '25%']
 
   <LegendRow class="mt-3" items={[{ label: 'พึ่งพาตัวเอง (%)', color: 'var(--chart-1)' }]} />
 </ChartCard>
+
+<div class="self-chart-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:130px">
+  <p class="self-tip-month mb-2 text-[10px] uppercase tracking-luxury text-muted-foreground"></p>
+  <div class="flex items-center justify-between gap-4">
+    <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+      <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-1)"></span>พึ่งตัวเอง
+    </span>
+    <span class="self-tip-val font-mono text-[11px] font-medium text-foreground"></span>
+  </div>
+</div>
+
+<script>
+  {
+    const overlay = document.querySelector<SVGRectElement>('.self-overlay')
+    const svg = overlay?.closest('svg') as SVGSVGElement | null
+    const crosshair = document.querySelector<SVGLineElement>('.self-crosshair')
+    const tip = document.querySelector<HTMLElement>('.self-chart-tip')
+    if (svg && overlay && tip && crosshair) {
+      const d = overlay.dataset
+      const px0 = +d.px0!,
+        px1 = +d.px1!,
+        vw = +d.vw!
+      const ratios: number[] = JSON.parse(d.ratios!)
+      const months: string[] = JSON.parse(d.months!)
+      const n = ratios.length
+      const monthEl = tip.querySelector('.self-tip-month')!
+      const valEl = tip.querySelector('.self-tip-val')!
+
+      svg.addEventListener('mousemove', (e) => {
+        const r = svg.getBoundingClientRect()
+        const sx = ((e.clientX - r.left) / r.width) * vw
+        if (sx < px0 || sx > px1) {
+          tip.classList.add('hidden')
+          crosshair.setAttribute('visibility', 'hidden')
+          return
+        }
+        const idx = Math.max(0, Math.min(n - 1, Math.round(((sx - px0) / (px1 - px0)) * (n - 1))))
+        const cx = n > 1 ? (px0 + (idx / (n - 1)) * (px1 - px0)).toFixed(1) : String(px0)
+        crosshair.setAttribute('x1', cx)
+        crosshair.setAttribute('x2', cx)
+        crosshair.setAttribute('visibility', 'visible')
+        monthEl.textContent = months[idx]
+        valEl.textContent = ratios[idx] + '%'
+        tip.classList.remove('hidden')
+        tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 160) + 'px'
+        tip.style.top = Math.max(e.clientY - 70, 8) + 'px'
+      })
+      svg.addEventListener('mouseleave', () => {
+        tip.classList.add('hidden')
+        crosshair.setAttribute('visibility', 'hidden')
+      })
+    }
+  }
+</script>

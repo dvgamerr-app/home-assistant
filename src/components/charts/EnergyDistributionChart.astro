@@ -10,18 +10,34 @@ const colors = ['var(--chart-2)', 'var(--chart-1)', 'var(--chart-3)']
 const R = 90,
   SW = 30
 const C = 2 * Math.PI * R
+const CX = 120,
+  CY = 120
+const INNER_R = R - SW / 2 // 75
+const OUTER_R = R + SW / 2 // 105
+
+// Wedge hitbox paths for tooltip interaction
+const toRad = (deg: number) => (deg * Math.PI) / 180
+const pt = (r: number, deg: number) => `${(CX + r * Math.cos(toRad(deg))).toFixed(2)},${(CY + r * Math.sin(toRad(deg))).toFixed(2)}`
+const wedgePath = (startDeg: number, endDeg: number) => {
+  const large = endDeg - startDeg > 180 ? 1 : 0
+  return `M${pt(OUTER_R, startDeg)} A${OUTER_R},${OUTER_R},0,${large},1,${pt(OUTER_R, endDeg)} L${pt(INNER_R, endDeg)} A${INNER_R},${INNER_R},0,${large},0,${pt(INNER_R, startDeg)} Z`
+}
 
 let acc = 0
 const slices = ENERGY_DISTRIBUTION.map((d, i) => {
   const f = d.value / total
   const dashoffset = (-acc * C).toFixed(2)
+  const startDeg = acc * 360 - 90
   acc += f
+  const endDeg = acc * 360 - 90
   return {
     label: d.name,
     color: colors[i],
     dasharray: `${(f * C).toFixed(2)} ${C.toFixed(2)}`,
     dashoffset,
     pct: Math.round(f * 100),
+    value: num(d.value, 0),
+    wedge: f > 0 ? wedgePath(startDeg, endDeg) : '',
   }
 })
 ---
@@ -47,6 +63,11 @@ const slices = ENERGY_DISTRIBUTION.map((d, i) => {
       </g>
       <text x="120" y="114" text-anchor="middle" font-family="var(--font-serif)" font-weight="300" font-size="26" fill="var(--foreground)">{num(total, 0)}</text>
       <text x="120" y="134" text-anchor="middle" font-family="var(--font-sans)" font-size="11" letter-spacing="0.1em" fill="var(--muted-foreground)">kWh</text>
+      {
+        slices.map((s, i) =>
+          s.wedge ? <path class="donut-hit" d={s.wedge} fill="transparent" style="cursor:default" data-label={s.label} data-pct={s.pct} data-value={s.value} data-color={s.color} data-i={i} /> : null,
+        )
+      }
     </svg>
   </div>
 
@@ -62,3 +83,46 @@ const slices = ENERGY_DISTRIBUTION.map((d, i) => {
     }
   </div>
 </ChartCard>
+
+<div class="donut-chart-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:140px">
+  <div class="mb-1.5 flex items-center gap-2">
+    <span class="donut-tip-dot h-2 w-2 shrink-0 rounded-full"></span>
+    <p class="donut-tip-label text-[11px] text-foreground"></p>
+  </div>
+  <div class="flex items-center justify-between gap-4">
+    <span class="text-[10px] text-muted-foreground">สัดส่วน</span>
+    <span class="donut-tip-pct font-mono text-[11px] font-medium text-foreground"></span>
+  </div>
+  <div class="flex items-center justify-between gap-4">
+    <span class="text-[10px] text-muted-foreground">พลังงาน</span>
+    <span class="donut-tip-val font-mono text-[11px] text-foreground"></span>
+  </div>
+</div>
+
+<script>
+  {
+    const tip = document.querySelector<HTMLElement>('.donut-chart-tip')
+    if (tip) {
+      const dotEl = tip.querySelector('.donut-tip-dot') as HTMLElement
+      const labelEl = tip.querySelector('.donut-tip-label')!
+      const pctEl = tip.querySelector('.donut-tip-pct')!
+      const valEl = tip.querySelector('.donut-tip-val')!
+
+      document.querySelectorAll<SVGPathElement>('.donut-hit').forEach((path) => {
+        path.addEventListener('mouseenter', (e) => {
+          const d = (e.currentTarget as SVGPathElement).dataset
+          dotEl.style.background = d.color!
+          labelEl.textContent = d.label!
+          pctEl.textContent = d.pct + '%'
+          valEl.textContent = d.value + ' kWh'
+          tip.classList.remove('hidden')
+        })
+        path.addEventListener('mousemove', (e) => {
+          tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 160) + 'px'
+          tip.style.top = Math.max(e.clientY - 70, 8) + 'px'
+        })
+        path.addEventListener('mouseleave', () => tip.classList.add('hidden'))
+      })
+    }
+  }
+</script>
