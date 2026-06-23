@@ -15,22 +15,16 @@ import PiggyBank from '@lucide/svelte/icons/piggy-bank'
 import Gauge from '@lucide/svelte/icons/gauge'
 import Receipt from '@lucide/svelte/icons/receipt'
 import { getAll } from '@/lib/solar-data'
-import { getBills } from '@/lib/db'
 import { thb, num, calculateMonthlyBill } from '@/lib/electricity'
 
 const data = await getAll()
-const bills = await getBills(12)
 
-// Tab 3 — จับคู่บิลกับข้อมูลรายเดือน เพื่อเทียบ "ถ้าไม่มีโซลาร์"
+// Tab 3 — ใช้ data.bills ที่ fetch มาแล้วจาก getAll()
 const MONTH_SHORT_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
-const billRows = bills.map((b) => {
+const billRows = data.bills.map((b) => {
   const monthLabel = MONTH_SHORT_TH[parseInt(b.month.slice(4)) - 1] ?? b.month
-  const estimated = data.months.find((m) => {
-    // months ใช้ format 'ม.ค.' ส่วน bill ใช้ YYYYMM → เทียบ index เดือน
-    const billMonthIdx = parseInt(b.month.slice(4)) - 1
-    return m.month === MONTH_SHORT_TH[billMonthIdx]
-  })
-  const withoutSolar = estimated?.billWithoutSolar ?? calculateMonthlyBill(b.kwh).total
+  // withoutSolar = คำนวณจาก kwh (กริด) + unitUsedSolar (โซลาร์) = total consumed จริงตามรอบบิล
+  const withoutSolar = calculateMonthlyBill(b.kwh + b.unitUsedSolar).total
   const saved = Math.max(0, withoutSolar - b.paid)
   return { month: monthLabel, kwh: b.kwh, paid: b.paid, withoutSolar, saved }
 })
@@ -40,7 +34,7 @@ const latestBill = billRows[0]
 
 <Layout title="ระบบไฟฟ้า — บ้าน">
   <Nav />
-  <main class="mx-auto max-w-6xl space-y-8 px-6 py-10 md:px-10 md:py-12">
+  <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
     <header class="space-y-3">
       <p class="text-[11px] uppercase tracking-luxury text-muted-foreground">ระบบไฟฟ้า</p>
       <h1 class="font-serif text-4xl font-light leading-tight text-foreground md:text-5xl">ข้อมูลพลังงาน</h1>

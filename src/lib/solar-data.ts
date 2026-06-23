@@ -1,14 +1,14 @@
 import { calculateMonthlyBill, marginalRate } from './electricity'
-import { getLiveSnapshot, getToday, getHourly, getMonthDays, getMonths, getLifetime } from './db'
+import { getLiveSnapshot, getToday, getHourly, getMonthDays, getMonths, getLifetime, getBills } from './db'
 
 // ── Config constants (not in DB) ──────────────────────────────────────────────
 
 export const SYSTEM = {
-  name: 'คุณกิ่งกาญจน์ 75/63',
+  name: 'บ้าน 75/63',
   ratedPowerKw: 8,
   batteryCapacityKwh: 10,
   installDate: '2026-05-11',
-  investmentTHB: 280000,
+  investmentTHB: 359000,
   serialNumber: 'LIBIPS08EEEAF618',
 }
 
@@ -26,7 +26,15 @@ export async function getAll() {
   const year = now.getFullYear()
   const month = now.getMonth() + 1
 
-  const [live, today, monthDays, rawMonths, hourly, lifetime] = await Promise.all([getLiveSnapshot(), getToday(), getMonthDays(year, month), getMonths(12), getHourly(), getLifetime()])
+  const [live, today, monthDays, rawMonths, hourly, lifetime, bills] = await Promise.all([
+    getLiveSnapshot(),
+    getToday(),
+    getMonthDays(year, month),
+    getMonths(12),
+    getHourly(),
+    getLifetime(),
+    getBills(36),
+  ])
 
   // ── Battery ────────────────────────────────────────────────────────────────
   const storedKwh = (SYSTEM.batteryCapacityKwh * live.batterySoc) / 100
@@ -48,28 +56,35 @@ export async function getAll() {
     { name: 'แผง MPPT 2', power: live.pv2.power, voltage: live.pv2.voltage, current: live.pv2.current },
   ]
 
-  // ── System health (gridFrequency not in DB → use design nominal 50 Hz) ────
+  // gridFrequency not in DB → nominal 50 Hz (Thailand standard)
+  const ratedKw = live.powerRating || SYSTEM.ratedPowerKw
   const systemHealth = {
     gridVoltage: live.gridVoltage,
     gridFrequency: 50,
     inverterVoltage: live.gridVoltage,
     totalGenerationHours: live.totalGenerationTime,
-    ratedPowerKw: SYSTEM.ratedPowerKw,
-    loadFactorPct: (live.pvPowerKw / SYSTEM.ratedPowerKw) * 100,
+    ratedPowerKw: ratedKw,
+    loadFactorPct: ratedKw > 0 ? (live.pvPowerKw / ratedKw) * 100 : 0,
     gridVoltageOk: live.gridVoltage >= 210 && live.gridVoltage <= 245,
     gridFrequencyOk: true,
   }
 
   // ── Today derived ─────────────────────────────────────────────────────────
   const selfUseToday = Math.max(0, today.consumed - today.gridImport)
-  const rate = marginalRate(320)
+  const monthlyGridKwh = monthDays.reduce((s, d) => s + d.gridImport, 0)
+  // diff bill ตาม tier จริง แทน flat rate — service charge หักล้างกันในทุก diff
+  const billActual = calculateMonthlyBill(monthlyGridKwh)
+  const billNoSolarToday = calculateMonthlyBill(monthlyGridKwh + selfUseToday)
+  const billNoElecToday = calculateMonthlyBill(Math.max(0, monthlyGridKwh - today.gridImport))
   const day = {
     selfUse: selfUseToday,
-    savedTHB: selfUseToday * rate,
-    gridCostTHB: today.gridImport * rate,
-    wouldHaveCostTHB: today.consumed * rate,
+    savedTHB: billNoSolarToday.total - billActual.total,
+    gridCostTHB: billActual.total - billNoElecToday.total,
+    wouldHaveCostTHB: billNoSolarToday.total - billNoElecToday.total,
     selfSufficiency: today.consumed > 0 ? (selfUseToday / today.consumed) * 100 : 0,
   }
+  // rate ยังใช้สำหรับ chart รายวัน (marginal เพียงพอสำหรับ relative comparison)
+  const rate = marginalRate(monthlyGridKwh || 320)
 
   // ── Month days ────────────────────────────────────────────────────────────
   const formattedMonthDays = monthDays.map((d) => {
@@ -121,17 +136,18 @@ export async function getAll() {
     return { hour: `${String(h).padStart(2, '0')}:00`, soc: d?.soc ?? 0 }
   })
 
-  // ── Energy distribution (from lifetime) ──────────────────────────────────
-  const selfUsedLife = Math.round(lifetime.generated * 0.62)
-  const toBatteryLife = Math.round(lifetime.generated * 0.26)
-  const exportedLife = Math.max(0, Math.round(lifetime.generated - selfUsedLife - toBatteryLife))
+  // ── Energy distribution — ratio derived from actual monthly DB data ───────
+  const histGen = rawMonths.reduce((s, m) => s + m.generated, 0)
+  const histSelfUse = rawMonths.reduce((s, m) => s + Math.max(0, m.consumed - m.gridImport), 0)
+  const selfUseRatio = histGen > 0 ? histSelfUse / histGen : 0
+  const selfUsedLife = Math.round(lifetime.generated * selfUseRatio)
+  const exportedLife = Math.max(0, lifetime.generated - selfUsedLife)
   const energyDistribution = [
     { name: 'ใช้ในบ้านทันที', value: selfUsedLife, key: 'selfUse' },
-    { name: 'เก็บเข้าแบตเตอรี่', value: toBatteryLife, key: 'battery' },
-    { name: 'ขายคืน/ส่งออก', value: exportedLife, key: 'export' },
+    { name: 'ส่งออก/เหลือเกิน', value: exportedLife, key: 'export' },
   ]
 
-  // ── Payback ───────────────────────────────────────────────────────────────
+  // ── Payback — ใช้ solar_record (inverter data) เพราะ mea_electric ไม่มี unitUsedSolar ──
   const totalSavedToDate = months.reduce((s, m) => s + m.saved, 0)
   const monthlyAvgSaving = months.length > 0 ? totalSavedToDate / months.length : 0
   const remaining = Math.max(0, SYSTEM.investmentTHB - totalSavedToDate)
@@ -147,12 +163,12 @@ export async function getAll() {
   }
 
   return {
-    system: SYSTEM,
+    system: { ...SYSTEM, ratedPowerKw: live.powerRating || SYSTEM.ratedPowerKw },
     live,
     battery,
     pvStrings,
     systemHealth,
-    today: { ...today, generationHours: 0 }, // generationHours not in DB
+    today: { ...today, generationHours: hourly.filter((h) => h.pv > 0).length },
     day,
     monthDays: formattedMonthDays,
     monthLabel,
@@ -162,6 +178,7 @@ export async function getAll() {
     energyDistribution,
     lifetime,
     payback,
+    bills,
   }
 }
 

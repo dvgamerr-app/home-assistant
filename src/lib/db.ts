@@ -24,6 +24,8 @@ export type LiveSnapshot = {
   pv2: { power: number; voltage: number; current: number }
   gridVoltage: number
   totalGenerationTime: number
+  powerRating: number // kW rated capacity from inverter
+  offGridPowerKw: number
   isOnline: boolean
   lastUpdate: string
 }
@@ -104,6 +106,8 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
     pv2: { power: m.pv2Power ?? 0, voltage: m.pv2Voltage ?? 0, current: m.pv2Current ?? 0 },
     gridVoltage: m.gridVoltage ?? 0,
     totalGenerationTime: m.totalGenerationTime ?? 0,
+    powerRating: m.powerRating ?? 0,
+    offGridPowerKw: m.offGridPortTotalPower ?? 0,
     isOnline,
     lastUpdate: new Date(lastUpdate).toISOString(),
   }

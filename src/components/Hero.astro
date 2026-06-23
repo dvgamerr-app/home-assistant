@@ -1,15 +1,22 @@
 ---
 import LiveClock from './LiveClock.svelte'
-import LiveStats from './LiveStats.svelte'
 import { num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
+import Sun from '@lucide/svelte/icons/sun'
+import Droplets from '@lucide/svelte/icons/droplets'
+import Wind from '@lucide/svelte/icons/wind'
 
-const { live, system } = Astro.props as Pick<SolarData, 'live' | 'system'>
-const firstName = system.name.replace(/\s*\d.*$/, '').trim()
+interface Props extends Pick<SolarData, 'live' | 'system'> {
+  userName: string
+}
+
+const { live, userName } = Astro.props
+const firstName = userName.split(' ')[0]
 const charging = live.batteryPowerKw < 0
 const buyingNothing = live.gridPowerKw < 0.05
-const socketPort = import.meta.env.SOCKET_PORT ?? '3000'
-const socketUrl = `${Astro.url.protocol}//${Astro.url.hostname}:${socketPort}`
+
+// ponytail: static weather — wire to a real API when you have a key
+const weather = { tempC: 22, humidity: 48, windKph: 6 }
 ---
 
 <section class="border-b border-border/60 px-6 py-12 md:px-10 md:py-16">
@@ -29,6 +36,28 @@ const socketUrl = `${Astro.url.protocol}//${Astro.url.hostname}:${socketPort}`
       </p>
     </div>
 
-    <LiveStats client:load socketUrl={socketUrl} pvPowerKw={live.pvPowerKw} batterySoc={live.batterySoc} gridPowerKw={live.gridPowerKw} />
+    <dl class="grid grid-cols-3 gap-6 md:gap-10">
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center gap-2 text-muted-foreground">
+          <Sun class="h-4 w-4" strokeWidth={1.25} aria-hidden="true" />
+          <dt class="text-[10px] uppercase tracking-luxury">Outside</dt>
+        </div>
+        <dd class="font-serif text-3xl font-light text-foreground md:text-4xl">{weather.tempC}°</dd>
+      </div>
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center gap-2 text-muted-foreground">
+          <Droplets class="h-4 w-4" strokeWidth={1.25} aria-hidden="true" />
+          <dt class="text-[10px] uppercase tracking-luxury">Humidity</dt>
+        </div>
+        <dd class="font-serif text-3xl font-light text-foreground md:text-4xl">{weather.humidity}%</dd>
+      </div>
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center gap-2 text-muted-foreground">
+          <Wind class="h-4 w-4" strokeWidth={1.25} aria-hidden="true" />
+          <dt class="text-[10px] uppercase tracking-luxury">Breeze</dt>
+        </div>
+        <dd class="font-serif text-3xl font-light text-foreground md:text-4xl">{weather.windKph} km/h</dd>
+      </div>
+    </dl>
   </div>
 </section>

@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="th" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Energy Flow · Home Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Thai:wght@300;400;500&family=Trirong:ital,wght@0,300;0,400;1,300&display=swap"
+    />
+    <style>
+      :root {
+        --tracking-luxury: 0.28em;
+        --radius: 0.5rem;
+        --font-serif: "Trirong", Georgia, serif;
+        --font-sans: "Noto Sans Thai", ui-sans-serif, system-ui, sans-serif;
+        --background: oklch(0.978 0.006 85);
+        --foreground: oklch(0.26 0.012 60);
+        --foreground-dim: oklch(0.26 0.012 60 / 30%);
+        --card: oklch(0.995 0.003 85);
+        --primary-foreground: oklch(0.98 0.002 85);
+        --muted-foreground: oklch(0.52 0.012 70);
+        --border: oklch(0.9 0.006 80);
+        --chart-1: oklch(0.65 0.1 60);
+        --chart-2: oklch(0.6 0.13 145);
+        --chart-3: oklch(0.6 0.08 230);
+        --chart-4: oklch(0.58 0.14 32);
+      }
+      [data-theme="dark"] {
+        --background: oklch(0.19 0.006 60);
+        --foreground: oklch(0.92 0.006 85);
+        --foreground-dim: oklch(0.92 0.006 85 / 30%);
+        --card: oklch(0.225 0.006 60);
+        --primary-foreground: oklch(0.15 0.006 60);
+        --muted-foreground: oklch(0.62 0.01 75);
+        --border: oklch(0.92 0.01 85 / 12%);
+        --chart-1: oklch(0.72 0.1 62);
+        --chart-2: oklch(0.68 0.13 148);
+        --chart-3: oklch(0.66 0.08 232);
+        --chart-4: oklch(0.65 0.14 34);
+      }
+
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: var(--font-sans);
+        background: var(--background);
+        color: var(--foreground);
+        -webkit-font-smoothing: antialiased;
+        min-height: 100svh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.25rem;
+        padding: 2.5rem 1.25rem;
+      }
+
+      /* simulate the 2/3 + 1/3 dashboard split */
+      .grid-2 {
+        width: 100%;
+        max-width: 960px;
+        display: grid;
+        gap: 1rem;
+        align-items: stretch;
+        grid-template-columns: 2fr 1fr;
+      }
+      @media (max-width: 720px) {
+        .grid-2 {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      .card {
+        background: var(--card);
+        border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+        border-radius: var(--radius);
+      }
+      .ef-card {
+        padding: 1.5rem 1.5rem 1.5rem;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .ef-hd {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 0.25rem;
+      }
+      .ef-title {
+        font-family: var(--font-serif);
+        font-weight: 300;
+        font-size: 1.175rem;
+      }
+      .ef-live {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-luxury);
+        color: var(--muted-foreground);
+      }
+      .ef-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--chart-1);
+        animation: dotblink 2s ease-in-out infinite;
+      }
+      @keyframes dotblink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.25;
+        }
+      }
+
+      .node-icon {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+      }
+      .icon-ring {
+        width: 56px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: 1px solid var(--border);
+        background: var(--card);
+        color: var(--muted-foreground);
+        transition:
+          border-color 0.3s,
+          background 0.3s,
+          color 0.3s;
+      }
+      .icon-ring svg {
+        width: 20px;
+        height: 20px;
+        stroke-width: 1.5;
+      }
+      .icon-ring.solar {
+        border-color: color-mix(in oklch, var(--chart-2) 40%, transparent);
+        background: color-mix(in oklch, var(--chart-2) 10%, transparent);
+        color: var(--chart-2);
+      }
+      .icon-ring.batt-c {
+        border-color: color-mix(in oklch, var(--chart-2) 40%, transparent);
+        background: color-mix(in oklch, var(--chart-2) 10%, transparent);
+        color: var(--chart-2);
+      }
+      .icon-ring.batt-d {
+        border-color: color-mix(in oklch, var(--chart-1) 40%, transparent);
+        background: color-mix(in oklch, var(--chart-1) 10%, transparent);
+        color: var(--chart-1);
+      }
+      .icon-ring.home {
+        border-color: var(--foreground-dim);
+        background: var(--foreground);
+        color: var(--primary-foreground);
+      }
+      .icon-ring.grid {
+        border-color: color-mix(in oklch, var(--chart-4) 40%, transparent);
+        background: color-mix(in oklch, var(--chart-4) 10%, transparent);
+        color: var(--chart-4);
+      }
+      .node-label {
+        margin-top: 8px;
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-luxury);
+        color: var(--muted-foreground);
+      }
+      .node-value {
+        margin-top: 4px;
+        font-family: var(--font-serif);
+        font-size: 1rem;
+        font-weight: 300;
+        line-height: 1;
+        color: var(--foreground);
+      }
+      .node-sub {
+        margin-top: 4px;
+        font-size: 9px;
+        color: var(--muted-foreground);
+      }
+
+      .ef-summary {
+        margin-top: auto;
+        padding-top: 0.875rem;
+        border-top: 1px solid
+          color-mix(in oklch, var(--border) 60%, transparent);
+        font-size: 0.8125rem;
+        line-height: 1.65;
+        color: var(--muted-foreground);
+      }
+      .ef-summary strong {
+        font-weight: 500;
+        color: var(--foreground);
+      }
+
+      /* payback placeholder (left 2/3) */
+      .pb {
+        padding: 1.5rem 1.75rem;
+      }
+      .pb-hd {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        color: var(--muted-foreground);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-luxury);
+      }
+      .pb-big {
+        margin-top: 1rem;
+        font-family: var(--font-serif);
+        font-weight: 300;
+        font-size: 3.5rem;
+        line-height: 1;
+      }
+      .pb-big span {
+        font-size: 1.5rem;
+        color: var(--muted-foreground);
+      }
+      .pb-sub {
+        margin-top: 0.5rem;
+        font-size: 0.8125rem;
+        color: var(--muted-foreground);
+      }
+      .pb-bar {
+        margin-top: 1.5rem;
+        height: 1px;
+        width: 100%;
+        background: var(--border);
+      }
+      .pb-bar > div {
+        height: 1px;
+        background: var(--chart-1);
+        width: 58%;
+      }
+      .pb-metrics {
+        margin-top: 1.5rem;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+        border-top: 1px solid
+          color-mix(in oklch, var(--border) 60%, transparent);
+        padding-top: 1.25rem;
+      }
+      .pb-m-label {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-luxury);
+        color: var(--muted-foreground);
+      }
+      .pb-m-val {
+        margin-top: 0.35rem;
+        font-family: var(--font-serif);
+        font-weight: 300;
+        font-size: 1.125rem;
+      }
+
+      .scenes {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      .scene-btn {
+        font-family: var(--font-sans);
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        padding: 0.35rem 1rem;
+        border-radius: 999px;
+        border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+        background: transparent;
+        color: var(--muted-foreground);
+        cursor: pointer;
+        transition:
+          background 0.12s,
+          color 0.12s,
+          border-color 0.12s;
+      }
+      .scene-btn.active,
+      .scene-btn:hover {
+        background: var(--foreground);
+        color: var(--background);
+        border-color: var(--foreground);
+      }
+      .scene-btn:focus-visible {
+        outline: 2px solid var(--chart-2);
+        outline-offset: 3px;
+      }
+
+      .theme-btn {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        font-family: var(--font-sans);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        padding: 0.35rem 0.85rem;
+        border-radius: 999px;
+        border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+        background: transparent;
+        color: var(--muted-foreground);
+        cursor: pointer;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .ef-dot {
+          animation: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <button
+      class="theme-btn"
+      onclick="
+        document.documentElement.dataset.theme =
+          document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'
+      "
+    >
+      สลับโหมด
+    </button>
+
+    <div class="grid-2">
+      <!-- LEFT 2/3 — payback (placeholder for preview) -->
+      <div class="card pb">
+        <div class="pb-hd">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.25"
+            aria-hidden="true"
+          >
+            <path d="M16 7h6v6" />
+            <path d="m22 7-8.5 8.5-5-5L2 17" />
+          </svg>
+          ความคืบหน้าการคืนทุน
+        </div>
+        <p class="pb-big">58.0<span>%</span></p>
+        <p class="pb-sub">คืนทุนแล้ว ฿203,000 จากเงินลงทุน ฿350,000</p>
+        <div class="pb-bar"><div></div></div>
+        <div class="pb-metrics">
+          <div>
+            <p class="pb-m-label">ประหยัดเฉลี่ย/เดือน</p>
+            <p class="pb-m-val">฿2,400</p>
+          </div>
+          <div>
+            <p class="pb-m-label">ประหยัดต่อปี</p>
+            <p class="pb-m-val">฿28,800</p>
+          </div>
+          <div>
+            <p class="pb-m-label">คืนทุนครบในอีก</p>
+            <p class="pb-m-val">5 ปี 1 เดือน</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT 1/3 — energy flow -->
+      <div class="card ef-card">
+        <div class="ef-hd">
+          <h2 class="ef-title">การไหลของพลังงาน</h2>
+          <div class="ef-live">
+            <div class="ef-dot"></div>
+            เรียลไทม์
+          </div>
+        </div>
+
+        <!--
+        Fan layout (viewBox 0 0 360 380) — Home is the hub:
+              Solar (top)
+                 |
+              Home (center)
+               /      \
+        Battery        Grid
+        Flows: solar→home always · home→battery when charging (surplus)
+               battery→home when discharging · grid→home when grid<0 (buying)
+      -->
+        <svg
+          id="ef"
+          viewBox="0 0 360 380"
+          width="100%"
+          xmlns="http://www.w3.org/2000/svg"
+          role="img"
+          aria-label="แผนผังการไหลของพลังงาน"
+        >
+          <defs>
+            <path id="p-sh" d="M180,66 L180,130" />
+            <path id="p-hb" d="M162,180 L98,256" />
+            <path id="p-bh" d="M98,256 L162,180" />
+            <path id="p-gh" d="M262,256 L198,180" />
+          </defs>
+
+          <use
+            href="#p-sh"
+            fill="none"
+            stroke="var(--border)"
+            stroke-width="3.5"
+            stroke-opacity="0.07"
+          />
+          <use
+            href="#p-hb"
+            fill="none"
+            stroke="var(--border)"
+            stroke-width="3.5"
+            stroke-opacity="0.07"
+          />
+          <use
+            href="#p-gh"
+            fill="none"
+            stroke="var(--border)"
+            stroke-width="3.5"
+            stroke-opacity="0.07"
+          />
+          <use
+            href="#p-sh"
+            fill="none"
+            stroke="var(--border)"
+            stroke-width="1"
+            stroke-opacity="0.45"
+          />
+          <use
+            href="#p-hb"
+            fill="none"
+            stroke="var(--border)"
+            stroke-width="1"
+            stroke-opacity="0.45"
+          />
+          <use
+            href="#p-gh"
+            fill="none"
+            stroke="var(--border)"
+            stroke-width="1"
+            stroke-opacity="0.45"
+          />
+
+          <!-- solar → home -->
+          <g id="f-sh">
+            <circle r="3" fill="var(--chart-2)">
+              <animateMotion
+                dur="1.6s"
+                begin="0s"
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href="#p-sh" />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                dur="1.6s"
+                begin="0s"
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+              />
+            </circle>
+            <circle r="3" fill="var(--chart-2)">
+              <animateMotion
+                dur="1.6s"
+                begin="0.53s"
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href="#p-sh" />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                dur="1.6s"
+                begin="0.53s"
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+              />
+            </circle>
+            <circle r="3" fill="var(--chart-2)">
+              <animateMotion
+                dur="1.6s"
+                begin="1.07s"
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href="#p-sh" />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                dur="1.6s"
+                begin="1.07s"
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+              />
+            </circle>
+          </g>
+
+          <!-- home → battery (charging surplus) -->
+          <g id="f-hb" style="display: none">
+            <circle r="3" fill="var(--chart-2)">
+              <animateMotion
+                dur="1.8s"
+                begin="0s"
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href="#p-hb" />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                dur="1.8s"
+                begin="0s"
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+              />
+            </circle>
+            <circle r="3" fill="var(--chart-2)">
+              <animateMotion
+                dur="1.8s"
+                begin="0.6s"
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href="#p-hb" />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                dur="1.8s"
+                begin="0.6s"
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+              />
+            </circle>
+            <circle r="3" fill="var(--chart-2)">
+              <animateMotion
+                dur="1.8s"
+                begin="1.2s"
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href="#p-hb" />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                dur="1.8s"
+                begin="1.2s"
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+              />
+            </circle>
+          </g>
+
+          <!-- battery → home (discharging) -->
+          <g id="f-bh" style="display: none">
+            <circle r="2.5" fill="var(--chart-1)">
+              <animateMotion
+                dur="2.2s"
+                begin="0s"
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href="#p-bh" />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                dur="2.2s"
+                begin="0s"
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+              />
+            </circle>
+            <circle r="2.5" fill="var(--chart-1)">
+              <animateMotion
+                dur="2.2s"
+                begin="0.73s"
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href="#p-bh" />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                dur="2.2s"
+                begin="0.73s"
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+              />
+            </circle>
+            <circle r="2.5" fill="var(--chart-1)">
+              <animateMotion
+                dur="2.2s"
+                begin="1.47s"
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href="#p-bh" />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                dur="2.2s"
+                begin="1.47s"
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+              />
+            </circle>
+          </g>
+
+          <!-- grid → home (buying, grid<0) -->
+          <g id="f-gh" style="display: none">
+            <circle r="2.5" fill="var(--chart-4)">
+              <animateMotion
+                dur="2.4s"
+                begin="0s"
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href="#p-gh" />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                dur="2.4s"
+                begin="0s"
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+              />
+            </circle>
+            <circle r="2.5" fill="var(--chart-4)">
+              <animateMotion
+                dur="2.4s"
+                begin="0.8s"
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href="#p-gh" />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                dur="2.4s"
+                begin="0.8s"
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+              />
+            </circle>
+            <circle r="2.5" fill="var(--chart-4)">
+              <animateMotion
+                dur="2.4s"
+                begin="1.6s"
+                repeatCount="indefinite"
+                calcMode="linear"
+              >
+                <mpath href="#p-gh" />
+              </animateMotion>
+              <animate
+                attributeName="opacity"
+                dur="2.4s"
+                begin="1.6s"
+                repeatCount="indefinite"
+                values="0;1;1;0"
+                keyTimes="0;0.15;0.85;1"
+              />
+            </circle>
+          </g>
+
+          <!-- solar node -->
+          <foreignObject x="120" y="10" width="120" height="110">
+            <div class="node-icon">
+              <div id="icon-solar" class="icon-ring solar">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                  ><circle cx="12" cy="12" r="4" /><path
+                    d="M12 2v2M12 20v2m-7.07-14.07 1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2m-4.34-5.66 1.41-1.41M6.34 17.66 4.93 19.07"
+                /></svg>
+              </div>
+              <p class="node-label">แผงโซลาร์</p>
+              <p class="node-value"><span id="val-solar">1.21</span> kW</p>
+            </div>
+          </foreignObject>
+
+          <!-- home node -->
+          <foreignObject x="120" y="130" width="120" height="110">
+            <div class="node-icon">
+              <div class="icon-ring home">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                  ><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8" /><path
+                    d="M3 10a2 2 0 0 1 .709-1.528l7-6a2 2 0 0 1 2.582 0l7 6A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"
+                /></svg>
+              </div>
+              <p class="node-label">โหลดในบ้าน</p>
+              <p class="node-value"><span id="val-load">1.25</span> kW</p>
+            </div>
+          </foreignObject>
+
+          <!-- battery node -->
+          <foreignObject x="20" y="250" width="120" height="120">
+            <div class="node-icon">
+              <div id="icon-batt" class="icon-ring batt-d">
+                <svg
+                  id="icon-batt-svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                  ><rect
+                    width="16"
+                    height="10"
+                    x="2"
+                    y="7"
+                    rx="2"
+                    ry="2" /><line x1="22" x2="22" y1="11" y2="13"
+                /></svg>
+              </div>
+              <p class="node-label">แบตเตอรี่</p>
+              <p class="node-value"><span id="val-batt">100</span>%</p>
+              <p class="node-sub" id="lbl-batt">จ่ายไฟ</p>
+            </div>
+          </foreignObject>
+
+          <!-- grid node -->
+          <foreignObject x="220" y="250" width="120" height="120">
+            <div class="node-icon">
+              <div id="icon-grid" class="icon-ring">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  aria-hidden="true"
+                  ><path
+                    d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"
+                /></svg>
+              </div>
+              <p class="node-label">การไฟฟ้า</p>
+              <p class="node-value"><span id="val-grid">-0.04</span> kW</p>
+              <p class="node-sub" id="lbl-grid">ไม่ได้ซื้อไฟ</p>
+            </div>
+          </foreignObject>
+        </svg>
+
+        <p id="ef-summary" class="ef-summary">
+          แผงผลิตได้ <strong>1.21 kW</strong> · บ้านใช้
+          <strong>1.25 kW</strong> · แบตจ่ายเสริม <strong>0.04 kW</strong> ·
+          <strong>ไม่ได้ซื้อไฟจากการไฟฟ้าเลย</strong>
+        </p>
+      </div>
+    </div>
+
+    <div class="scenes" role="group" aria-label="เลือกสถานการณ์จำลอง">
+      <button class="scene-btn active" data-s="self">พึ่งตัวเอง</button>
+      <button class="scene-btn" data-s="charge">เหลือ ชาร์จแบต</button>
+      <button class="scene-btn" data-s="buy">ไม่พอ ซื้อไฟ</button>
+      <button class="scene-btn" data-s="night">กลางคืน</button>
+    </div>
+
+    <script>
+      const SVG_BATT_D =
+        '<rect width="16" height="10" x="2" y="7" rx="2" ry="2"/><line x1="22" x2="22" y1="11" y2="13"/>';
+      const SVG_BATT_C =
+        '<path d="m11 7-3 5h4l-3 5"/><path d="M14.856 6H16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.935"/><path d="M22 14v-4"/><path d="M5.14 18H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h2.936"/>';
+
+      // grid < 0 = buying from grid; house never exports
+      const SCENES = {
+        self: {
+          // solar slightly under load → solar+battery feed home
+          solar: "1.21",
+          batt: "100",
+          battState: "d",
+          battLbl: "จ่ายไฟ",
+          load: "1.25",
+          grid: "-0.04",
+          gridLbl: "ไม่ได้ซื้อไฟ",
+          flows: { sh: true, hb: false, bh: true, gh: false },
+          summary:
+            "แผงผลิตได้ <strong>1.21 kW</strong> · บ้านใช้ <strong>1.25 kW</strong> · แบตจ่ายเสริม <strong>0.04 kW</strong> · <strong>ไม่ได้ซื้อไฟจากการไฟฟ้าเลย</strong>",
+        },
+        charge: {
+          // solar over load → surplus charges battery (solar→home→battery)
+          solar: "5.20",
+          batt: "65",
+          battState: "c",
+          battLbl: "กำลังชาร์จ",
+          load: "2.10",
+          grid: "0.00",
+          gridLbl: "ไม่ได้ซื้อไฟ",
+          flows: { sh: true, hb: true, bh: false, gh: false },
+          summary:
+            "แผงผลิตได้ <strong>5.20 kW</strong> · บ้านใช้ <strong>2.10 kW</strong> · โซลาร์เหลือ ชาร์จเข้าแบต <strong>3.10 kW</strong>",
+        },
+        buy: {
+          // no solar, battery + grid feed home
+          solar: "0.00",
+          batt: "40",
+          battState: "d",
+          battLbl: "จ่ายไฟ",
+          load: "3.20",
+          grid: "-2.70",
+          gridLbl: "นำเข้าจากกริด",
+          flows: { sh: false, hb: false, bh: true, gh: true },
+          summary:
+            "แผงไม่ผลิต · แบตจ่าย <strong>0.50 kW</strong> · <strong>ซื้อไฟ 2.70 kW</strong> จากการไฟฟ้า",
+        },
+        night: {
+          // no solar, battery only
+          solar: "0.00",
+          batt: "78",
+          battState: "d",
+          battLbl: "จ่ายไฟ",
+          load: "1.20",
+          grid: "0.00",
+          gridLbl: "ไม่ได้ซื้อไฟ",
+          flows: { sh: false, hb: false, bh: true, gh: false },
+          summary:
+            "กลางคืน ไม่มีแสงอาทิตย์ · แบตจ่ายทั้งหมด <strong>1.20 kW</strong> · <strong>ไม่ได้ซื้อไฟเลย</strong>",
+        },
+      };
+
+      function applyScene(key) {
+        const s = SCENES[key];
+        document.getElementById("val-solar").textContent = s.solar;
+        document.getElementById("val-batt").textContent = s.batt;
+        document.getElementById("lbl-batt").textContent = s.battLbl;
+        document.getElementById("val-load").textContent = s.load;
+        document.getElementById("val-grid").textContent = s.grid;
+        document.getElementById("lbl-grid").textContent = s.gridLbl;
+        document.getElementById("ef-summary").innerHTML = s.summary;
+
+        for (const [id, on] of Object.entries(s.flows))
+          document.getElementById(`f-${id}`).style.display = on ? "" : "none";
+
+        document.getElementById("icon-solar").className =
+          "icon-ring" + (s.flows.sh || s.flows.hb ? " solar" : "");
+
+        const battEl = document.getElementById("icon-batt");
+        const battSvg = document.getElementById("icon-batt-svg");
+        if (s.battState === "c") {
+          battEl.className = "icon-ring batt-c";
+          battSvg.innerHTML = SVG_BATT_C;
+        } else {
+          battEl.className = "icon-ring" + (s.flows.bh ? " batt-d" : "");
+          battSvg.innerHTML = SVG_BATT_D;
+        }
+
+        document.getElementById("icon-grid").className =
+          "icon-ring" + (parseFloat(s.grid) < -0.05 ? " grid" : "");
+
+        document
+          .querySelectorAll(".scene-btn")
+          .forEach((b) => b.classList.toggle("active", b.dataset.s === key));
+      }
+
+      document
+        .querySelectorAll(".scene-btn")
+        .forEach((b) =>
+          b.addEventListener("click", () => applyScene(b.dataset.s)),
+        );
+      if (window.matchMedia("(prefers-reduced-motion: reduce)").matches)
+        document.getElementById("ef").pauseAnimations();
+      applyScene("self");
+    </script>
+  </body>
+</html>
