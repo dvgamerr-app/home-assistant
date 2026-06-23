@@ -1,4 +1,4 @@
-import { calculateMonthlyBill, marginalRate } from './electricity'
+import { calculateMonthlyBill, marginalRate, MONTH_SHORT_TH } from './electricity'
 import { getLiveSnapshot, getToday, getHourly, getMonthDays, getMonths, getLifetime, getBills } from './db'
 
 // ── Config constants (not in DB) ──────────────────────────────────────────────
@@ -14,7 +14,6 @@ export const SYSTEM = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const MONTH_SHORT_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
 const MONTH_LONG_TH = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม']
 // 'YYYY-MM' → Thai short label
 const thMonth = (yyyymm: string) => MONTH_SHORT_TH[parseInt(yyyymm.slice(4)) - 1] ?? yyyymm

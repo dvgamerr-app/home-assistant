@@ -11,17 +11,15 @@ import PiggyBank from '@lucide/svelte/icons/piggy-bank'
 import Gauge from '@lucide/svelte/icons/gauge'
 import { getAll } from '@/lib/solar-data'
 import { thb, num } from '@/lib/electricity'
-import { auth } from '@/lib/auth'
 
-const [data, session] = await Promise.all([getAll(), auth.api.getSession({ headers: Astro.request.headers })])
-const userName = session?.user.name ?? session?.user.email?.split('@')[0] ?? 'คุณ'
+const data = await getAll()
 const { protocol, hostname } = new URL(Astro.request.url)
 const socketUrl = `${protocol}//${hostname}:${process.env.SOCKET_PORT ?? '3000'}`
 ---
 
 <Layout title="ภาพรวมพลังงานในบ้าน">
   <Nav />
-  <Hero live={data.live} system={data.system} userName={userName} />
+  <Hero live={data.live} system={data.system} />
   <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
     <div class="grid items-stretch gap-4 lg:grid-cols-3">
       <div class="flex flex-col gap-4 lg:col-span-2">

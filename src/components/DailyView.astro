@@ -30,7 +30,7 @@ const ph = py1 - py0
 const maxTotal = Math.max(...MONTH_DAYS.map((d) => d.selfUse + d.gridImport), 1)
 
 const bars = svgStackedBars(
-  MONTH_DAYS.map((d) => [d.selfUse, d.gridImport]),
+  MONTH_DAYS.map((d) => [d.gridImport, d.selfUse]),
   px0,
   py0,
   px1,
@@ -48,7 +48,8 @@ const gridLines = [0.25, 0.5, 0.75].map((f) => ({
 const padLeft = +((ML / VW) * 100).toFixed(2)
 const padRight = +((MR / VW) * 100).toFixed(2)
 
-const segColors = ['var(--chart-1)', 'var(--chart-4)']
+const segColors = ['var(--chart-4)', 'var(--chart-1)']
+const segOpacity = [0.35, 0.85]
 ---
 
 <div class="space-y-6">
@@ -82,7 +83,7 @@ const segColors = ['var(--chart-1)', 'var(--chart-4)']
         <div class="chart-frame">
           <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
             {gridLines.map((g) => <line x1={px0} x2={px1} y1={g.y} y2={g.y} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
-            {bars.map((segs) => segs.map((seg, j) => (seg.h > 0 ? <rect x={seg.x} y={seg.y} width={seg.w} height={seg.h} rx={seg.rx} fill={segColors[j]} fill-opacity="0.85" /> : null)))}
+            {bars.map((segs) => segs.map((seg, j) => (seg.h > 0 ? <rect x={seg.x} y={seg.y} width={seg.w} height={seg.h} rx={seg.rx} fill={segColors[j]} fill-opacity={segOpacity[j]} /> : null)))}
             <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5"></line>
             <line x1={px0} x2={px0} y1={py0} y2={py1} stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5"></line>
           </svg>
@@ -97,7 +98,7 @@ const segColors = ['var(--chart-1)', 'var(--chart-4)']
       class="mt-5"
       items={[
         { label: 'ใช้ไฟจากโซลาร์', color: 'var(--chart-1)' },
-        { label: 'ซื้อจากการไฟฟ้า', color: 'var(--chart-4)' },
+        { label: 'ซื้อจากการไฟฟ้า', color: 'color-mix(in oklch, var(--chart-4) 40%, transparent)' },
       ]}
     />
   </ChartCard>

@@ -6,6 +6,8 @@
 //   over 400 units     : 4.4217
 // Plus Ft charge, monthly service charge, then 7% VAT.
 
+export const MONTH_SHORT_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+
 export const MEA_TIERS = [
   { upTo: 150, rate: 3.2484 },
   { upTo: 400, rate: 4.2218 },
@@ -57,15 +59,8 @@ export function calculateMonthlyBill(units: number) {
  * Used to value solar self-consumption realistically (it offsets the top tier first).
  */
 export function marginalRate(monthlyUnits: number) {
-  let tierRate = MEA_TIERS[0].rate
-  for (const tier of MEA_TIERS) {
-    if (monthlyUnits <= tier.upTo) {
-      tierRate = tier.rate
-      break
-    }
-    tierRate = tier.rate
-  }
-  return (tierRate + FT_RATE) * (1 + VAT_RATE)
+  const tier = MEA_TIERS.find((t) => monthlyUnits <= t.upTo) ?? MEA_TIERS.at(-1)!
+  return (tier.rate + FT_RATE) * (1 + VAT_RATE)
 }
 
 export function thb(value: number, digits = 0) {

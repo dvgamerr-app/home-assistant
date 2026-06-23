@@ -2,16 +2,17 @@
 import LiveClock from './LiveClock.svelte'
 import { num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
+import { auth } from '@/lib/auth'
 import Sun from '@lucide/svelte/icons/sun'
 import Droplets from '@lucide/svelte/icons/droplets'
 import Wind from '@lucide/svelte/icons/wind'
 
-interface Props extends Pick<SolarData, 'live' | 'system'> {
-  userName: string
-}
+type Props = Pick<SolarData, 'live' | 'system'>
 
-const { live, userName } = Astro.props
-const firstName = userName.split(' ')[0]
+const { live } = Astro.props
+const session = await auth.api.getSession({ headers: Astro.request.headers })
+const displayName = session?.user.name?.trim() || session?.user.email?.split('@')[0] || 'คุณ'
+const firstName = displayName.split(' ')[0]
 const charging = live.batteryPowerKw < 0
 const buyingNothing = live.gridPowerKw < 0.05
 

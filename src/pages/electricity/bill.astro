@@ -8,11 +8,10 @@ import PiggyBank from '@lucide/svelte/icons/piggy-bank'
 import Gauge from '@lucide/svelte/icons/gauge'
 import Receipt from '@lucide/svelte/icons/receipt'
 import { getAll } from '@/lib/solar-data'
-import { thb, num } from '@/lib/electricity'
+import { thb, num, MONTH_SHORT_TH } from '@/lib/electricity'
 
 const data = await getAll()
 
-const MONTH_SHORT_TH = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
 const billRows = data.bills.map((b) => ({
   month: MONTH_SHORT_TH[parseInt(b.month.slice(4)) - 1] ?? b.month,
   kwh: b.kwh,
