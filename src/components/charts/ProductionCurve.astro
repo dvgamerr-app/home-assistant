@@ -8,8 +8,6 @@ import LegendRow from '@/components/ui/LegendRow.astro'
 const { hourly: HOURLY } = Astro.props as Pick<SolarData, 'hourly'>
 const maxValue = Math.max(...HOURLY.map((h) => Math.max(h.pv, h.load)), 1)
 const max = maxValue * 1.12
-const pvVals = HOURLY.map((h) => h.pv / max)
-const loadVals = HOURLY.map((h) => h.load / max)
 const peakPv = Math.max(...HOURLY.map((h) => h.pv))
 const peakLoad = Math.max(...HOURLY.map((h) => h.load))
 
@@ -17,10 +15,17 @@ const [VW, VH, ML, MT, MR, MB] = [560, 220, 4, 18, 8, 28]
 const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
 const ph = py1 - py0
 
-const pvLine = svgLine(pvVals, px0, py0, px1, py1)
-const pvFill = svgArea(pvVals, px0, py0, px1, py1)
-const loadLine = svgLine(loadVals, px0, py0, px1, py1)
-const loadFill = svgArea(loadVals, px0, py0, px1, py1)
+// ตัดชั่วโมงอนาคต (ค่า 0) ออก แล้ว scale x ให้ตรงกับ label 24 ชม.
+const currentHour = new Date().getHours()
+const active = HOURLY.slice(0, Math.min(currentHour + 1, HOURLY.length))
+const xEnd = active.length <= 1 ? px0 : px0 + ((active.length - 1) / 23) * (px1 - px0)
+const pvVals = active.map((h) => h.pv / max)
+const loadVals = active.map((h) => h.load / max)
+
+const pvLine = svgLine(pvVals, px0, py0, xEnd, py1)
+const pvFill = svgArea(pvVals, px0, py0, xEnd, py1)
+const loadLine = svgLine(loadVals, px0, py0, xEnd, py1)
+const loadFill = svgArea(loadVals, px0, py0, xEnd, py1)
 
 const yTicks = [1, 0.75, 0.5, 0.25]
 const gridYs = yTicks.map((f) => +(py0 + (1 - f) * ph).toFixed(1))
