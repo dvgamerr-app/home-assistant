@@ -235,6 +235,29 @@ export async function getMonths(nMonths = 12): Promise<MonthPoint[]> {
   }))
 }
 
+/** Estimate charged-to-battery energy from negative batteryPower samples. */
+export async function getBatteryCharge(nMonths = 12): Promise<number> {
+  const [row] = await sql<{ charged: string }[]>`
+    WITH points AS (
+      SELECT
+        recorded_at,
+        GREATEST(-(value::numeric), 0) as charge_kw,
+        LEAD(recorded_at) OVER (ORDER BY recorded_at) as next_at
+      FROM stash.solar_record
+      WHERE device_id = ${DEVICE}
+        AND attr = 'batteryPower'
+        AND recorded_at >= now() - (${nMonths} || ' months')::interval
+    )
+    SELECT COALESCE(
+      SUM(charge_kw * LEAST(EXTRACT(EPOCH FROM (next_at - recorded_at)) / 3600, 0.25)),
+      0
+    ) as charged
+    FROM points
+    WHERE next_at IS NOT NULL
+  `
+  return n(row?.charged)
+}
+
 /** lifetime totals */
 export async function getLifetime(): Promise<LifetimeData> {
   const [row] = await sql<{ generated: string; grid_import: string; gen_time: string }[]>`

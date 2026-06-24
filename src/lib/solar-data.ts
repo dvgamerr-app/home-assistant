@@ -1,5 +1,5 @@
 import { calculateMonthlyBill, marginalRate, MONTH_SHORT_TH } from './electricity'
-import { getLiveSnapshot, getToday, getHourly, getMonthDays, getMonths, getLifetime, getBills } from './db'
+import { getLiveSnapshot, getToday, getHourly, getMonthDays, getMonths, getLifetime, getBills, getBatteryCharge } from './db'
 
 // ── Config constants (not in DB) ──────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ export async function getAll() {
   const year = now.getFullYear()
   const month = now.getMonth() + 1
 
-  const [live, today, monthDays, rawMonths, hourly, lifetime, bills] = await Promise.all([
+  const [live, today, monthDays, rawMonths, hourly, lifetime, bills, histBatteryCharge] = await Promise.all([
     getLiveSnapshot(),
     getToday(),
     getMonthDays(year, month),
@@ -33,6 +33,7 @@ export async function getAll() {
     getHourly(),
     getLifetime(),
     getBills(36),
+    getBatteryCharge(12),
   ])
 
   // ── Battery ────────────────────────────────────────────────────────────────
@@ -143,13 +144,18 @@ export async function getAll() {
 
   // ── Energy distribution — ratio derived from actual monthly DB data ───────
   const histGen = rawMonths.reduce((s, m) => s + m.generated, 0)
-  const histSelfUse = rawMonths.reduce((s, m) => s + Math.max(0, m.consumed - m.gridImport), 0)
-  const selfUseRatio = histGen > 0 ? histSelfUse / histGen : 0
-  const selfUsedLife = Math.round(lifetime.generated * selfUseRatio)
-  const exportedLife = Math.max(0, lifetime.generated - selfUsedLife)
+  const histSolarUse = rawMonths.reduce((s, m) => s + Math.max(0, m.consumed - m.gridImport), 0)
+  const histBatteryUse = Math.min(histBatteryCharge, histGen)
+  const histHomeUse = Math.max(0, histSolarUse - histBatteryUse)
+  const homeUseRatio = histGen > 0 ? histHomeUse / histGen : 0
+  const batteryUseRatio = histGen > 0 ? histBatteryUse / histGen : 0
+  const selfUsedLife = Math.round(lifetime.generated * homeUseRatio)
+  const batteryChargedLife = Math.round(lifetime.generated * batteryUseRatio)
+  const discardedLife = Math.max(0, lifetime.generated - selfUsedLife - batteryChargedLife)
   const energyDistribution = [
     { name: 'ใช้เองในบ้าน', value: selfUsedLife, key: 'selfUse' },
-    { name: 'เหลือทิ้ง', value: exportedLife, key: 'clipped' },
+    { name: 'ชาร์จเข้าแบตเตอรี่', value: batteryChargedLife, key: 'batteryCharge' },
+    { name: 'เหลือทิ้ง', value: discardedLife, key: 'clipped' },
   ]
 
   // ── Payback — ใช้ solar_record (inverter data) เพราะ mea_electric ไม่มี unitUsedSolar ──

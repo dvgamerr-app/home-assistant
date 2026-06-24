@@ -12,6 +12,13 @@ test('svgLine: value=1 maps to yMin (top), value=0 maps to yMax (bottom)', () =>
   expect(path).toContain('100.0,100.0') // i=1, v=0 → y=100
 })
 
+test('svgLine: smooth curve control points stay inside the plot area', () => {
+  const path = svgLine([0, 1, 0], 0, 0, 100, 100)
+  const yValues = [...path.matchAll(/(?:^|[ ,])[-\d.]+,([-\d.]+)/g)].map((m) => Number(m[1]))
+  expect(Math.min(...yValues)).toBeGreaterThanOrEqual(0)
+  expect(Math.max(...yValues)).toBeLessThanOrEqual(100)
+})
+
 test('svgArea: closes path to bottom corners', () => {
   const path = svgArea([0.5, 0.5], 0, 0, 100, 100)
   expect(path.endsWith('L 100,100 L 0,100 Z')).toBe(true)

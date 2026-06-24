@@ -236,6 +236,45 @@
         height: 1px;
         background: var(--accent);
       }
+
+      /* ── Select / Dropdown ─────────────────────────────── */
+      .select-wrap {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+      }
+      .select-wrap select {
+        appearance: none;
+        font: inherit;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: var(--tracking-luxury);
+        color: var(--muted-foreground);
+        background: var(--card);
+        border: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
+        border-radius: calc(var(--radius) - 2px);
+        padding: 0.35rem 1.75rem 0.35rem 0.75rem;
+        cursor: pointer;
+        transition: color 0.15s, border-color 0.15s;
+        outline: none;
+        min-width: 7rem;
+      }
+      .select-wrap select:hover,
+      .select-wrap select:focus {
+        color: var(--foreground);
+        border-color: color-mix(in oklch, var(--foreground) 30%, var(--border));
+      }
+      .select-chevron {
+        position: absolute;
+        right: 0.5rem;
+        pointer-events: none;
+        color: var(--muted-foreground);
+        transition: color 0.15s;
+      }
+      .select-wrap:has(select:hover) .select-chevron,
+      .select-wrap:has(select:focus) .select-chevron {
+        color: var(--foreground);
+      }
       .statvalue {
         font-family: var(--font-serif);
         font-weight: 300;
@@ -370,9 +409,60 @@
         </div>
       </section>
 
+      <!-- DROPDOWN -->
+      <section>
+        <p class="eyebrow">05 — Select / Dropdown</p>
+        <h2 class="serif">ดรอปดาวน์</h2>
+        <p class="muted" style="margin-bottom:1.5rem">
+          Native <code class="mono">&lt;select&gt;</code> + <code class="mono">appearance-none</code> · chevron SVG overlay ·
+          ไม่ต้องใช้ JS framework — navigate ด้วย <code class="mono">onchange="location.href=..."</code> ·
+          ใช้ใน ChartCard header สำหรับเลือกช่วงข้อมูล
+        </p>
+
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.5rem">
+          <!-- Demo: chart header context -->
+          <div class="card">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.25rem">
+              <div>
+                <p class="eyebrow" style="margin-bottom:0.25rem">ไฟที่ใช้แต่ละวัน</p>
+                <h3 class="serif" style="font-size:1.1rem;font-weight:300;margin:0">ใช้ใน ChartCard header</h3>
+              </div>
+              <div class="select-wrap">
+                <select>
+                  <option selected>มิ.ย. 68</option>
+                  <option>พ.ค. 68</option>
+                  <option>เม.ย. 68</option>
+                  <option>มี.ค. 68</option>
+                  <option>ก.พ. 68</option>
+                </select>
+                <svg class="select-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </div>
+            </div>
+            <div style="height:3rem;border-radius:4px;background:var(--muted);opacity:0.4"></div>
+          </div>
+
+          <!-- Token reference -->
+          <div class="card" style="display:flex;flex-direction:column;gap:1rem;justify-content:center">
+            <p class="eyebrow" style="margin-bottom:0.5rem">Tokens ที่ใช้</p>
+            <div style="display:flex;flex-direction:column;gap:0.5rem">
+              <code class="mono" style="font-size:11px;color:var(--muted-foreground)">border/60 · bg-card</code>
+              <code class="mono" style="font-size:11px;color:var(--muted-foreground)">text-[10px] uppercase tracking-luxury</code>
+              <code class="mono" style="font-size:11px;color:var(--muted-foreground)">radius: calc(--radius - 2px)</code>
+              <code class="mono" style="font-size:11px;color:var(--muted-foreground)">padding: 0.35rem 1.75rem 0.35rem 0.75rem</code>
+            </div>
+            <p class="muted" style="font-size:11px;margin-top:0.25rem">
+              chevron: SVG <code class="mono">10×10px</code> · <code class="mono">absolute right-0.5rem</code> ·
+              <code class="mono">pointer-events:none</code>
+            </p>
+          </div>
+        </div>
+      </section>
+
       <!-- CHARTS -->
       <section>
-        <p class="eyebrow">05 — Charts</p>
+        <p class="eyebrow">06 — Charts</p>
         <h2 class="serif">กราฟ</h2>
         <p class="muted" style="margin-bottom: 1.5rem">
           SVG smooth bezier area — เส้นโค้ง cubic bezier (cardinal spline) · gradient fill · dashed gridlines · คำนวณ server-side ใน Astro frontmatter ไม่ต้องใช้ charting lib ·
@@ -430,7 +520,7 @@
             <div id="line-y-axis" style="position:relative;width:1.75rem;height:160px;flex-shrink:0"></div>
             <div style="flex:1;min-width:0">
               <div style="height:160px;width:100%">
-                <svg id="chart-demo-svg" width="100%" height="100%" viewBox="0 0 560 160" preserveAspectRatio="none"></svg>
+                <svg id="chart-demo-svg" width="100%" height="100%" viewBox="0 0 560 160" preserveAspectRatio="none" style="cursor:crosshair"></svg>
               </div>
               <div id="line-x-axis" style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted-foreground);margin-top:4px;padding-right:1.43%"></div>
             </div>
@@ -440,11 +530,129 @@
             <span class="row" style="gap:0.5rem"><span class="legend-dot" style="background:var(--chart-4)"></span>ใช้ในบ้าน (kW)</span>
           </div>
         </div>
+
+        <div style="margin-top:1rem">
+          <p class="eyebrow" style="margin-bottom:0.75rem">Chart Tooltip</p>
+          <h3 class="serif" style="font-size:1.4rem;margin:0 0 0.75rem;font-weight:300">Tooltip สำหรับกราฟ</h3>
+          <p style="font-size:0.85rem;color:var(--muted-foreground);margin-bottom:1.5rem;line-height:1.6">
+            Tooltip ที่ใช้กับกราฟทุกประเภท — สไตล์ card เดียวกับ UI (border บาง, bg-card) ไม่มี shadow หนัก
+            เปิดตัวอย่างโดยเลื่อน mouse บนกราฟกำลังผลิตรายชั่วโมง
+          </p>
+
+          <!-- Static tooltip anatomy -->
+          <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start;margin-bottom:2rem">
+            <div>
+              <p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.75rem">Line / Area Chart</p>
+              <div style="border:1px solid var(--border);background:var(--card);border-radius:0.5rem;padding:0.75rem 0.875rem;min-width:140px;font-family:var(--font-sans)">
+                <p style="font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.5rem">14:00 น.</p>
+                <div style="display:flex;flex-direction:column;gap:0.375rem">
+                  <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)">
+                      <span style="width:8px;height:8px;border-radius:50%;background:var(--chart-2);flex-shrink:0"></span>โซลาร์
+                    </span>
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">2.45 kW</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)">
+                      <span style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);flex-shrink:0"></span>โหลด
+                    </span>
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">0.82 kW</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.75rem">Bar Chart</p>
+              <div style="border:1px solid var(--border);background:var(--card);border-radius:0.5rem;padding:0.75rem 0.875rem;min-width:150px;font-family:var(--font-sans)">
+                <p style="font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.5rem">ม.ค. 68</p>
+                <div style="display:flex;flex-direction:column;gap:0.375rem">
+                  <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)">
+                      <span style="width:8px;height:8px;border-radius:50%;background:var(--chart-1);flex-shrink:0"></span>โซลาร์
+                    </span>
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">8.4 kWh</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)">
+                      <span style="width:8px;height:8px;border-radius:50%;background:color-mix(in oklch,var(--chart-4) 50%,transparent);flex-shrink:0"></span>กริด
+                    </span>
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">3.1 kWh</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;border-top:1px solid var(--border);padding-top:0.375rem">
+                    <span style="font-size:11px;color:var(--muted-foreground)">รวม</span>
+                    <span style="font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--foreground)">11.5 kWh</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.75rem">Donut Chart</p>
+              <div style="border:1px solid var(--border);background:var(--card);border-radius:0.5rem;padding:0.75rem 0.875rem;min-width:140px;font-family:var(--font-sans)">
+                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
+                  <span style="width:8px;height:8px;border-radius:50%;background:var(--chart-1);flex-shrink:0"></span>
+                  <p style="font-size:11px;color:var(--foreground)">ใช้เองในบ้าน</p>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:0.25rem">
+                  <div style="display:flex;justify-content:space-between;gap:1rem">
+                    <span style="font-size:10px;color:var(--muted-foreground)">สัดส่วน</span>
+                    <span style="font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--foreground)">62%</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;gap:1rem">
+                    <span style="font-size:10px;color:var(--muted-foreground)">พลังงาน</span>
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">1,240 kWh</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.75rem">Y-axis Max Label</p>
+              <div style="display:flex;gap:0.25rem;align-items:flex-start">
+                <div style="position:relative;width:1.75rem;height:100px;flex-shrink:0">
+                  <span style="position:absolute;right:0;top:0%;transform:translateY(-50%);font-size:9px;font-weight:500;color:oklch(0.52 0.012 70 / 60%);text-align:right">3.5</span>
+                  <span style="position:absolute;right:0;top:33%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">2.6</span>
+                  <span style="position:absolute;right:0;top:66%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">1.7</span>
+                  <span style="position:absolute;right:0;top:100%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">0.8</span>
+                </div>
+                <div style="flex:1;height:100px;border:1px solid var(--border);border-radius:4px;background:var(--card);position:relative;overflow:hidden">
+                  <div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:0">
+                    <div style="width:100%;height:1px;background:var(--border);opacity:0.4;margin-top:0"></div>
+                    <div style="width:100%;height:1px;background:var(--border);opacity:0.8"></div>
+                    <div style="width:100%;height:1px;background:var(--border);opacity:0.8"></div>
+                    <div style="width:100%;height:1px;background:var(--border);opacity:0.8"></div>
+                  </div>
+                </div>
+              </div>
+              <p style="font-size:9px;color:var(--muted-foreground);margin-top:0.5rem">max = <code style="font-family:var(--font-mono)">font-medium text-foreground/60</code></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating tooltip (shared for demo) -->
+        <div id="tooltip-demo-tip" style="display:none;position:fixed;z-index:9999;border:1px solid var(--border);background:var(--card);border-radius:0.5rem;padding:0.75rem 0.875rem;pointer-events:none;min-width:140px;font-family:var(--font-sans)">
+          <p class="tdHour" style="font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.5rem"></p>
+          <div style="display:flex;flex-direction:column;gap:0.375rem">
+            <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+              <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--chart-2);flex-shrink:0"></span>โซลาร์
+              </span>
+              <span class="tdPv" style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)"></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+              <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)">
+                <span style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);flex-shrink:0"></span>โหลด
+              </span>
+              <span class="tdLoad" style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)"></span>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- ICONOGRAPHY + VOICE -->
       <section>
-        <p class="eyebrow">06 — Iconography &amp; Voice</p>
+        <p class="eyebrow">07 — Iconography &amp; Voice</p>
         <h2 class="serif">ไอคอนและน้ำเสียง</h2>
         <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 1rem">
           <div class="card">
@@ -538,18 +746,49 @@
       // SVG smooth bezier chart demo
       ;(function () {
         const clamp = (v) => Math.max(0, Math.min(1, v))
-        function smoothPath(values, xMin, yMin, xMax, yMax, tension = 0.4) {
+        function smoothPath(values, xMin, yMin, xMax, yMax, tension = 0.9) {
           const n = values.length
           if (n < 2) return ''
           const pts = values.map((v, i) => ({
             x: xMin + (i / (n - 1)) * (xMax - xMin),
             y: yMin + (1 - clamp(v)) * (yMax - yMin),
           }))
+
+          const curve = clamp(tension)
+          const slopes = pts.slice(0, -1).map((p, i) => (pts[i + 1].y - p.y) / (pts[i + 1].x - p.x))
+          const tangents = pts.map((_, i) => {
+            if (i === 0) return slopes[0]
+            if (i === pts.length - 1) return slopes[slopes.length - 1]
+
+            const prev = slopes[i - 1]
+            const next = slopes[i]
+            if (prev === 0 || next === 0 || Math.sign(prev) !== Math.sign(next)) return 0
+            return (2 * prev * next) / (prev + next)
+          })
+
+          slopes.forEach((slope, i) => {
+            if (slope === 0) {
+              tangents[i] = 0
+              tangents[i + 1] = 0
+              return
+            }
+
+            const a = tangents[i] / slope
+            const b = tangents[i + 1] / slope
+            const h = Math.hypot(a, b)
+            if (h > 3) {
+              const scale = 3 / h
+              tangents[i] = scale * a * slope
+              tangents[i + 1] = scale * b * slope
+            }
+          })
+
           let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`
           for (let i = 1; i < n; i++) {
-            const p0 = pts[Math.max(i - 2, 0)], p1 = pts[i - 1], p2 = pts[i], p3 = pts[Math.min(i + 1, n - 1)]
-            const cp1x = p1.x + (p2.x - p0.x) * tension, cp1y = p1.y + (p2.y - p0.y) * tension
-            const cp2x = p2.x - (p3.x - p1.x) * tension, cp2y = p2.y - (p3.y - p1.y) * tension
+            const p1 = pts[i - 1], p2 = pts[i]
+            const dx = (p2.x - p1.x) / 3
+            const cp1x = p1.x + dx * curve, cp1y = p1.y + tangents[i - 1] * dx * curve
+            const cp2x = p2.x - dx * curve, cp2y = p2.y - tangents[i] * dx * curve
             d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
           }
           return d
@@ -583,10 +822,11 @@
           <line x1="${px0}" x2="${px1}" y1="${py1}" y2="${py1}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"/>
           <g clip-path="url(#ds-clip)">
             <path d="${pvFill}" fill="url(#ds-pv)"/>
-            <path d="${pvLine}" fill="none" stroke="var(--chart-2)" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="${pvLine}" fill="none" stroke="var(--chart-2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             <path d="${ldFill}" fill="url(#ds-load)"/>
-            <path d="${ldLine}" fill="none" stroke="var(--chart-4)" stroke-width="1.5" stroke-linecap="round"/>
-          </g>`
+            <path d="${ldLine}" fill="none" stroke="var(--chart-4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>
+          <line id="chart-demo-crosshair" x1="0" x2="0" y1="${py0}" y2="${py1}" stroke="var(--foreground)" stroke-opacity="0.18" stroke-width="0.5" visibility="hidden"/>`
 
         // Y-axis HTML labels
         const yEl = document.getElementById('line-y-axis')
@@ -599,7 +839,47 @@
         // X-axis HTML labels (all 24 hours)
         const xEl = document.getElementById('line-x-axis')
         xEl.innerHTML = Array.from({length:24}, (_,i) => `<span>${String(i).padStart(2,'0')}</span>`).join('')
+
+        // Line chart interactive tooltip demo
+        ;(function lineTooltipDemo() {
+          const svg = document.getElementById("chart-demo-svg")
+          const tip = document.getElementById("tooltip-demo-tip")
+          if (!svg || !tip) return
+
+          const tipPv = tip.querySelector(".tdPv")
+          const tipLd = tip.querySelector(".tdLoad")
+          const tipHr = tip.querySelector(".tdHour")
+          const crosshair = svg.querySelector("#chart-demo-crosshair")
+          const n = pvData.length
+          svg.addEventListener("mousemove", (event) => {
+            const bounds = svg.getBoundingClientRect()
+            const sx = ((event.clientX - bounds.left) / bounds.width) * VW
+            if (sx < px0 || sx > px1) {
+              tip.style.display = "none"
+              crosshair.setAttribute("visibility", "hidden")
+              return
+            }
+
+            const idx = Math.max(0, Math.min(n - 1, Math.round(((sx - px0) / (px1 - px0)) * (n - 1))))
+            const cx = n > 1 ? (px0 + (idx / (n - 1)) * (px1 - px0)).toFixed(1) : String(px0)
+            crosshair.setAttribute("x1", cx)
+            crosshair.setAttribute("x2", cx)
+            crosshair.setAttribute("visibility", "visible")
+            tipHr.textContent = `${String(idx).padStart(2, "0")}:00 น.`
+            tipPv.textContent = `${(pvData[idx] * 3.5).toFixed(2)} kW`
+            tipLd.textContent = `${(loadData[idx] * 2).toFixed(2)} kW`
+            tip.style.display = "block"
+            tip.style.left = `${Math.min(event.clientX + 14, window.innerWidth - 160)}px`
+            tip.style.top = `${Math.max(event.clientY - 80, 8)}px`
+          })
+          svg.addEventListener("mouseleave", () => {
+            tip.style.display = "none"
+            crosshair.setAttribute("visibility", "hidden")
+          })
+        })()
       })()
     </script>
+
+
   </body>
 </html>
