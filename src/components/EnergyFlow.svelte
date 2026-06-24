@@ -19,6 +19,7 @@
   let svgEl: SVGSVGElement | undefined
   let containerEl: HTMLElement | undefined
   let svgW = $state(0)
+  let connected = $state(false)
   const svgH = $derived(svgW ? Math.round((svgW * 380) / 360) : 0)
 
   const timers: Record<string, ReturnType<typeof setInterval>> = {}
@@ -52,6 +53,12 @@
   onMount(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) svgEl?.pauseAnimations()
     const socket = io(socketUrl, { transports: ['websocket'] })
+    socket.on('connect', () => {
+      connected = true
+    })
+    socket.on('disconnect', () => {
+      connected = false
+    })
     socket.on('live', (data: LiveSnapshot) => {
       animateTo(
         'pv',
@@ -148,9 +155,15 @@
 <section class="flex h-full flex-col rounded-lg border border-border/70 bg-card p-6 md:p-8">
   <div class="mb-2 flex items-center justify-between">
     <h2 class="font-serif text-xl font-light">การไหลของพลังงาน</h2>
-    <span class="flex items-center gap-2 text-[10px] uppercase tracking-luxury text-muted-foreground">
-      <span class="size-1.5 animate-pulse rounded-full bg-chart-1"></span>เรียลไทม์
-    </span>
+    {#if connected}
+      <span class="flex items-center gap-2 text-[10px] uppercase tracking-luxury text-muted-foreground">
+        <span class="size-1.5 animate-pulse rounded-full bg-chart-1"></span>เรียลไทม์
+      </span>
+    {:else}
+      <span class="flex items-center gap-2 text-[10px] uppercase tracking-luxury text-muted-foreground/50">
+        <span class="size-1.5 rounded-full bg-muted-foreground/40"></span>offline
+      </span>
+    {/if}
   </div>
 
   <div bind:this={containerEl} class="mx-auto w-full max-w-90">
