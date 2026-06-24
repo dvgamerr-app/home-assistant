@@ -7,7 +7,6 @@ import SystemHealth from '@/components/SystemHealth.astro'
 import PanelStrings from '@/components/PanelStrings.astro'
 import EnergyDistributionChart from '@/components/charts/EnergyDistributionChart.astro'
 import ProductionCurve from '@/components/charts/ProductionCurve.astro'
-import BatterySocChart from '@/components/charts/BatterySocChart.astro'
 import SelfSufficiencyChart from '@/components/charts/SelfSufficiencyChart.astro'
 import { getAll } from '@/lib/solar-data'
 
@@ -25,16 +24,20 @@ const data = await getAll()
     <ElectricityNav active="solar" />
 
     <div class="space-y-6">
-      <div class="grid gap-6 lg:grid-cols-2">
+      <!-- main chart — full width -->
+      <ProductionCurve fiveMin={data.fiveMin} />
+
+      <!-- status cards -->
+      <div class="grid gap-6 lg:grid-cols-3">
         <BatteryCard battery={data.battery} />
         <SystemHealth systemHealth={data.systemHealth} />
         <PanelStrings pvStrings={data.pvStrings} system={data.system} />
-        <EnergyDistributionChart energyDistribution={data.energyDistribution} />
       </div>
-      <ProductionCurve hourly={data.hourly} />
+
+      <!-- analysis -->
       <div class="grid gap-6 lg:grid-cols-2">
-        <BatterySocChart hourlySoc={data.hourlySoc} />
         <SelfSufficiencyChart months={data.months} />
+        <EnergyDistributionChart energyDistribution={data.energyDistribution} />
       </div>
     </div>
   </main>

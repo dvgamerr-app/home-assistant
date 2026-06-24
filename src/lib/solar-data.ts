@@ -1,5 +1,5 @@
 import { calculateMonthlyBill, marginalRate, MONTH_SHORT_TH } from './electricity'
-import { getLiveSnapshot, getToday, getHourly, getMonthDays, getMonths, getLifetime, getBills, getBatteryCharge } from './db'
+import { getLiveSnapshot, getToday, getHourly, get5Min, getMonthDays, getMonths, getLifetime, getBills, getBatteryCharge, getPvPeak } from './db'
 
 // ── Config constants (not in DB) ──────────────────────────────────────────────
 
@@ -25,15 +25,17 @@ export async function getAll() {
   const year = now.getFullYear()
   const month = now.getMonth() + 1
 
-  const [live, today, monthDays, rawMonths, hourly, lifetime, bills, histBatteryCharge] = await Promise.all([
+  const [live, today, monthDays, rawMonths, hourly, fiveMinRaw, lifetime, bills, histBatteryCharge, pvPeak] = await Promise.all([
     getLiveSnapshot(),
     getToday(),
     getMonthDays(year, month),
     getMonths(12),
     getHourly(),
+    get5Min(),
     getLifetime(),
     getBills(36),
     getBatteryCharge(12),
+    getPvPeak(),
   ])
 
   // ── Battery ────────────────────────────────────────────────────────────────
@@ -52,8 +54,8 @@ export async function getAll() {
 
   // ── PV strings ────────────────────────────────────────────────────────────
   const pvStrings = [
-    { name: 'แผง MPPT 1', power: live.pv1.power, voltage: live.pv1.voltage, current: live.pv1.current },
-    { name: 'แผง MPPT 2', power: live.pv2.power, voltage: live.pv2.voltage, current: live.pv2.current },
+    { name: 'แผง MPPT 1', power: live.pv1.power, voltage: live.pv1.voltage, current: live.pv1.current, installed: true, peakKw: pvPeak.pv1 },
+    { name: 'แผง MPPT 2', power: live.pv2.power, voltage: live.pv2.voltage, current: live.pv2.current, installed: true, peakKw: pvPeak.pv2 },
   ]
 
   // gridFrequency not in DB → nominal 50 Hz (Thailand standard)
@@ -128,18 +130,38 @@ export async function getAll() {
   // ── Hourly ───────────────────────────────────────────────────────────────
   // Fill all 24 hours, zeroing out hours with no data
   const hourlyMap = new Map(hourly.map((h) => [h.hour, h]))
+  const ZERO_HOUR = { hour: 0, pv: 0, load: 0, soc: 0, batteryPower: 0, gridPower: 0 }
   const fullHourly = Array.from({ length: 24 }, (_, h) => {
-    const d = hourlyMap.get(h) ?? { hour: h, pv: 0, load: 0, soc: 0 }
+    const d = hourlyMap.get(h) ?? { ...ZERO_HOUR, hour: h }
     return {
       hour: `${String(h).padStart(2, '0')}:00`,
       pv: d.pv,
       load: d.load,
       net: +(d.pv - d.load).toFixed(2),
+      batt: d.batteryPower, // + = discharging, - = charging
+      grid: d.gridPower, // - = importing
     }
   })
   const hourlySoc = Array.from({ length: 24 }, (_, h) => {
     const d = hourlyMap.get(h)
     return { hour: `${String(h).padStart(2, '0')}:00`, soc: d?.soc ?? 0 }
+  })
+
+  // ── 5-minute resolution ───────────────────────────────────────────────────
+  const slotMap = new Map(fiveMinRaw.map((s) => [s.slot, s]))
+  const ZERO_SLOT = { slot: 0, pv: 0, load: 0, soc: 0, batteryPower: 0, gridPower: 0 }
+  const full5Min = Array.from({ length: 288 }, (_, i) => {
+    const d = slotMap.get(i) ?? { ...ZERO_SLOT, slot: i }
+    const h = Math.floor((i * 5) / 60)
+    const m = (i * 5) % 60
+    return {
+      time: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
+      pv: d.pv,
+      load: d.load,
+      net: +(d.pv - d.load).toFixed(2),
+      batt: d.batteryPower,
+      grid: d.gridPower,
+    }
   })
 
   // ── Energy distribution — ratio derived from actual monthly DB data ───────
@@ -202,6 +224,7 @@ export async function getAll() {
     months,
     hourly: fullHourly,
     hourlySoc,
+    fiveMin: full5Min,
     energyDistribution,
     lifetime,
     payback,

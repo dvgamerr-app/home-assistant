@@ -41,6 +41,8 @@ export type HourlyPoint = {
   pv: number // kW avg
   load: number // kW avg
   soc: number // % avg
+  batteryPower: number // kW avg; + = discharging, - = charging
+  gridPower: number // kW avg; - = importing (buying from grid)
 }
 
 export type DayPoint = {
@@ -143,25 +145,85 @@ export async function getToday(): Promise<TodayData> {
   }
 }
 
+export type MinutePoint = {
+  slot: number // 0-287 (5-min slots from midnight)
+  pv: number
+  load: number
+  soc: number
+  batteryPower: number
+  gridPower: number
+}
+
+/** 288 จุด 5 นาทีของ date ที่กำหนด (default วันนี้) */
+export async function get5Min(date?: Date): Promise<MinutePoint[]> {
+  const d = date ?? new Date()
+  const dayStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+  const rows = await sql<{ slot: string; pv: string; load: string; soc: string; battery_power: string; grid_power: string }[]>`
+    SELECT
+      FLOOR(EXTRACT(EPOCH FROM (recorded_at AT TIME ZONE ${TZ} - date_trunc('day', recorded_at AT TIME ZONE ${TZ}))) / 300)::int as slot,
+      AVG(CASE WHEN attr = 'generationPower'   THEN value::numeric END) as pv,
+      AVG(CASE WHEN attr = 'totalLoadPower'    THEN value::numeric END) as load,
+      AVG(CASE WHEN attr = 'batterySOC'        THEN value::numeric END) as soc,
+      AVG(CASE WHEN attr = 'batteryPower'      THEN value::numeric END) as battery_power,
+      AVG(CASE WHEN attr = 'aPhaseFeederPower' THEN value::numeric END) as grid_power
+    FROM stash.solar_record
+    WHERE device_id = ${DEVICE}
+      AND attr IN ('generationPower', 'totalLoadPower', 'batterySOC', 'batteryPower', 'aPhaseFeederPower')
+      AND (recorded_at AT TIME ZONE ${TZ})::date = ${dayStart}::date
+    GROUP BY slot
+    ORDER BY slot
+  `
+  return rows.map((r) => ({
+    slot: Number(r.slot),
+    pv: n(r.pv),
+    load: n(r.load),
+    soc: n(r.soc),
+    batteryPower: n(r.battery_power),
+    gridPower: n(r.grid_power),
+  }))
+}
+
 /** 24 จุดรายชั่วโมงของ date ที่กำหนด (default วันนี้) */
 export async function getHourly(date?: Date): Promise<HourlyPoint[]> {
   const d = date ?? new Date()
   const dayStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-  const rows = await sql<{ hour: string; pv: string; load: string; soc: string }[]>`
+  const rows = await sql<{ hour: string; pv: string; load: string; soc: string; battery_power: string; grid_power: string }[]>`
     SELECT
       EXTRACT(HOUR FROM recorded_at AT TIME ZONE ${TZ})::int as hour,
-      AVG(CASE WHEN attr = 'generationPower'  THEN value::numeric END) as pv,
-      AVG(CASE WHEN attr = 'totalLoadPower'   THEN value::numeric END) as load,
-      AVG(CASE WHEN attr = 'batterySOC'       THEN value::numeric END) as soc
+      AVG(CASE WHEN attr = 'generationPower'    THEN value::numeric END) as pv,
+      AVG(CASE WHEN attr = 'totalLoadPower'     THEN value::numeric END) as load,
+      AVG(CASE WHEN attr = 'batterySOC'         THEN value::numeric END) as soc,
+      AVG(CASE WHEN attr = 'batteryPower'       THEN value::numeric END) as battery_power,
+      AVG(CASE WHEN attr = 'aPhaseFeederPower'  THEN value::numeric END) as grid_power
     FROM stash.solar_record
     WHERE device_id = ${DEVICE}
-      AND attr IN ('generationPower', 'totalLoadPower', 'batterySOC')
+      AND attr IN ('generationPower', 'totalLoadPower', 'batterySOC', 'batteryPower', 'aPhaseFeederPower')
       AND (recorded_at AT TIME ZONE ${TZ})::date = ${dayStart}::date
     GROUP BY hour
     ORDER BY hour
   `
-  return rows.map((r) => ({ hour: Number(r.hour), pv: n(r.pv), load: n(r.load), soc: n(r.soc) }))
+  return rows.map((r) => ({
+    hour: Number(r.hour),
+    pv: n(r.pv),
+    load: n(r.load),
+    soc: n(r.soc),
+    batteryPower: n(r.battery_power),
+    gridPower: n(r.grid_power),
+  }))
+}
+
+/** peak all-time สำหรับแต่ละ MPPT string */
+export async function getPvPeak(): Promise<{ pv1: number; pv2: number }> {
+  const rows = await sql<{ attr: string; value: string }[]>`
+    SELECT attr, MAX(value::numeric) as value
+    FROM stash.solar_record
+    WHERE device_id = ${DEVICE} AND attr IN ('pv1Power', 'pv2Power')
+    GROUP BY attr
+  `
+  const m = Object.fromEntries(rows.map((r) => [r.attr, n(r.value)]))
+  return { pv1: m.pv1Power ?? 0, pv2: m.pv2Power ?? 0 }
 }
 
 /** รายวันของเดือน year/month (1-based) */

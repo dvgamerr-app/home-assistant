@@ -1,17 +1,18 @@
 ---
 import { svgLine, svgArea } from '@/lib/chart'
+import { num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
+import { SYSTEM } from '@/lib/solar-data'
 import ChartCard from '@/components/ui/ChartCard.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
 
 const { hourlySoc: HOURLY_SOC } = Astro.props as Pick<SolarData, 'hourlySoc'>
-const displaySoc = (value: number) => (value >= 99.5 ? 100 : Math.round(value))
+const CAP = SYSTEM.batteryCapacityKwh
 
 const [VW, VH, ML, MT, MR, MB] = [560, 220, 4, 18, 8, 28]
 const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
 const ph = py1 - py0
 
-// ตัดชั่วโมงอนาคต (ค่า 0) ออก แล้ว scale x ให้ตรงกับ label 24 ชม.
 const currentHour = new Date().getHours()
 const active = HOURLY_SOC.slice(0, Math.min(currentHour + 1, HOURLY_SOC.length))
 const xEnd = active.length <= 1 ? px0 : px0 + ((active.length - 1) / 23) * (px1 - px0)
@@ -20,7 +21,8 @@ const vals = active.map((r) => r.soc / 100)
 const nonZero = active.filter((r) => r.soc > 0)
 const currentSoc = active[active.length - 1]?.soc ?? 0
 const minSoc = nonZero.length > 0 ? Math.min(...nonZero.map((r) => r.soc)) : 0
-const maxSoc = nonZero.length > 0 ? Math.max(...nonZero.map((r) => r.soc)) : 0
+const maxSoc = nonZero.length > 0 ? Math.max(...nonZero.map((r) => r.soc)) : currentSoc
+const toKwh = (soc: number) => +((soc / 100) * CAP).toFixed(1)
 
 const linePath = svgLine(vals, px0, py0, xEnd, py1)
 const fillPath = svgArea(vals, px0, py0, xEnd, py1)
@@ -30,24 +32,24 @@ const gridPct = yTicks.map((f) => +(((MT + (1 - f) * ph) / VH) * 100).toFixed(2)
 const padLeft = +((ML / VW) * 100).toFixed(2)
 const padRight = +((MR / VW) * 100).toFixed(2)
 const xLabels = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
-const yLabels = ['100%', '75%', '50%', '25%']
+const yLabels = yTicks.map((f) => num(CAP * f, 1))
 ---
 
-<ChartCard eyebrow="แบตเตอรี่" title="ระดับพลังงานสำรองระหว่างวัน" class="flex flex-col overflow-hidden">
+<ChartCard eyebrow="แบตเตอรี่" title="พลังงานสำรองระหว่างวัน" class="flex flex-col overflow-hidden">
   <div class="flex items-end gap-8 border-b border-border/60 pb-5">
     <div class="space-y-1">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ล่าสุด</p>
       <p class="font-serif text-4xl font-light leading-none">
-        {displaySoc(currentSoc)}<span class="ml-1 text-base text-muted-foreground">%</span>
+        {toKwh(currentSoc)}<span class="ml-1 text-base text-muted-foreground">kWh</span>
       </p>
     </div>
     <div class="space-y-1">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ต่ำสุดวันนี้</p>
-      <p class="font-serif text-2xl font-light leading-none text-muted-foreground">{displaySoc(minSoc)}%</p>
+      <p class="font-serif text-2xl font-light leading-none text-muted-foreground">{toKwh(minSoc)} kWh</p>
     </div>
     <div class="ml-auto space-y-1 text-right">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">สูงสุดวันนี้</p>
-      <p class="font-serif text-lg text-foreground">{displaySoc(maxSoc)}%</p>
+      <p class="font-serif text-lg text-foreground">{toKwh(maxSoc)} kWh</p>
     </div>
   </div>
 
@@ -59,7 +61,7 @@ const yLabels = ['100%', '75%', '50%', '25%']
             class:list={['absolute right-0 text-right text-[9px] leading-none', i === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
             style={`top:${gridPct[i]}%;transform:translateY(-50%)`}
           >
-            {l}
+            {l} <span class="text-[8px] opacity-60">kWh</span>
           </span>
         ))
       }
@@ -93,7 +95,8 @@ const yLabels = ['100%', '75%', '50%', '25%']
             data-px0={px0}
             data-px1={px1}
             data-vw={VW}
-            data-soc={JSON.stringify(active.map((r) => r.soc))}></rect>
+            data-soc={JSON.stringify(active.map((r) => r.soc))}
+            data-cap={CAP}></rect>
         </svg>
       </div>
       <div class="mt-1 flex justify-between text-[9px] text-muted-foreground" style={`padding-left:${padLeft}%;padding-right:${padRight}%`}>
@@ -102,14 +105,14 @@ const yLabels = ['100%', '75%', '50%', '25%']
     </div>
   </div>
 
-  <LegendRow class="mt-3" items={[{ label: 'ระดับแบตเตอรี่ (%)', color: 'var(--chart-1)' }]} />
+  <LegendRow class="mt-3" items={[{ label: `พลังงานสำรอง (kWh) · ความจุเต็ม ${CAP} kWh`, color: 'var(--chart-1)' }]} />
 </ChartCard>
 
 <div class="soc-chart-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:130px">
   <p class="soc-tip-hour mb-2 text-[10px] uppercase tracking-luxury text-muted-foreground"></p>
   <div class="flex items-center justify-between gap-4">
     <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-      <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-1)"></span>SOC
+      <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-1)"></span>สำรอง
     </span>
     <span class="soc-tip-val font-mono text-[11px] font-medium text-foreground"></span>
   </div>
@@ -125,7 +128,8 @@ const yLabels = ['100%', '75%', '50%', '25%']
       const d = overlay.dataset
       const px0 = +d.px0!,
         px1 = +d.px1!,
-        vw = +d.vw!
+        vw = +d.vw!,
+        cap = +d.cap!
       const socData: number[] = JSON.parse(d.soc!)
       const n = socData.length
       const hourEl = tip.querySelector('.soc-tip-hour')!
@@ -145,7 +149,8 @@ const yLabels = ['100%', '75%', '50%', '25%']
         crosshair.setAttribute('x2', cx)
         crosshair.setAttribute('visibility', 'visible')
         hourEl.textContent = String(idx).padStart(2, '0') + ':00 น.'
-        valEl.textContent = Math.round(socData[idx]) + '%'
+        const kwh = ((socData[idx] / 100) * cap).toFixed(1)
+        valEl.textContent = kwh + ' kWh (' + Math.round(socData[idx]) + '%)'
         tip.classList.remove('hidden')
         tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 160) + 'px'
         tip.style.top = Math.max(e.clientY - 70, 8) + 'px'

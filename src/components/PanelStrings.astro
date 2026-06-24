@@ -17,19 +17,21 @@ const perStringMax = system.ratedPowerKw / PV_STRINGS.length
   <div class="space-y-5">
     {
       PV_STRINGS.map((pv) => {
-        const pct = Math.min(100, (pv.power / perStringMax) * 100)
+        const maxRef = pv.peakKw && pv.peakKw > 0 ? pv.peakKw : perStringMax
+        const pct = Math.min(100, (pv.power / maxRef) * 100)
         const active = pv.power > 0.05
+        const statusLabel = active ? `${num(pv.voltage, 0)} V · ${num(pv.current, 1)} A · ${num(pv.peakKw ?? 0, 2)} kW` : pv.installed ? `ไม่ผลิต · ${num(pv.peakKw ?? 0, 2)} kW` : 'ไม่ได้ติดตั้ง'
         return (
           <div>
             <div class="mb-1.5 flex items-center justify-between">
               <span class="text-sm text-foreground">{pv.name}</span>
               <span class="font-mono text-sm text-foreground">{num(pv.power, 2)} kW</span>
             </div>
-            <div class="h-px w-full bg-border">
-              <div class="h-px bg-chart-2" style={`width:${pct}%`} />
+            <div class="h-0.5 w-full bg-border">
+              <div class="h-0.5 bg-chart-2" style={`width:${pct}%`} />
             </div>
             <div class="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-              <span>{active ? `${num(pv.voltage, 0)} V · ${num(pv.current, 1)} A` : 'ไม่มีการผลิต / ไม่ได้ติดตั้ง'}</span>
+              <span>{statusLabel}</span>
               <span>{num(pct, 0)}% ของกำลังสูงสุด</span>
             </div>
           </div>

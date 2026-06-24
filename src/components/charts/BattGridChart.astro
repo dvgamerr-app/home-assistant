@@ -1,0 +1,211 @@
+---
+import { svgLine } from '@/lib/chart'
+import { num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
+import ChartCard from '@/components/ui/ChartCard.astro'
+import LegendRow from '@/components/ui/LegendRow.astro'
+
+const { hourly: HOURLY } = Astro.props as Pick<SolarData, 'hourly'>
+
+const currentHour = new Date().getHours()
+const active = HOURLY.slice(0, Math.min(currentHour + 1, HOURLY.length))
+
+// batt: + = discharging, - = charging
+// grid: - = importing → negate so positive = buying
+const battVals = active.map((h) => h.batt ?? 0)
+const gridVals = active.map((h) => -(h.grid ?? 0)) // positive = buying
+
+const allVals = [...battVals, ...gridVals]
+const absMax = Math.max(Math.abs(Math.min(...allVals, 0)), Math.max(...allVals, 0), 0.5) * 1.15
+
+// scale: 0 mapped to midpoint, +absMax = top, -absMax = bottom
+const norm = (v: number) => 0.5 + v / (2 * absMax)
+
+const [VW, VH, ML, MT, MR, MB] = [560, 220, 4, 16, 8, 28]
+const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
+const ph = py1 - py0
+const xEnd = active.length <= 1 ? px0 : px0 + ((active.length - 1) / 23) * (px1 - px0)
+
+const battLine = svgLine(battVals.map(norm), px0, py0, xEnd, py1)
+const gridLine = svgLine(gridVals.map(norm), px0, py0, xEnd, py1)
+
+// zero-line Y
+const zeroY = +(py0 + (1 - norm(0)) * ph).toFixed(1)
+
+const yTicks = [absMax, absMax * 0.5, 0, -absMax * 0.5, -absMax]
+const gridYs = yTicks.map((v) => +(py0 + (1 - norm(v)) * ph).toFixed(1))
+const gridPct = yTicks.map((v) => +(((MT + (1 - norm(v)) * ph) / VH) * 100).toFixed(2))
+const yLabels = yTicks.map((v) => (v === 0 ? '0' : num(Math.abs(v), 1)))
+const padLeft = +((ML / VW) * 100).toFixed(2)
+const padRight = +((MR / VW) * 100).toFixed(2)
+const xLabels = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
+
+const peakBattDis = Math.max(...battVals, 0)
+const peakGridImp = Math.max(...gridVals, 0)
+const chargingHours = battVals.filter((v) => v < -0.05).length
+---
+
+<ChartCard eyebrow="กำลังไฟ" title="แบตเตอรี่ & กริดระหว่างวัน" class="flex flex-col overflow-hidden">
+  <div class="flex flex-wrap items-end gap-6 border-b border-border/60 pb-5">
+    <div class="space-y-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">แบตจ่ายออกสูงสุด</p>
+      <p class="font-serif text-4xl font-light leading-none" style="color:var(--chart-1)">
+        {num(peakBattDis, 2)}<span class="ml-1 text-base text-muted-foreground">kW</span>
+      </p>
+    </div>
+    <div class="space-y-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">กริดสูงสุด</p>
+      <p class="font-serif text-2xl font-light leading-none" style="color:var(--chart-4)">{num(peakGridImp, 2)} kW</p>
+    </div>
+    <div class="ml-auto space-y-1 text-right">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ชาร์จแบต</p>
+      <p class="font-serif text-lg text-foreground">{chargingHours} ชม.</p>
+    </div>
+  </div>
+
+  <div class="mt-5 flex items-start gap-1">
+    <div class="relative h-56 shrink-0 overflow-visible md:h-60" style="width:1.75rem">
+      {
+        yLabels.map((l, i) => (
+          <span
+            class:list={['absolute right-0 text-right text-[9px] leading-none', yTicks[i] === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
+            style={`top:${gridPct[i]}%;transform:translateY(-50%)`}
+          >
+            {yTicks[i] < 0 ? '−' : ''}
+            {l}
+          </span>
+        ))
+      }
+    </div>
+    <div class="min-w-0 flex-1">
+      <div class="h-56 w-full md:h-60">
+        <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
+          <defs>
+            <clipPath id="bg-clip"><rect x={px0} y={py0} width={px1 - px0} height={ph}></rect></clipPath>
+          </defs>
+          <!-- grid lines -->
+          <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
+          <line x1={px0} x2={px0} y1={py0} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
+          {
+            gridYs.map((y, i) => (
+              <line
+                x1={px0}
+                x2={px1}
+                y1={y}
+                y2={y}
+                stroke="var(--border)"
+                stroke-opacity={yTicks[i] === 0 ? '0.6' : '0.4'}
+                stroke-width={yTicks[i] === 0 ? '0.8' : '0.5'}
+                stroke-dasharray={yTicks[i] === 0 ? undefined : '2 4'}
+              />
+            ))
+          }
+          <!-- zone labels -->
+          <text x={px0 + 4} y={zeroY - 6} font-size="8" fill="var(--muted-foreground)" letter-spacing="0.5">จ่ายออก / ซื้อ</text>
+          <text x={px0 + 4} y={zeroY + 12} font-size="8" fill="var(--muted-foreground)" letter-spacing="0.5">ชาร์จ / ไม่ซื้อ</text>
+          <g clip-path="url(#bg-clip)">
+            <!-- grid line (dashed, chart-4) -->
+            <path d={gridLine} fill="none" stroke="var(--chart-4)" stroke-width="1.5" stroke-linecap={'round' as const} stroke-linejoin={'round' as const} stroke-dasharray="5 2"></path>
+            <!-- battery line (solid, chart-1) -->
+            <path d={battLine} fill="none" stroke="var(--chart-1)" stroke-width="2" stroke-linecap={'round' as const} stroke-linejoin={'round' as const}></path>
+          </g>
+          <line class="bg-crosshair" x1="0" x2="0" y1={py0} y2={py1} stroke="var(--foreground)" stroke-opacity="0.2" stroke-width="0.5" visibility="hidden"></line>
+          <rect
+            class="bg-overlay"
+            x={px0}
+            y={py0}
+            width={xEnd - px0}
+            height={ph}
+            fill="transparent"
+            style="cursor:crosshair"
+            data-px0={px0}
+            data-px1={px1}
+            data-vw={VW}
+            data-batt={JSON.stringify(battVals)}
+            data-grid={JSON.stringify(gridVals)}></rect>
+        </svg>
+      </div>
+      <div class="mt-1 flex justify-between text-[9px] text-muted-foreground" style={`padding-left:${padLeft}%;padding-right:${padRight}%`}>
+        {xLabels.map((l) => <span>{l}</span>)}
+      </div>
+    </div>
+  </div>
+
+  <LegendRow class="mt-3" items={[{ label: 'แบตเตอรี่ (kW) · บวก=จ่ายออก ลบ=ชาร์จ', color: 'var(--chart-1)' }]}>
+    <span class="flex items-center gap-2 text-xs text-muted-foreground">
+      <span class="inline-block h-px w-5 border-t-2 border-dashed" style="border-color:var(--chart-4)"></span>
+      กริด (kW) · บวก=ซื้อไฟ
+    </span>
+  </LegendRow>
+</ChartCard>
+
+<div class="bg-chart-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:160px">
+  <p class="bg-tip-hour mb-2 text-[10px] uppercase tracking-luxury text-muted-foreground"></p>
+  <div class="space-y-1.5">
+    <div class="flex items-center justify-between gap-4">
+      <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-1)"></span>แบตเตอรี่
+      </span>
+      <span class="bg-tip-batt font-mono text-[11px] text-foreground"></span>
+    </div>
+    <div class="flex items-center justify-between gap-4">
+      <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-4)"></span>กริด
+      </span>
+      <span class="bg-tip-grid font-mono text-[11px] text-foreground"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+  {
+    const overlay = document.querySelector<SVGRectElement>('.bg-overlay')
+    const svg = overlay?.closest('svg') as SVGSVGElement | null
+    const crosshair = document.querySelector<SVGLineElement>('.bg-crosshair')
+    const tip = document.querySelector<HTMLElement>('.bg-chart-tip')
+    if (svg && overlay && tip && crosshair) {
+      const d = overlay.dataset
+      const px0 = +d.px0!,
+        px1 = +d.px1!,
+        vw = +d.vw!
+      const battData: number[] = JSON.parse(d.batt!)
+      const gridData: number[] = JSON.parse(d.grid!)
+      const n = battData.length
+      const hourEl = tip.querySelector('.bg-tip-hour')!
+      const battEl = tip.querySelector('.bg-tip-batt')!
+      const gridEl = tip.querySelector('.bg-tip-grid')!
+
+      const fmt = (v: number) => {
+        const abs = Math.abs(v).toFixed(2)
+        if (v > 0.05) return `+${abs} kW`
+        if (v < -0.05) return `−${abs} kW`
+        return '0.00 kW'
+      }
+
+      svg.addEventListener('mousemove', (e) => {
+        const r = svg.getBoundingClientRect()
+        const sx = ((e.clientX - r.left) / r.width) * vw
+        if (sx < px0 || sx > px1) {
+          tip.classList.add('hidden')
+          crosshair.setAttribute('visibility', 'hidden')
+          return
+        }
+        const idx = Math.max(0, Math.min(n - 1, Math.round(((sx - px0) / (px1 - px0)) * (n - 1))))
+        const cx = (px0 + (idx / (n - 1)) * (px1 - px0)).toFixed(1)
+        crosshair.setAttribute('x1', cx)
+        crosshair.setAttribute('x2', cx)
+        crosshair.setAttribute('visibility', 'visible')
+        hourEl.textContent = String(idx).padStart(2, '0') + ':00 น.'
+        battEl.textContent = fmt(battData[idx])
+        gridEl.textContent = fmt(gridData[idx])
+        tip.classList.remove('hidden')
+        tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 190) + 'px'
+        tip.style.top = Math.max(e.clientY - 80, 8) + 'px'
+      })
+      svg.addEventListener('mouseleave', () => {
+        tip.classList.add('hidden')
+        crosshair.setAttribute('visibility', 'hidden')
+      })
+    }
+  }
+</script>
