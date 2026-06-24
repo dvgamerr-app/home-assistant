@@ -36,7 +36,7 @@ const metrics = [
     <span class="font-serif text-3xl font-light text-foreground">{b.soc}<span class="text-lg text-muted-foreground">%</span></span>
   </div>
   <div class="h-px w-full bg-border">
-    <div class="h-px bg-accent" style={`width:${b.soc}%`}></div>
+    <div class="h-px" style={`width:${b.soc}%;background:var(--chart-3)`}></div>
   </div>
   <p class="mt-3 text-sm text-muted-foreground">
     เก็บไฟไว้ {num(b.storedKwh, 1)} kWh{b.status === 'charging' ? ' · กำลังเติมเข้าแบตเตอรี่' : ''}

@@ -153,7 +153,7 @@
     </span>
   </div>
 
-  <div bind:this={containerEl} class="w-full">
+  <div bind:this={containerEl} class="mx-auto w-full max-w-90">
     <svg bind:this={svgEl} viewBox="0 0 360 380" width={svgW || undefined} height={svgH || undefined} class="h-auto w-full" role="img" aria-label="แผนผังการไหลของพลังงาน">
       <defs>
         <path id="p-sh" d="M180,66 L180,130" />

@@ -20,18 +20,18 @@ const thMonth = (yyyymm: string) => MONTH_SHORT_TH[parseInt(yyyymm.slice(4)) - 1
 
 // ── Main assembler ────────────────────────────────────────────────────────────
 
-export async function getAll() {
+export async function getAll(date?: Date) {
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth() + 1
 
   const [live, today, monthDays, rawMonths, hourly, fiveMinRaw, lifetime, bills, histBatteryCharge, pvPeak] = await Promise.all([
     getLiveSnapshot(),
-    getToday(),
+    getToday(date),
     getMonthDays(year, month),
     getMonths(12),
-    getHourly(),
-    get5Min(),
+    getHourly(date),
+    get5Min(date),
     getLifetime(),
     getBills(36),
     getBatteryCharge(12),
@@ -147,22 +147,16 @@ export async function getAll() {
     return { hour: `${String(h).padStart(2, '0')}:00`, soc: d?.soc ?? 0 }
   })
 
-  // ── 5-minute resolution ───────────────────────────────────────────────────
-  const slotMap = new Map(fiveMinRaw.map((s) => [s.slot, s]))
-  const ZERO_SLOT = { slot: 0, pv: 0, load: 0, soc: 0, batteryPower: 0, gridPower: 0 }
-  const full5Min = Array.from({ length: 288 }, (_, i) => {
-    const d = slotMap.get(i) ?? { ...ZERO_SLOT, slot: i }
-    const h = Math.floor((i * 5) / 60)
-    const m = (i * 5) % 60
-    return {
-      time: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`,
-      pv: d.pv,
-      load: d.load,
-      net: +(d.pv - d.load).toFixed(2),
-      batt: d.batteryPower,
-      grid: d.gridPower,
-    }
-  })
+  // ── 5-minute resolution — ใช้ recorded_at จริง ไม่ fill slot ───────────────
+  const full5Min = fiveMinRaw.map((s) => ({
+    minuteOfDay: s.minuteOfDay,
+    time: `${String(Math.floor(s.minuteOfDay / 60)).padStart(2, '0')}:${String(s.minuteOfDay % 60).padStart(2, '0')}`,
+    pv: s.pv,
+    load: s.load,
+    net: +(s.pv - s.load).toFixed(2),
+    batt: s.batteryPower,
+    grid: s.gridPower,
+  }))
 
   // ── Energy distribution — ratio derived from actual monthly DB data ───────
   const histGen = rawMonths.reduce((s, m) => s + m.generated, 0)

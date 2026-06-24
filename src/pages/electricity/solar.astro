@@ -2,15 +2,19 @@
 import Layout from '@/layouts/Layout.astro'
 import Nav from '@/components/Nav.astro'
 import ElectricityNav from '@/components/ElectricityNav.astro'
-import BatteryCard from '@/components/BatteryCard.astro'
-import SystemHealth from '@/components/SystemHealth.astro'
-import PanelStrings from '@/components/PanelStrings.astro'
+import SolarStatusCards from '@/components/SolarStatusCards.svelte'
 import EnergyDistributionChart from '@/components/charts/EnergyDistributionChart.astro'
 import ProductionCurve from '@/components/charts/ProductionCurve.astro'
 import SelfSufficiencyChart from '@/components/charts/SelfSufficiencyChart.astro'
 import { getAll } from '@/lib/solar-data'
 
-const data = await getAll()
+const dateParam = Astro.url.searchParams.get('date')
+const todayISO = new Date().toISOString().slice(0, 10)
+const selectedDate = dateParam ? new Date(dateParam + 'T00:00:00') : undefined
+const data = await getAll(selectedDate)
+
+const { protocol, hostname } = Astro.url
+const socketUrl = `${protocol}//${hostname}:${process.env.SOCKET_PORT ?? '3000'}`
 ---
 
 <Layout title="ผลิตไฟ — บ้าน">
@@ -25,14 +29,10 @@ const data = await getAll()
 
     <div class="space-y-6">
       <!-- main chart — full width -->
-      <ProductionCurve fiveMin={data.fiveMin} />
+      <ProductionCurve fiveMin={data.fiveMin} date={dateParam ?? todayISO} />
 
-      <!-- status cards -->
-      <div class="grid gap-6 lg:grid-cols-3">
-        <BatteryCard battery={data.battery} />
-        <SystemHealth systemHealth={data.systemHealth} />
-        <PanelStrings pvStrings={data.pvStrings} system={data.system} />
-      </div>
+      <!-- status cards — realtime via socket.io -->
+      <SolarStatusCards live={data.live} pvStrings={data.pvStrings} system={data.system} socketUrl={socketUrl} client:load />
 
       <!-- analysis -->
       <div class="grid gap-6 lg:grid-cols-2">

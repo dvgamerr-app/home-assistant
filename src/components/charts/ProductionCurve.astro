@@ -3,20 +3,20 @@ import { num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
 import ChartCard from '@/components/ui/ChartCard.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
+import DatePicker from '@/components/ui/DatePicker.svelte'
 
-const { fiveMin: POINTS } = Astro.props as Pick<SolarData, 'fiveMin'>
+const { fiveMin: POINTS, date } = Astro.props as Pick<SolarData, 'fiveMin'> & { date: string }
 
 const [VW, VH, ML, MT, MR, MB] = [560, 220, 4, 18, 8, 28]
 const [py0, py1] = [MT, VH - MB]
 const ph = py1 - py0
 
 const now = new Date()
-const currentSlot = now.getHours() * 12 + Math.floor(now.getMinutes() / 5)
-const rawActive = POINTS.slice(0, Math.min(currentSlot + 1, POINTS.length))
-// trim trailing slots with no DB data (collector not polled yet = all zeros)
-let cutoff = rawActive.length
-while (cutoff > 0 && rawActive[cutoff - 1].pv === 0 && rawActive[cutoff - 1].load === 0 && Math.abs(rawActive[cutoff - 1].batt) < 0.001 && Math.abs(rawActive[cutoff - 1].grid) < 0.001) cutoff--
-const active = rawActive.slice(0, Math.max(cutoff, 1))
+const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+const isToday = date === todayISO
+const currentMinute = isToday ? now.getHours() * 60 + now.getMinutes() : 1439
+// ข้อมูลมาจาก recorded_at จริง จึงใช้ทุก point ที่ <= เวลาปัจจุบัน
+const active = POINTS.filter((p) => p.minuteOfDay <= currentMinute)
 
 // unified scale รองรับค่าลบ (battery charging)
 const battVals = active.map((h) => h.batt ?? 0)
@@ -53,15 +53,18 @@ const padRight = +((MR / VW) * 100).toFixed(2)
 
 // data passed to client-side draw()
 const chartJson = JSON.stringify({
-  pv: POINTS.map((h) => h.pv),
-  load: POINTS.map((h) => h.load),
-  batt: POINTS.map((h) => h.batt ?? 0),
-  grid: POINTS.map((h) => h.grid ?? 0),
-  activeLen: active.length,
+  pv: active.map((h) => h.pv),
+  load: active.map((h) => h.load),
+  batt: active.map((h) => h.batt ?? 0),
+  grid: active.map((h) => h.grid ?? 0),
+  times: active.map((h) => h.minuteOfDay),
   scaleMin,
   scaleMax,
   hasNeg: hasNegative,
   tickNorms,
+  gridPct,
+  yLabels,
+  isToday,
 })
 ---
 
@@ -70,25 +73,24 @@ const chartJson = JSON.stringify({
     <div class="space-y-1">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">พีคโซลาร์</p>
       <p class="font-serif text-4xl font-light leading-none">
-        {num(peakPv, 2)}<span class="ml-1 text-base text-muted-foreground">kW</span>
+        <span id="pv-peak-pv">{num(peakPv, 2)}</span><span class="ml-1 text-base text-muted-foreground">kW</span>
       </p>
     </div>
     <div class="space-y-1">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">พีคโหลด</p>
-      <p class="font-serif text-2xl font-light leading-none" style="color:var(--chart-4)">{num(peakLoad, 2)} kW</p>
+      <p class="font-serif text-2xl font-light leading-none" style="color:var(--destructive)"><span id="pv-peak-load">{num(peakLoad, 2)}</span> kW</p>
     </div>
     <div class="space-y-1">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">แบตจ่ายออกสูงสุด</p>
-      <p class="font-serif text-2xl font-light leading-none" style="color:var(--chart-1)">{num(peakBattDis, 2)} kW</p>
+      <p class="font-serif text-2xl font-light leading-none" style="color:var(--chart-3)"><span id="pv-peak-batt">{num(peakBattDis, 2)}</span> kW</p>
     </div>
-    <div class="ml-auto space-y-1 text-right">
-      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ตลอดวัน</p>
-      <p class="font-serif text-base text-muted-foreground">00:00 → 23:55</p>
+    <div class="ml-auto flex items-center">
+      <DatePicker selected={date} client:load />
     </div>
   </div>
 
   <div class="mt-5 flex items-start gap-1">
-    <div class="relative h-56 shrink-0 overflow-visible md:h-60" style="width:1.75rem">
+    <div id="pv-y-axis" class="relative h-56 shrink-0 overflow-visible md:h-60" style="width:1.75rem">
       {
         yLabels.map((l, i) => (
           <span
@@ -114,8 +116,8 @@ const chartJson = JSON.stringify({
     class="mt-3"
     items={[
       { label: 'โซลาร์ (kW)', color: 'var(--chart-2)' },
-      { label: 'โหลด (kW)', color: 'var(--chart-4)' },
-      { label: 'แบตเตอรี่ (kW)', color: 'var(--chart-1)' },
+      { label: 'โหลด (kW)', color: 'var(--destructive)' },
+      { label: 'แบตเตอรี่ (kW)', color: 'var(--chart-3)' },
     ]}
   >
     <span class="flex items-center gap-2 text-xs text-muted-foreground">
@@ -136,13 +138,13 @@ const chartJson = JSON.stringify({
     </div>
     <div class="flex items-center justify-between gap-4">
       <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-4)"></span>โหลด
+        <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--destructive)"></span>โหลด
       </span>
       <span class="pv-tip-load font-mono text-[11px] text-foreground"></span>
     </div>
     <div class="flex items-center justify-between gap-4">
       <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-1)"></span>แบตเตอรี่
+        <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-3)"></span>แบตเตอรี่
       </span>
       <span class="pv-tip-batt font-mono text-[11px] text-foreground"></span>
     </div>
@@ -165,26 +167,26 @@ const chartJson = JSON.stringify({
 
     // --- server data ---
     const J = JSON.parse(wrapEl.dataset.chart!)
-    const pvAll: number[] = J.pv
-    const loadAll: number[] = J.load
-    const battAll: number[] = J.batt
-    const gridAll: number[] = J.grid
-    const activeLen: number = J.activeLen
-    const scaleMin: number = J.scaleMin
-    const scaleMax: number = J.scaleMax
-    const hasNeg: boolean = J.hasNeg
-    const tickNorms: number[] = J.tickNorms
-    const N = pvAll.length // 288
+    let pvAll: number[] = J.pv
+    let loadAll: number[] = J.load
+    let battAll: number[] = J.batt
+    let gridAll: number[] = J.grid
+    let times: number[] = J.times // minuteOfDay per point
+    let scaleMin: number = J.scaleMin
+    let scaleMax: number = J.scaleMax
+    let hasNeg: boolean = J.hasNeg
+    let tickNorms: number[] = J.tickNorms
+    const isToday: boolean = J.isToday
 
     const nm = (v: number) => (v - scaleMin) / (scaleMax - scaleMin)
 
-    // --- bezier path (same algo as chart.ts svgLine) ---
+    // --- bezier path — x positioned by actual minuteOfDay ---
     const clamp01 = (x: number) => Math.max(0, Math.min(1, x))
     function smoothLine(values: number[], xMin: number, yMin: number, xMax: number, yMax: number): string {
       if (values.length < 2) return ''
       const tension = 0.9
       const pts = values.map((v, i) => ({
-        x: xMin + (i / (values.length - 1)) * (xMax - xMin),
+        x: xMin + (times[i] / 1439) * (xMax - xMin),
         y: yMin + (1 - clamp01(v)) * (yMax - yMin),
       }))
       const slopes = pts.slice(0, -1).map((p, i) => (pts[i + 1].y - p.y) / (pts[i + 1].x - p.x))
@@ -242,12 +244,13 @@ const chartJson = JSON.stringify({
 
       svg!.setAttribute('viewBox', `0 0 ${w} ${h}`)
 
-      const xEnd = activeLen <= 1 ? px0 : px0 + ((activeLen - 1) / (N - 1)) * (px1 - px0)
+      const N = pvAll.length
+      const lastX = N <= 1 ? px0 : px0 + (times[N - 1] / 1439) * (px1 - px0)
 
-      const pvL = smoothLine(pvAll.slice(0, activeLen).map(nm), px0, py0, xEnd, py1)
-      const ldL = smoothLine(loadAll.slice(0, activeLen).map(nm), px0, py0, xEnd, py1)
-      const btL = smoothLine(battAll.slice(0, activeLen).map(nm), px0, py0, xEnd, py1)
-      const grL = smoothLine(gridAll.slice(0, activeLen).map(nm), px0, py0, xEnd, py1)
+      const pvL = smoothLine(pvAll.map(nm), px0, py0, px1, py1)
+      const ldL = smoothLine(loadAll.map(nm), px0, py0, px1, py1)
+      const btL = smoothLine(battAll.map(nm), px0, py0, px1, py1)
+      const grL = smoothLine(gridAll.map(nm), px0, py0, px1, py1)
 
       const zeroY = (py0 + (1 - nm(0)) * ph).toFixed(1)
       const gridYs = tickNorms.map((nv) => (py0 + (1 - nv) * ph).toFixed(1))
@@ -259,8 +262,8 @@ const chartJson = JSON.stringify({
             <stop offset="100%" stop-color="var(--chart-2)" stop-opacity="0"/>
           </linearGradient>
           <linearGradient id="load-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="var(--chart-4)" stop-opacity="0.2"/>
-            <stop offset="100%" stop-color="var(--chart-4)" stop-opacity="0"/>
+            <stop offset="0%" stop-color="var(--destructive)" stop-opacity="0.2"/>
+            <stop offset="100%" stop-color="var(--destructive)" stop-opacity="0"/>
           </linearGradient>
           <clipPath id="pv-clip"><rect x="${px0}" y="${py0}" width="${px1 - px0}" height="${ph}"/></clipPath>
         </defs>
@@ -268,11 +271,11 @@ const chartJson = JSON.stringify({
         ${gridYs.map((y) => `<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')}
         ${hasNeg ? `<line x1="${px0}" x2="${px1}" y1="${zeroY}" y2="${zeroY}" stroke="var(--border)" stroke-opacity="0.7" stroke-width="0.8"/>` : ''}
         <g clip-path="url(#pv-clip)">
-          <path d="${pvL} L ${xEnd},${py1} L ${px0},${py1} Z" fill="url(#pv-grad)"/>
+          <path d="${pvL} L ${lastX},${py1} L ${px0},${py1} Z" fill="url(#pv-grad)"/>
           <path d="${pvL}" fill="none" stroke="var(--chart-2)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="${ldL} L ${xEnd},${py1} L ${px0},${py1} Z" fill="url(#load-grad)"/>
-          <path d="${ldL}" fill="none" stroke="var(--chart-4)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="${btL}" fill="none" stroke="var(--chart-1)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="${ldL} L ${lastX},${py1} L ${px0},${py1} Z" fill="url(#load-grad)"/>
+          <path d="${ldL}" fill="none" stroke="var(--destructive)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="${btL}" fill="none" stroke="var(--chart-3)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
           <path d="${grL}" fill="none" stroke="var(--chart-4)" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 2" stroke-opacity="0.7"/>
         </g>
         <line class="pv-crosshair" x1="0" x2="0" y1="${py0}" y2="${py1}" stroke="var(--foreground)" stroke-opacity="0.2" stroke-width="0.5" visibility="hidden"/>
@@ -307,12 +310,13 @@ const chartJson = JSON.stringify({
         crosshair.setAttribute('visibility', 'hidden')
         return
       }
-      const idx = Math.max(0, Math.min(N - 1, Math.round(((sx - curPx0) / (curPx1 - curPx0)) * (N - 1))))
-      const cx = N > 1 ? (curPx0 + (idx / (N - 1)) * (curPx1 - curPx0)).toFixed(1) : String(curPx0)
+      const targetMin = ((sx - curPx0) / (curPx1 - curPx0)) * 1439
+      const idx = times.reduce((best, t, i) => (Math.abs(t - targetMin) < Math.abs(times[best] - targetMin) ? i : best), 0)
+      const cx = (curPx0 + (times[idx] / 1439) * (curPx1 - curPx0)).toFixed(1)
       crosshair.setAttribute('x1', cx)
       crosshair.setAttribute('x2', cx)
       crosshair.setAttribute('visibility', 'visible')
-      const totalMin = idx * 5
+      const totalMin = times[idx]
       tip!.querySelector('.pv-tip-hour')!.textContent = `${String(Math.floor(totalMin / 60)).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')} น.`
       tip!.querySelector('.pv-tip-pv')!.textContent = pvAll[idx].toFixed(2) + ' kW'
       tip!.querySelector('.pv-tip-load')!.textContent = loadAll[idx].toFixed(2) + ' kW'
@@ -326,5 +330,47 @@ const chartJson = JSON.stringify({
       tip!.classList.add('hidden')
       crosshair?.setAttribute('visibility', 'hidden')
     })
+
+    // --- realtime poll (today only) ---
+    function numFmt(v: number, d: number) {
+      return v.toFixed(d)
+    }
+    function updateYAxis(newGridPct: number[], newYLabels: string[]) {
+      const yAxisEl = document.getElementById('pv-y-axis')
+      if (!yAxisEl) return
+      yAxisEl.innerHTML = newYLabels
+        .map(
+          (l, i) =>
+            `<span class="absolute right-0 text-right text-[9px] leading-none ${i === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground'}" style="top:${newGridPct[i]}%;transform:translateY(-50%)">${l}</span>`,
+        )
+        .join('')
+    }
+    async function refresh() {
+      try {
+        const r = await fetch('/api/solar/fivemin')
+        if (!r.ok) return
+        const d = await r.json()
+        pvAll = d.pv
+        loadAll = d.load
+        battAll = d.batt
+        gridAll = d.grid
+        times = d.times
+        scaleMin = d.scaleMin
+        scaleMax = d.scaleMax
+        hasNeg = d.hasNeg
+        tickNorms = d.tickNorms
+        draw()
+        updateYAxis(d.gridPct, d.yLabels)
+        const ppv = document.getElementById('pv-peak-pv')
+        if (ppv) ppv.textContent = numFmt(d.peakPv, 2)
+        const pld = document.getElementById('pv-peak-load')
+        if (pld) pld.textContent = numFmt(d.peakLoad, 2)
+        const pbt = document.getElementById('pv-peak-batt')
+        if (pbt) pbt.textContent = numFmt(d.peakBattDis, 2)
+      } catch {
+        /* network error — skip this tick */
+      }
+    }
+    if (isToday) setInterval(refresh, 60_000)
   }
 </script>

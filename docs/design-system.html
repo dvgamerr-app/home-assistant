@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="th" data-theme="light">
+<html lang="th">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -25,35 +25,46 @@
         --foreground: oklch(0.26 0.012 60);
         --card: oklch(0.995 0.003 85);
         --card-foreground: oklch(0.26 0.012 60);
+        --popover: oklch(0.995 0.003 85);
+        --popover-foreground: oklch(0.26 0.012 60);
         --primary: oklch(0.42 0.02 65);
         --primary-foreground: oklch(0.97 0.006 85);
         --secondary: oklch(0.95 0.008 80);
+        --secondary-foreground: oklch(0.33 0.015 65);
         --muted: oklch(0.955 0.006 80);
         --muted-foreground: oklch(0.52 0.012 70);
         --accent: oklch(0.74 0.085 70);
         --accent-foreground: oklch(0.32 0.04 65);
         --destructive: oklch(0.55 0.14 28);
         --border: oklch(0.9 0.006 80);
-        --chart-1: oklch(0.62 0.07 150);
-        --chart-2: oklch(0.76 0.1 75);
-        --chart-3: oklch(0.6 0.06 230);
-        --chart-4: oklch(0.58 0.12 30);
-        --chart-5: oklch(0.55 0.04 200);
+        --input: oklch(0.9 0.006 80);
+        --ring: oklch(0.74 0.085 70);
+        --chart-1: oklch(0.62 0.07 150);  /* sage — self-use / solar good */
+        --chart-2: oklch(0.76 0.1 75);    /* brass — production / sun */
+        --chart-3: oklch(0.6 0.06 230);   /* dusty blue — consumption */
+        --chart-4: oklch(0.58 0.12 30);   /* terracotta — grid import / cost */
+        --chart-5: oklch(0.55 0.04 200);  /* slate — neutral */
       }
-      [data-theme='dark'] {
+      /* dark mode — toggle via .dark class on <html> */
+      .dark {
         --background: oklch(0.19 0.006 60);
         --foreground: oklch(0.92 0.006 85);
         --card: oklch(0.225 0.006 60);
         --card-foreground: oklch(0.92 0.006 85);
+        --popover: oklch(0.225 0.006 60);
+        --popover-foreground: oklch(0.92 0.006 85);
         --primary: oklch(0.85 0.02 80);
         --primary-foreground: oklch(0.22 0.01 60);
         --secondary: oklch(0.28 0.006 60);
+        --secondary-foreground: oklch(0.92 0.006 85);
         --muted: oklch(0.28 0.006 60);
         --muted-foreground: oklch(0.68 0.01 75);
         --accent: oklch(0.78 0.09 75);
         --accent-foreground: oklch(0.22 0.02 65);
         --destructive: oklch(0.62 0.14 28);
         --border: oklch(0.92 0.01 85 / 10%);
+        --input: oklch(0.92 0.01 85 / 14%);
+        --ring: oklch(0.78 0.09 75);
         --chart-1: oklch(0.68 0.08 150);
         --chart-2: oklch(0.8 0.1 78);
         --chart-3: oklch(0.66 0.07 230);
@@ -64,11 +75,7 @@
       /* ============================================================
          BASE
          ============================================================ */
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
       body {
         font-family: var(--font-sans);
         background: var(--background);
@@ -76,326 +83,202 @@
         -webkit-font-smoothing: antialiased;
         line-height: 1.6;
       }
-      .wrap {
-        max-width: 1040px;
-        margin: 0 auto;
-        padding: 0 1.5rem;
-      }
+      .wrap { max-width: 1040px; margin: 0 auto; padding: 0 1.5rem; }
       .eyebrow {
         font-size: 10px;
         text-transform: uppercase;
         letter-spacing: var(--tracking-luxury);
         color: var(--muted-foreground);
       }
-      .serif {
-        font-family: var(--font-serif);
-        font-weight: 300;
-      }
-      .mono {
-        font-family: var(--font-mono);
-      }
-      h1.serif {
-        font-size: clamp(2.5rem, 6vw, 4rem);
-        line-height: 1.05;
-      }
-      h2.serif {
-        font-size: 1.5rem;
-        margin-bottom: 0.25rem;
-      }
+      .serif { font-family: var(--font-serif); font-weight: 300; }
+      .mono { font-family: var(--font-mono); }
+      h1.serif { font-size: clamp(2.5rem, 6vw, 4rem); line-height: 1.05; }
+      h2.serif { font-size: 1.5rem; margin-bottom: 0.25rem; }
       section {
         padding: 3.5rem 0;
         border-top: 1px solid color-mix(in oklch, var(--border) 80%, transparent);
       }
-      .muted {
-        color: var(--muted-foreground);
-      }
+      .muted { color: var(--muted-foreground); }
       .card {
         background: var(--card);
         border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
         border-radius: var(--radius);
         padding: 1.5rem;
       }
-      .grid {
-        display: grid;
-        gap: 1rem;
-      }
-      .row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
-        align-items: center;
-      }
+      .grid { display: grid; gap: 1rem; }
+      .row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
       .legend-dot {
-        width: 0.7rem;
-        height: 0.7rem;
+        width: 0.7rem; height: 0.7rem;
         border-radius: 2px;
         display: inline-block;
       }
+      .legend-dot.circle { border-radius: 50%; }
 
       /* header */
       header {
-        position: sticky;
-        top: 0;
-        z-index: 10;
+        position: sticky; top: 0; z-index: 10;
         background: color-mix(in oklch, var(--background) 85%, transparent);
         backdrop-filter: blur(8px);
         border-bottom: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
       }
       header .wrap {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        display: flex; align-items: center; justify-content: space-between;
         padding-block: 1rem;
       }
       .toggle {
-        font: inherit;
-        font-size: 11px;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
+        font: inherit; font-size: 11px;
+        text-transform: uppercase; letter-spacing: 0.1em;
         cursor: pointer;
-        background: transparent;
-        color: var(--muted-foreground);
-        border: 1px solid var(--border);
-        border-radius: 999px;
+        background: transparent; color: var(--muted-foreground);
+        border: 1px solid var(--border); border-radius: 999px;
         padding: 0.4rem 0.9rem;
       }
 
       /* swatches */
-      .swatches {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        gap: 0.75rem;
-      }
-      .swatch .chip {
-        height: 60px;
-        border-radius: calc(var(--radius) - 2px);
-        border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
-      }
-      .swatch code {
-        font-family: var(--font-mono);
-        font-size: 11px;
-        color: var(--muted-foreground);
-        display: block;
-        margin-top: 0.4rem;
-      }
-      .swatch b {
-        font-weight: 500;
-        font-size: 12px;
-      }
+      .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem; }
+      .swatch .chip { height: 60px; border-radius: calc(var(--radius) - 2px); border: 1px solid color-mix(in oklch, var(--border) 70%, transparent); }
+      .swatch code { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); display: block; margin-top: 0.4rem; }
+      .swatch b { font-weight: 500; font-size: 12px; }
 
       /* type scale */
-      .type-row {
-        display: flex;
-        align-items: baseline;
-        gap: 1.5rem;
-        padding: 0.6rem 0;
-        border-bottom: 1px dashed color-mix(in oklch, var(--border) 60%, transparent);
-      }
-      .type-row span:first-child {
-        width: 90px;
-        flex-shrink: 0;
-        font-family: var(--font-mono);
-        font-size: 11px;
-        color: var(--muted-foreground);
-      }
+      .type-row { display: flex; align-items: baseline; gap: 1.5rem; padding: 0.6rem 0; border-bottom: 1px dashed color-mix(in oklch, var(--border) 60%, transparent); }
+      .type-row span:first-child { width: 90px; flex-shrink: 0; font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
 
-      /* sample components */
-      .btn {
-        font: inherit;
-        font-size: 13px;
-        border-radius: 999px;
-        padding: 0.55rem 1.3rem;
-        cursor: pointer;
-        border: 1px solid transparent;
-      }
-      .btn-primary {
-        background: var(--primary);
-        color: var(--primary-foreground);
-      }
-      .btn-ghost {
-        background: transparent;
-        color: var(--foreground);
-        border-color: var(--border);
-      }
-      .badge {
-        border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
-        border-radius: 999px;
-        padding: 0.2rem 0.7rem;
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: var(--muted-foreground);
-      }
-      .progress {
-        height: 1px;
-        width: 100%;
-        background: var(--border);
-        margin-top: 0.75rem;
-      }
-      .progress > div {
-        height: 1px;
-        background: var(--accent);
-      }
+      /* components */
+      .btn { font: inherit; font-size: 13px; border-radius: 999px; padding: 0.55rem 1.3rem; cursor: pointer; border: 1px solid transparent; }
+      .btn-primary { background: var(--primary); color: var(--primary-foreground); }
+      .btn-ghost { background: transparent; color: var(--foreground); border-color: var(--border); }
+      .badge { border: 1px solid color-mix(in oklch, var(--border) 70%, transparent); border-radius: 999px; padding: 0.2rem 0.7rem; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted-foreground); }
+      .progress { height: 1px; width: 100%; background: var(--border); margin-top: 0.75rem; }
+      .progress > div { height: 1px; background: var(--accent); }
 
-      /* ── Select / Dropdown ─────────────────────────────── */
-      .select-wrap {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-      }
+      /* select */
+      .select-wrap { position: relative; display: inline-flex; align-items: center; }
       .select-wrap select {
-        appearance: none;
-        font: inherit;
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: var(--tracking-luxury);
-        color: var(--muted-foreground);
-        background: var(--card);
+        appearance: none; font: inherit; font-size: 10px;
+        text-transform: uppercase; letter-spacing: var(--tracking-luxury);
+        color: var(--muted-foreground); background: var(--card);
         border: 1px solid color-mix(in oklch, var(--border) 60%, transparent);
         border-radius: calc(var(--radius) - 2px);
         padding: 0.35rem 1.75rem 0.35rem 0.75rem;
-        cursor: pointer;
-        transition: color 0.15s, border-color 0.15s;
-        outline: none;
-        min-width: 7rem;
+        cursor: pointer; transition: color 0.15s, border-color 0.15s; outline: none; min-width: 7rem;
       }
-      .select-wrap select:hover,
-      .select-wrap select:focus {
-        color: var(--foreground);
-        border-color: color-mix(in oklch, var(--foreground) 30%, var(--border));
-      }
-      .select-chevron {
-        position: absolute;
-        right: 0.5rem;
-        pointer-events: none;
-        color: var(--muted-foreground);
-        transition: color 0.15s;
-      }
-      .select-wrap:has(select:hover) .select-chevron,
-      .select-wrap:has(select:focus) .select-chevron {
-        color: var(--foreground);
-      }
-      .statvalue {
-        font-family: var(--font-serif);
-        font-weight: 300;
-        font-size: 2rem;
-        line-height: 1;
-      }
-      .chart-frame {
-        height: 220px;
-        overflow: hidden;
-      }
-      footer {
-        padding: 3rem 0;
-        color: var(--muted-foreground);
-        font-size: 12px;
-      }
+      .select-wrap select:hover, .select-wrap select:focus { color: var(--foreground); border-color: color-mix(in oklch, var(--foreground) 30%, var(--border)); }
+      .select-chevron { position: absolute; right: 0.5rem; pointer-events: none; color: var(--muted-foreground); transition: color 0.15s; }
+      .select-wrap:has(select:hover) .select-chevron, .select-wrap:has(select:focus) .select-chevron { color: var(--foreground); }
+
+      .statvalue { font-family: var(--font-serif); font-weight: 300; font-size: 2rem; line-height: 1; }
+      footer { padding: 3rem 0; color: var(--muted-foreground); font-size: 12px; }
+
+      /* chart layout helpers */
+      .chart-y-axis { position: relative; width: 1.75rem; flex-shrink: 0; overflow: visible; }
+      .chart-y-axis span { position: absolute; right: 0; text-align: right; font-size: 9px; transform: translateY(-50%); line-height: 1; }
+      .chart-x-axis { display: flex; justify-content: space-between; font-size: 9px; color: var(--muted-foreground); margin-top: 4px; }
+      .chart-legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem; font-size: 12px; color: var(--muted-foreground); }
+      .chart-legend-item { display: flex; align-items: center; gap: 0.5rem; }
+      .chart-frame { height: 280px; overflow: hidden; } /* matches global.css */
+      .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.25rem; }
+      .card-stats { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1.5rem; border-bottom: 1px solid color-mix(in oklch, var(--border) 60%, transparent); padding-bottom: 1.25rem; margin-bottom: 1.25rem; }
+      .stat-item { display: flex; flex-direction: column; gap: 0.25rem; }
+      .stat-big { font-family: var(--font-serif); font-weight: 300; font-size: 2.5rem; line-height: 1; }
+      .stat-mid { font-family: var(--font-serif); font-weight: 300; font-size: 1.5rem; line-height: 1; }
     </style>
   </head>
   <body>
     <header>
       <div class="wrap">
-        <span class="serif" style="font-size: 1rem">Design System</span>
-        <button class="toggle" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">สลับโหมด</button>
+        <span class="serif" style="font-size:1rem">Design System</span>
+        <button class="toggle" onclick="document.documentElement.classList.toggle('dark')">สลับโหมด</button>
       </div>
     </header>
 
     <div class="wrap">
+
       <!-- INTRO -->
-      <section style="border-top: none">
-        <p class="eyebrow">Design System · v0.1</p>
-        <h1 class="serif" style="margin-top: 1rem">
-          ภาษาดีไซน์<br /><span class="serif" style="font-style: italic; opacity: 0.9">ของบ้านอันสงบ</span>
+      <section style="border-top:none">
+        <p class="eyebrow">Design System · v0.2</p>
+        <h1 class="serif" style="margin-top:1rem">
+          ภาษาดีไซน์<br /><span class="serif" style="font-style:italic;opacity:0.9">ของบ้านอันสงบ</span>
         </h1>
-        <p class="muted" style="max-width: 38ch; margin-top: 1.5rem">
+        <p class="muted" style="max-width:38ch;margin-top:1.5rem">
           ระบบดีไซน์สำหรับแดชบอร์ด Home Assistant — โทนอบอุ่นแบบ residence, ตัวอักษร serif น้ำหนักเบา, พื้นที่ว่างเยอะ และเส้นบาง ใช้เป็นแหล่งอ้างอิงเดียวสำหรับ token, typography และ component ทั้งหมด
         </p>
       </section>
 
-      <!-- COLOR -->
+      <!-- 01 COLOR -->
       <section>
         <p class="eyebrow">01 — Color</p>
         <h2 class="serif">โทนสี</h2>
-        <p class="muted" style="margin-bottom: 1.5rem">นิยามด้วย oklch ใน <code class="mono">@theme</code> ของ Tailwind v4 · กดปุ่ม “สลับโหมด” ด้านบนเพื่อดู dark mode</p>
+        <p class="muted" style="margin-bottom:1.5rem">นิยามด้วย oklch ใน <code class="mono">@theme</code> ของ Tailwind v4 · dark mode ใช้ <code class="mono">.dark</code> class บน <code class="mono">&lt;html&gt;</code></p>
 
-        <p class="eyebrow" style="margin-bottom: 0.75rem">Surfaces &amp; Text</p>
+        <p class="eyebrow" style="margin-bottom:0.75rem">Surfaces &amp; Text</p>
         <div class="swatches" id="sw-surface"></div>
 
-        <p class="eyebrow" style="margin: 1.75rem 0 0.75rem">Accent &amp; Chart palette</p>
+        <p class="eyebrow" style="margin:1.75rem 0 0.75rem">Accent &amp; Chart palette</p>
         <div class="swatches" id="sw-accent"></div>
       </section>
 
-      <!-- TYPOGRAPHY -->
+      <!-- 02 TYPOGRAPHY -->
       <section>
         <p class="eyebrow">02 — Typography</p>
         <h2 class="serif">ตัวอักษร</h2>
-        <p class="muted" style="margin-bottom: 1.5rem">
-          <b style="color: var(--foreground); font-weight: 500">Trirong</b> (serif, ไทย+ละติน) สำหรับหัวข้อและตัวเลขเด่น ·
-          <b style="color: var(--foreground); font-weight: 500">Noto Sans Thai</b> สำหรับเนื้อหา ·
-          <b style="color: var(--foreground); font-weight: 500">IBM Plex Mono</b> สำหรับค่าทางเทคนิค
+        <p class="muted" style="margin-bottom:1.5rem">
+          <b style="color:var(--foreground);font-weight:500">Trirong</b> (serif, ไทย+ละติน) สำหรับหัวข้อและตัวเลขเด่น ·
+          <b style="color:var(--foreground);font-weight:500">Noto Sans Thai</b> สำหรับเนื้อหา ·
+          <b style="color:var(--foreground);font-weight:500">IBM Plex Mono</b> สำหรับค่าทางเทคนิค
         </p>
-
         <div class="card">
-          <div class="type-row"><span>serif / 4rem</span><span class="serif" style="font-size: 2.6rem">22°</span></div>
-          <div class="type-row"><span>serif italic</span><span class="serif" style="font-size: 1.8rem; font-style: italic">Alexandra</span></div>
+          <div class="type-row"><span>serif / 4rem</span><span class="serif" style="font-size:2.6rem">22°</span></div>
+          <div class="type-row"><span>serif italic</span><span class="serif" style="font-size:1.8rem;font-style:italic">Alexandra</span></div>
           <div class="type-row"><span>sans / body</span><span>บ้านกำลังทำงานเป็นปกติ แผงโซลาร์ผลิตไฟอยู่</span></div>
           <div class="type-row"><span>mono / data</span><span class="mono">228.4 V · 50.01 Hz</span></div>
-          <div class="type-row" style="border-bottom: none"><span>eyebrow</span><span class="eyebrow">Outside · Humidity · Breeze</span></div>
+          <div class="type-row" style="border-bottom:none"><span>eyebrow</span><span class="eyebrow">Outside · Humidity · Breeze</span></div>
         </div>
-        <p class="muted mono" style="font-size: 11px; margin-top: 0.75rem">tracking-luxury = 0.28em · ใช้กับ label พิมพ์ใหญ่เสมอ</p>
+        <p class="muted mono" style="font-size:11px;margin-top:0.75rem">tracking-luxury = 0.28em · ใช้กับ label พิมพ์ใหญ่เสมอ</p>
       </section>
 
-      <!-- SPACING / RADIUS -->
+      <!-- 03 RADIUS & LINES -->
       <section>
         <p class="eyebrow">03 — Radius &amp; Lines</p>
         <h2 class="serif">มุมโค้งและเส้น</h2>
-        <p class="muted" style="margin-bottom: 1.5rem"><code class="mono">--radius: 0.5rem</code> · เส้นคั่นบาง 1px สีจาง (<code class="mono">border/60–70</code>) แทนเงา เพื่อความเรียบหรู</p>
+        <p class="muted" style="margin-bottom:1.5rem"><code class="mono">--radius: 0.5rem</code> · เส้นคั่นบาง 1px สีจาง (<code class="mono">border/60–70</code>) แทนเงา เพื่อความเรียบหรู</p>
         <div class="row">
-          <div style="text-align: center">
-            <div style="width: 90px; height: 64px; background: var(--secondary); border: 1px solid var(--border); border-radius: calc(var(--radius) - 4px)"></div>
-            <code class="mono" style="font-size: 11px">sm · 1px</code>
-          </div>
-          <div style="text-align: center">
-            <div style="width: 90px; height: 64px; background: var(--secondary); border: 1px solid var(--border); border-radius: var(--radius)"></div>
-            <code class="mono" style="font-size: 11px">lg · 8px</code>
-          </div>
-          <div style="text-align: center">
-            <div style="width: 90px; height: 64px; background: var(--secondary); border: 1px solid var(--border); border-radius: 999px"></div>
-            <code class="mono" style="font-size: 11px">full · pills</code>
-          </div>
+          <div style="text-align:center"><div style="width:90px;height:64px;background:var(--secondary);border:1px solid var(--border);border-radius:calc(var(--radius) - 4px)"></div><code class="mono" style="font-size:11px">sm · 1px</code></div>
+          <div style="text-align:center"><div style="width:90px;height:64px;background:var(--secondary);border:1px solid var(--border);border-radius:var(--radius)"></div><code class="mono" style="font-size:11px">lg · 8px</code></div>
+          <div style="text-align:center"><div style="width:90px;height:64px;background:var(--secondary);border:1px solid var(--border);border-radius:999px"></div><code class="mono" style="font-size:11px">full · pills</code></div>
         </div>
       </section>
 
-      <!-- COMPONENTS -->
+      <!-- 04 COMPONENTS -->
       <section>
         <p class="eyebrow">04 — Components</p>
         <h2 class="serif">คอมโพเนนต์</h2>
-        <p class="muted" style="margin-bottom: 1.5rem">.astro แบบ static + Svelte islands เฉพาะส่วนที่โต้ตอบ (นาฬิกาเรียลไทม์, ปุ่มสลับธีม)</p>
+        <p class="muted" style="margin-bottom:1.5rem">.astro แบบ static + Svelte islands เฉพาะส่วนที่โต้ตอบ (EnergyFlow realtime, ปุ่มสลับธีม)</p>
 
-        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))">
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">
           <!-- StatCard -->
-          <div class="card" style="display: flex; flex-direction: column; gap: 1.25rem">
-            <div class="row" style="justify-content: space-between">
-              <span style="color: var(--chart-2)">☀</span>
+          <div class="card" style="display:flex;flex-direction:column;gap:1.25rem">
+            <div class="row" style="justify-content:space-between">
+              <span style="color:var(--chart-2)">☀</span>
               <span class="badge">76% พึ่งตัวเอง</span>
             </div>
             <div>
               <p class="eyebrow">ผลิตไฟวันนี้</p>
-              <p class="statvalue" style="margin-top: 0.4rem">7.5 kWh</p>
-              <p class="muted" style="font-size: 12px; margin-top: 0.4rem">ผลิตมาแล้ว 0.9 ชม.</p>
+              <p class="statvalue" style="margin-top:0.4rem">7.5 kWh</p>
+              <p class="muted" style="font-size:12px;margin-top:0.4rem">ผลิตมาแล้ว 0.9 ชม.</p>
             </div>
           </div>
 
           <!-- Progress / payback -->
           <div class="card">
             <p class="eyebrow">ความคืบหน้าการคืนทุน</p>
-            <p class="statvalue" style="font-size: 3rem; margin-top: 0.5rem">2.1<span style="font-size: 1.25rem; color: var(--muted-foreground)">%</span></p>
-            <div class="progress"><div style="width: 2.1%"></div></div>
-            <p class="muted" style="font-size: 12px; margin-top: 0.75rem">คืนทุนแล้ว ฿5,900 จาก ฿280,000</p>
+            <p class="statvalue" style="font-size:3rem;margin-top:0.5rem">2.1<span style="font-size:1.25rem;color:var(--muted-foreground)">%</span></p>
+            <div class="progress"><div style="width:2.1%"></div></div>
+            <p class="muted" style="font-size:12px;margin-top:0.75rem">คืนทุนแล้ว ฿5,900 จาก ฿280,000</p>
           </div>
 
           <!-- Buttons + badges -->
-          <div class="card" style="display: flex; flex-direction: column; gap: 1rem; justify-content: center">
+          <div class="card" style="display:flex;flex-direction:column;gap:1rem;justify-content:center">
             <div class="row">
               <button class="btn btn-primary">ปุ่มหลัก</button>
               <button class="btn btn-ghost">ปุ่มรอง</button>
@@ -403,13 +286,13 @@
             <div class="row">
               <span class="badge">ออนไลน์</span>
               <span class="badge">กำลังชาร์จ</span>
-              <span class="badge" style="color: var(--destructive); border-color: var(--destructive)">ผิดปกติ</span>
+              <span class="badge" style="color:var(--destructive);border-color:var(--destructive)">ผิดปกติ</span>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- DROPDOWN -->
+      <!-- 05 SELECT / DROPDOWN -->
       <section>
         <p class="eyebrow">05 — Select / Dropdown</p>
         <h2 class="serif">ดรอปดาวน์</h2>
@@ -418,9 +301,7 @@
           ไม่ต้องใช้ JS framework — navigate ด้วย <code class="mono">onchange="location.href=..."</code> ·
           ใช้ใน ChartCard header สำหรับเลือกช่วงข้อมูล
         </p>
-
         <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1.5rem">
-          <!-- Demo: chart header context -->
           <div class="card">
             <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.25rem">
               <div>
@@ -433,17 +314,12 @@
                   <option>พ.ค. 68</option>
                   <option>เม.ย. 68</option>
                   <option>มี.ค. 68</option>
-                  <option>ก.พ. 68</option>
                 </select>
-                <svg class="select-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polyline points="6 9 12 15 18 9"/>
-                </svg>
+                <svg class="select-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
               </div>
             </div>
             <div style="height:3rem;border-radius:4px;background:var(--muted);opacity:0.4"></div>
           </div>
-
-          <!-- Token reference -->
           <div class="card" style="display:flex;flex-direction:column;gap:1rem;justify-content:center">
             <p class="eyebrow" style="margin-bottom:0.5rem">Tokens ที่ใช้</p>
             <div style="display:flex;flex-direction:column;gap:0.5rem">
@@ -452,219 +328,488 @@
               <code class="mono" style="font-size:11px;color:var(--muted-foreground)">radius: calc(--radius - 2px)</code>
               <code class="mono" style="font-size:11px;color:var(--muted-foreground)">padding: 0.35rem 1.75rem 0.35rem 0.75rem</code>
             </div>
-            <p class="muted" style="font-size:11px;margin-top:0.25rem">
-              chevron: SVG <code class="mono">10×10px</code> · <code class="mono">absolute right-0.5rem</code> ·
-              <code class="mono">pointer-events:none</code>
-            </p>
           </div>
         </div>
       </section>
 
-      <!-- CHARTS -->
+      <!-- 06 CHARTS -->
       <section>
         <p class="eyebrow">06 — Charts</p>
         <h2 class="serif">กราฟ</h2>
-        <p class="muted" style="margin-bottom: 1.5rem">
-          SVG smooth bezier area — เส้นโค้ง cubic bezier (cardinal spline) · gradient fill · dashed gridlines · คำนวณ server-side ใน Astro frontmatter ไม่ต้องใช้ charting lib ·
-          column/bar และ pie ก็ใช้ SVG เช่นกัน — ไม่มี charting library
-        </p>
-        <p class="muted" style="margin-bottom:1.5rem;font-size:12px">
-          <b style="color:var(--foreground);font-weight:500">Axis label pattern</b> — Y-axis และ X-axis เป็น HTML ทั้งคู่ ไม่ใช้ SVG <code class="mono">&lt;text&gt;</code>
-          เพราะ <code class="mono">preserveAspectRatio="none"</code> จะทำให้ตัวอักษรยึดตามกว้างหน้าจอ ·
-          Y-axis: <code class="mono">div[relative h-40 width:1.75rem]</code> + <code class="mono">span[absolute right-0]</code> top % คำนวณจาก <code class="mono">(MT + (1−f)×ph) / VH × 100</code> ·
-          X-axis: <code class="mono">flex justify-between</code> ใต้ SVG, <code class="mono">padding-right: MR/VW%</code> (ML=0 แล้ว) ·
-          SVG ตั้ง <code class="mono">ML=0</code> เพราะ Y label อยู่ใน HTML column แทน
+        <p class="muted" style="margin-bottom:1.5rem">
+          SVG ล้วน คำนวณ server-side ใน Astro frontmatter — ไม่มี charting library ·
+          Y-axis และ X-axis เป็น HTML ไม่ใช้ SVG <code class="mono">&lt;text&gt;</code> (ป้องกัน scaling เพี้ยนจาก <code class="mono">preserveAspectRatio="none"</code>)
         </p>
 
-        <!-- stacked bar demo -->
-        <div class="card" style="margin-bottom:1rem">
-          <p class="eyebrow" style="margin-bottom:0.75rem">Stacked bar · DailyView</p>
-          <div style="display:flex;align-items:flex-start;gap:4px">
-            <div id="bar-y-axis" style="position:relative;width:1.75rem;height:220px;flex-shrink:0"></div>
-            <div style="flex:1;min-width:0">
-              <div class="chart-frame">
-                <svg id="bar-demo-svg" width="100%" height="100%" viewBox="0 0 560 220" preserveAspectRatio="none"></svg>
-              </div>
-              <div id="bar-x-axis" style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted-foreground);margin-top:4px;padding-right:1.43%"></div>
+        <!-- CHART TYPE 1: Area/Line — 4 series (ProductionCurve) -->
+        <p class="eyebrow" style="margin-bottom:0.75rem">Area / Line Chart — 4 Series · ProductionCurve</p>
+        <div class="card" style="margin-bottom:1.5rem">
+          <div class="card-stats">
+            <div class="stat-item">
+              <p class="eyebrow">พีคโซลาร์</p>
+              <p class="stat-big">6.2<span style="font-size:1rem;color:var(--muted-foreground);margin-left:0.25rem">kW</span></p>
             </div>
-          </div>
-          <div class="row muted" style="margin-top:1rem;font-size:12px;gap:1.5rem">
-            <span class="row" style="gap:0.5rem"><span class="legend-dot" style="background:var(--chart-1)"></span>ใช้ไฟจากโซลาร์</span>
-            <span class="row" style="gap:0.5rem"><span class="legend-dot" style="background:var(--chart-4)"></span>ซื้อจากการไฟฟ้า</span>
-          </div>
-        </div>
-
-        <!-- area line card design -->
-        <div class="card" style="display:flex;flex-direction:column;gap:0">
-          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem">
-            <div style="display:flex;flex-direction:column;gap:0.35rem">
-              <span class="eyebrow">พลังงาน</span>
-              <h3 class="serif" style="font-size:1.4rem;margin:0;font-weight:300">กราฟกำลังผลิตรายชั่วโมง</h3>
+            <div class="stat-item">
+              <p class="eyebrow">พีคโหลด</p>
+              <p class="stat-mid" style="color:var(--chart-4)">3.8 kW</p>
             </div>
-          </div>
-          <div style="display:flex;align-items:flex-end;gap:2rem;border-bottom:1px solid color-mix(in oklch,var(--border) 60%,transparent);padding-bottom:1.25rem;margin-bottom:1.25rem">
-            <div>
-              <p class="eyebrow" style="margin-bottom:0.25rem">พีคโซลาร์</p>
-              <p class="statvalue">6.2<span style="font-size:1rem;color:var(--muted-foreground);margin-left:0.25rem">kW</span></p>
+            <div class="stat-item">
+              <p class="eyebrow">แบตจ่ายออกสูงสุด</p>
+              <p class="stat-mid" style="color:var(--chart-1)">1.4 kW</p>
             </div>
-            <div>
-              <p class="eyebrow" style="margin-bottom:0.25rem">พีคโหลด</p>
-              <p class="statvalue" style="font-size:1.5rem;color:var(--chart-4)">↑ 3.8</p>
-            </div>
-            <div style="margin-left:auto;text-align:right">
-              <p class="eyebrow" style="margin-bottom:0.25rem">ตลอดวัน</p>
-              <p class="muted" style="font-size:0.85rem;font-family:var(--font-serif);font-weight:300">00:00 → 23:00</p>
+            <div class="stat-item" style="margin-left:auto;text-align:right">
+              <p class="eyebrow">ตลอดวัน</p>
+              <p class="muted" style="font-size:0.85rem;font-family:var(--font-serif);font-weight:300">00:00 → 23:55</p>
             </div>
           </div>
           <div style="display:flex;align-items:flex-start;gap:4px">
-            <div id="line-y-axis" style="position:relative;width:1.75rem;height:160px;flex-shrink:0"></div>
+            <div class="chart-y-axis" id="line4-y-axis" style="height:220px"></div>
             <div style="flex:1;min-width:0">
-              <div style="height:160px;width:100%">
-                <svg id="chart-demo-svg" width="100%" height="100%" viewBox="0 0 560 160" preserveAspectRatio="none" style="cursor:crosshair"></svg>
+              <div style="height:220px;width:100%">
+                <svg id="line4-svg" viewBox="0 0 560 220" preserveAspectRatio="none" width="100%" height="100%" style="cursor:crosshair"></svg>
               </div>
-              <div id="line-x-axis" style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted-foreground);margin-top:4px;padding-right:1.43%"></div>
+              <div class="chart-x-axis" id="line4-x-axis"></div>
             </div>
           </div>
-          <div class="row muted" style="margin-top:1rem;font-size:12px;gap:1.5rem">
-            <span class="row" style="gap:0.5rem"><span class="legend-dot" style="background:var(--chart-2)"></span>ผลิตจากแผง (kW)</span>
-            <span class="row" style="gap:0.5rem"><span class="legend-dot" style="background:var(--chart-4)"></span>ใช้ในบ้าน (kW)</span>
+          <div class="chart-legend">
+            <span class="chart-legend-item"><span class="legend-dot circle" style="background:var(--chart-2)"></span>โซลาร์ (kW)</span>
+            <span class="chart-legend-item"><span class="legend-dot circle" style="background:var(--chart-4)"></span>โหลด (kW)</span>
+            <span class="chart-legend-item"><span class="legend-dot circle" style="background:var(--chart-1)"></span>แบตเตอรี่ (kW)</span>
+            <span class="chart-legend-item">
+              <span style="display:inline-block;width:1.25rem;height:1px;border-top:2px dashed var(--chart-4);opacity:0.7"></span>
+              กริด (kW)
+            </span>
           </div>
         </div>
 
-        <div style="margin-top:1rem">
+        <!-- CHART TYPE 2: Area/Line — single series (BatterySoC) -->
+        <p class="eyebrow" style="margin-bottom:0.75rem">Area / Line Chart — Single Series · BatterySocChart</p>
+        <div class="card" style="margin-bottom:1.5rem">
+          <div class="card-stats">
+            <div class="stat-item">
+              <p class="eyebrow">ล่าสุด</p>
+              <p class="stat-big">8.4<span style="font-size:1rem;color:var(--muted-foreground);margin-left:0.25rem">kWh</span></p>
+            </div>
+            <div class="stat-item">
+              <p class="eyebrow">ต่ำสุดวันนี้</p>
+              <p class="stat-mid" style="color:var(--muted-foreground)">3.1 kWh</p>
+            </div>
+            <div class="stat-item" style="margin-left:auto;text-align:right">
+              <p class="eyebrow">สูงสุดวันนี้</p>
+              <p class="serif" style="font-size:1.1rem">9.6 kWh</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:4px">
+            <div class="chart-y-axis" id="soc-y-axis" style="height:180px"></div>
+            <div style="flex:1;min-width:0">
+              <div style="height:180px;width:100%">
+                <svg id="soc-svg" viewBox="0 0 560 180" preserveAspectRatio="none" width="100%" height="100%"></svg>
+              </div>
+              <div class="chart-x-axis" id="soc-x-axis"></div>
+            </div>
+          </div>
+          <div class="chart-legend">
+            <span class="chart-legend-item"><span class="legend-dot circle" style="background:var(--chart-1)"></span>พลังงานสำรอง (kWh) · ความจุเต็ม 12 kWh</span>
+          </div>
+        </div>
+
+        <!-- CHART TYPE 3: Stacked Bar — 3 segments (EnergySourceChart) -->
+        <p class="eyebrow" style="margin-bottom:0.75rem">Stacked Bar — 3 Segments · EnergySourceChart</p>
+        <div class="card" style="margin-bottom:1.5rem">
+          <div class="card-stats">
+            <div class="stat-item">
+              <p class="eyebrow">โซลาร์ใช้เอง</p>
+              <p class="stat-big" style="color:var(--chart-2)">38.2<span style="font-size:1rem;color:var(--muted-foreground);margin-left:0.25rem">kWh</span></p>
+            </div>
+            <div class="stat-item">
+              <p class="eyebrow">แบตจ่ายเสริม</p>
+              <p class="stat-mid" style="color:var(--chart-1)">8.4 kWh</p>
+            </div>
+            <div class="stat-item">
+              <p class="eyebrow">ซื้อจากกริด</p>
+              <p class="stat-mid" style="color:var(--chart-4)">4.1 kWh</p>
+            </div>
+            <div class="stat-item" style="margin-left:auto;text-align:right">
+              <p class="eyebrow">ชม. ที่ใช้กริด</p>
+              <p class="serif" style="font-size:1.1rem">3 ชม.</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:4px">
+            <div class="chart-y-axis" id="esrc-y-axis" style="height:180px"></div>
+            <div style="flex:1;min-width:0">
+              <div style="height:180px;width:100%">
+                <svg id="esrc-svg" viewBox="0 0 560 200" preserveAspectRatio="none" width="100%" height="100%"></svg>
+              </div>
+              <div class="chart-x-axis" id="esrc-x-axis"></div>
+            </div>
+          </div>
+          <div class="chart-legend">
+            <span class="chart-legend-item"><span class="legend-dot" style="background:var(--chart-2)"></span>โซลาร์ใช้เอง</span>
+            <span class="chart-legend-item"><span class="legend-dot" style="background:var(--chart-1)"></span>แบตเตอรี่จ่าย</span>
+            <span class="chart-legend-item"><span class="legend-dot" style="background:var(--chart-4)"></span>กริด</span>
+          </div>
+          <p class="muted" style="font-size:11px;margin-top:0.5rem">legend dot: <code class="mono">rounded-sm</code> (border-radius 2px) สำหรับ bar charts · <code class="mono">rounded-full</code> (50%) สำหรับ line/area</p>
+        </div>
+
+        <!-- CHART TYPE 4: ± Dual-axis Line (BattGridChart) -->
+        <p class="eyebrow" style="margin-bottom:0.75rem">Dual-axis ± Line · BattGridChart</p>
+        <div class="card" style="margin-bottom:1.5rem">
+          <div class="card-stats">
+            <div class="stat-item">
+              <p class="eyebrow">แบตจ่ายออกสูงสุด</p>
+              <p class="stat-big" style="color:var(--chart-1)">2.1<span style="font-size:1rem;color:var(--muted-foreground);margin-left:0.25rem">kW</span></p>
+            </div>
+            <div class="stat-item">
+              <p class="eyebrow">กริดสูงสุด</p>
+              <p class="stat-mid" style="color:var(--chart-4)">1.8 kW</p>
+            </div>
+            <div class="stat-item" style="margin-left:auto;text-align:right">
+              <p class="eyebrow">ชาร์จแบต</p>
+              <p class="serif" style="font-size:1.1rem">4 ชม.</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:4px">
+            <div class="chart-y-axis" id="batt-y-axis" style="height:200px"></div>
+            <div style="flex:1;min-width:0">
+              <div style="height:200px;width:100%">
+                <svg id="batt-svg" viewBox="0 0 560 220" preserveAspectRatio="none" width="100%" height="100%"></svg>
+              </div>
+              <div class="chart-x-axis" id="batt-x-axis"></div>
+            </div>
+          </div>
+          <div class="chart-legend">
+            <span class="chart-legend-item"><span class="legend-dot circle" style="background:var(--chart-1)"></span>แบตเตอรี่ (kW) · บวก=จ่ายออก ลบ=ชาร์จ</span>
+            <span class="chart-legend-item">
+              <span style="display:inline-block;width:1.25rem;height:1px;border-top:2px dashed var(--chart-4)"></span>
+              กริด (kW) · บวก=ซื้อไฟ
+            </span>
+          </div>
+          <p class="muted" style="font-size:11px;margin-top:0.5rem">zero line solid border · SVG <code class="mono">&lt;text&gt;</code> zone labels ใช้ได้เพราะไม่ scale ตาม viewBox · Y label HTML ยังคงแยกไว้</p>
+        </div>
+
+        <!-- CHART TYPE 5: Single Bar (GridUsageBar) -->
+        <p class="eyebrow" style="margin-bottom:0.75rem">Single Bar · GridUsageBar</p>
+        <div class="card" style="margin-bottom:1.5rem">
+          <div class="card-stats">
+            <div class="stat-item">
+              <p class="eyebrow">ซื้อวันนี้</p>
+              <p class="stat-big" style="color:var(--chart-4)">4.1<span style="font-size:1rem;color:var(--muted-foreground);margin-left:0.25rem">kWh</span></p>
+            </div>
+            <div class="stat-item">
+              <p class="eyebrow">ชม. ที่ซื้อ</p>
+              <p class="stat-mid" style="color:var(--chart-4)">3 ชม.</p>
+            </div>
+            <div class="stat-item" style="margin-left:auto;text-align:right">
+              <p class="eyebrow">พีคกริด</p>
+              <p class="serif" style="font-size:1.1rem">1.8 kW</p>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:4px">
+            <div class="chart-y-axis" id="gu-y-axis" style="height:130px"></div>
+            <div style="flex:1;min-width:0">
+              <div style="height:130px;width:100%">
+                <svg id="gu-svg" viewBox="0 0 560 160" preserveAspectRatio="none" width="100%" height="100%"></svg>
+              </div>
+              <div class="chart-x-axis" id="gu-x-axis"></div>
+            </div>
+          </div>
+          <div class="chart-legend">
+            <span class="chart-legend-item"><span class="legend-dot" style="background:var(--chart-4)"></span>กำลังไฟที่ซื้อจากการไฟฟ้า (kW)</span>
+          </div>
+          <p class="muted" style="font-size:11px;margin-top:0.5rem">ชั่วโมงที่ไม่ซื้อไฟ: faint stub 2px สูง (fill-opacity 0.2) · ชั่วโมงที่ซื้อ: fill-opacity 0.75</p>
+        </div>
+
+        <!-- Y-axis & Axis label pattern reference -->
+        <div style="margin-top:1.5rem">
+          <p class="eyebrow" style="margin-bottom:0.75rem">Axis Label Pattern</p>
+          <div class="card">
+            <div style="display:flex;gap:2rem;flex-wrap:wrap">
+              <div>
+                <p style="font-size:11px;color:var(--muted-foreground);margin-bottom:0.5rem">Y-axis HTML column</p>
+                <div style="display:flex;gap:0.25rem;align-items:flex-start">
+                  <div style="position:relative;width:1.75rem;height:100px;flex-shrink:0">
+                    <span style="position:absolute;right:0;top:0%;transform:translateY(-50%);font-size:9px;font-weight:500;color:oklch(0.52 0.012 70 / 60%);text-align:right">3.5</span>
+                    <span style="position:absolute;right:0;top:33%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">2.6</span>
+                    <span style="position:absolute;right:0;top:66%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">1.7</span>
+                    <span style="position:absolute;right:0;top:100%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">0.8</span>
+                  </div>
+                  <div style="flex:1;height:100px;border:1px solid var(--border);border-radius:4px;background:var(--card);position:relative;overflow:hidden">
+                    <div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:0">
+                      <div style="width:100%;height:1px;background:var(--border);opacity:0.4;margin-top:0"></div>
+                      <div style="width:100%;height:1px;background:var(--border);opacity:0.8"></div>
+                      <div style="width:100%;height:1px;background:var(--border);opacity:0.8"></div>
+                      <div style="width:100%;height:1px;background:var(--border);opacity:0.8"></div>
+                    </div>
+                  </div>
+                </div>
+                <p style="font-size:9px;color:var(--muted-foreground);margin-top:0.5rem">max = <code style="font-family:var(--font-mono)">font-medium text-foreground/60</code></p>
+              </div>
+              <div style="flex:1;min-width:240px">
+                <p style="font-size:11px;color:var(--muted-foreground);margin-bottom:0.5rem">สูตรคำนวณ top %</p>
+                <code class="mono" style="font-size:10px;display:block;line-height:1.8;color:var(--foreground)">
+                  top = (MT + (1 − f) × ph) / VH × 100<br>
+                  ML = 4px (Y label ใน HTML แยกออก)<br>
+                  MR = 8px · MT = 16–18px · MB = 28px<br>
+                  padRight = MR/VW × 100 (X-axis align)
+                </code>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tooltip anatomy -->
+        <div style="margin-top:1.5rem">
           <p class="eyebrow" style="margin-bottom:0.75rem">Chart Tooltip</p>
-          <h3 class="serif" style="font-size:1.4rem;margin:0 0 0.75rem;font-weight:300">Tooltip สำหรับกราฟ</h3>
-          <p style="font-size:0.85rem;color:var(--muted-foreground);margin-bottom:1.5rem;line-height:1.6">
-            Tooltip ที่ใช้กับกราฟทุกประเภท — สไตล์ card เดียวกับ UI (border บาง, bg-card) ไม่มี shadow หนัก
-            เปิดตัวอย่างโดยเลื่อน mouse บนกราฟกำลังผลิตรายชั่วโมง
-          </p>
+          <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start">
 
-          <!-- Static tooltip anatomy -->
-          <div style="display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start;margin-bottom:2rem">
+            <!-- Line/Area — 4 series -->
             <div>
-              <p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.75rem">Line / Area Chart</p>
-              <div style="border:1px solid var(--border);background:var(--card);border-radius:0.5rem;padding:0.75rem 0.875rem;min-width:140px;font-family:var(--font-sans)">
-                <p style="font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.5rem">14:00 น.</p>
+              <p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.75rem">Line / Area (4 series)</p>
+              <div style="border:1px solid var(--border);background:var(--card);border-radius:0.5rem;padding:0.75rem 0.875rem;min-width:160px;font-family:var(--font-sans)">
+                <p style="font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.5rem">14:35 น.</p>
                 <div style="display:flex;flex-direction:column;gap:0.375rem">
                   <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
-                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)">
-                      <span style="width:8px;height:8px;border-radius:50%;background:var(--chart-2);flex-shrink:0"></span>โซลาร์
-                    </span>
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:50%;background:var(--chart-2);flex-shrink:0"></span>โซลาร์</span>
                     <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">2.45 kW</span>
                   </div>
                   <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
-                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)">
-                      <span style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);flex-shrink:0"></span>โหลด
-                    </span>
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);flex-shrink:0"></span>โหลด</span>
                     <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">0.82 kW</span>
                   </div>
+                  <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:50%;background:var(--chart-1);flex-shrink:0"></span>แบตเตอรี่</span>
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">+0.60 kW</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);opacity:0.7;flex-shrink:0"></span>กริด</span>
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">ไม่ซื้อ</span>
+                  </div>
                 </div>
               </div>
             </div>
 
+            <!-- Bar chart 3-stack -->
             <div>
-              <p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.75rem">Bar Chart</p>
+              <p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.75rem">Stacked Bar</p>
               <div style="border:1px solid var(--border);background:var(--card);border-radius:0.5rem;padding:0.75rem 0.875rem;min-width:150px;font-family:var(--font-sans)">
-                <p style="font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.5rem">ม.ค. 68</p>
+                <p style="font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.5rem">14:00 น.</p>
                 <div style="display:flex;flex-direction:column;gap:0.375rem">
                   <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
-                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)">
-                      <span style="width:8px;height:8px;border-radius:50%;background:var(--chart-1);flex-shrink:0"></span>โซลาร์
-                    </span>
-                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">8.4 kWh</span>
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:2px;background:var(--chart-2);flex-shrink:0"></span>โซลาร์</span>
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">2.10 kW</span>
                   </div>
                   <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
-                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)">
-                      <span style="width:8px;height:8px;border-radius:50%;background:color-mix(in oklch,var(--chart-4) 50%,transparent);flex-shrink:0"></span>กริด
-                    </span>
-                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">3.1 kWh</span>
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:2px;background:var(--chart-1);flex-shrink:0"></span>แบตจ่าย</span>
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">0.00 kW</span>
                   </div>
-                  <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center;border-top:1px solid var(--border);padding-top:0.375rem">
-                    <span style="font-size:11px;color:var(--muted-foreground)">รวม</span>
-                    <span style="font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--foreground)">11.5 kWh</span>
+                  <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:2px;background:var(--chart-4);flex-shrink:0"></span>กริด</span>
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">0.00 kW</span>
                   </div>
                 </div>
               </div>
             </div>
 
+            <!-- BattGrid ± -->
             <div>
-              <p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.75rem">Donut Chart</p>
+              <p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.75rem">Dual-axis ±</p>
+              <div style="border:1px solid var(--border);background:var(--card);border-radius:0.5rem;padding:0.75rem 0.875rem;min-width:150px;font-family:var(--font-sans)">
+                <p style="font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.5rem">09:00 น.</p>
+                <div style="display:flex;flex-direction:column;gap:0.375rem">
+                  <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:50%;background:var(--chart-1);flex-shrink:0"></span>แบตเตอรี่</span>
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">−1.20 kW</span>
+                  </div>
+                  <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+                    <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);flex-shrink:0"></span>กริด</span>
+                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">0.00 kW</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- single bar -->
+            <div>
+              <p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.75rem">Single Bar (GridUsage)</p>
               <div style="border:1px solid var(--border);background:var(--card);border-radius:0.5rem;padding:0.75rem 0.875rem;min-width:140px;font-family:var(--font-sans)">
-                <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.5rem">
-                  <span style="width:8px;height:8px;border-radius:50%;background:var(--chart-1);flex-shrink:0"></span>
-                  <p style="font-size:11px;color:var(--foreground)">ใช้เองในบ้าน</p>
-                </div>
-                <div style="display:flex;flex-direction:column;gap:0.25rem">
-                  <div style="display:flex;justify-content:space-between;gap:1rem">
-                    <span style="font-size:10px;color:var(--muted-foreground)">สัดส่วน</span>
-                    <span style="font-family:var(--font-mono);font-size:11px;font-weight:500;color:var(--foreground)">62%</span>
-                  </div>
-                  <div style="display:flex;justify-content:space-between;gap:1rem">
-                    <span style="font-size:10px;color:var(--muted-foreground)">พลังงาน</span>
-                    <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">1,240 kWh</span>
-                  </div>
+                <p style="font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.5rem">06:00 น.</p>
+                <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+                  <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:2px;background:var(--chart-4);flex-shrink:0"></span>กริด</span>
+                  <span style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)">1.80 kW</span>
                 </div>
               </div>
             </div>
 
-            <div>
-              <p style="font-size:0.7rem;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.75rem">Y-axis Max Label</p>
-              <div style="display:flex;gap:0.25rem;align-items:flex-start">
-                <div style="position:relative;width:1.75rem;height:100px;flex-shrink:0">
-                  <span style="position:absolute;right:0;top:0%;transform:translateY(-50%);font-size:9px;font-weight:500;color:oklch(0.52 0.012 70 / 60%);text-align:right">3.5</span>
-                  <span style="position:absolute;right:0;top:33%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">2.6</span>
-                  <span style="position:absolute;right:0;top:66%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">1.7</span>
-                  <span style="position:absolute;right:0;top:100%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">0.8</span>
-                </div>
-                <div style="flex:1;height:100px;border:1px solid var(--border);border-radius:4px;background:var(--card);position:relative;overflow:hidden">
-                  <div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:0">
-                    <div style="width:100%;height:1px;background:var(--border);opacity:0.4;margin-top:0"></div>
-                    <div style="width:100%;height:1px;background:var(--border);opacity:0.8"></div>
-                    <div style="width:100%;height:1px;background:var(--border);opacity:0.8"></div>
-                    <div style="width:100%;height:1px;background:var(--border);opacity:0.8"></div>
-                  </div>
-                </div>
-              </div>
-              <p style="font-size:9px;color:var(--muted-foreground);margin-top:0.5rem">max = <code style="font-family:var(--font-mono)">font-medium text-foreground/60</code></p>
-            </div>
           </div>
+          <p class="muted" style="font-size:11px;margin-top:1rem">tooltip: <code class="mono">border border-border/70 bg-card rounded-lg px-3 py-2.5 shadow-md</code> · <code class="mono">position:fixed z-50 pointer-events-none</code></p>
         </div>
 
-        <!-- Floating tooltip (shared for demo) -->
-        <div id="tooltip-demo-tip" style="display:none;position:fixed;z-index:9999;border:1px solid var(--border);background:var(--card);border-radius:0.5rem;padding:0.75rem 0.875rem;pointer-events:none;min-width:140px;font-family:var(--font-sans)">
-          <p class="tdHour" style="font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.5rem"></p>
+        <!-- Floating tooltip for line4 demo -->
+        <div id="line4-tip" style="display:none;position:fixed;z-index:9999;border:1px solid var(--border);background:var(--card);border-radius:0.5rem;padding:0.75rem 0.875rem;pointer-events:none;min-width:160px;font-family:var(--font-sans)">
+          <p class="t4Hour" style="font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground);margin-bottom:0.5rem"></p>
           <div style="display:flex;flex-direction:column;gap:0.375rem">
             <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
-              <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)">
-                <span style="width:8px;height:8px;border-radius:50%;background:var(--chart-2);flex-shrink:0"></span>โซลาร์
-              </span>
-              <span class="tdPv" style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)"></span>
+              <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:50%;background:var(--chart-2);flex-shrink:0"></span>โซลาร์</span>
+              <span class="t4Pv" style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)"></span>
             </div>
             <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
-              <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)">
-                <span style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);flex-shrink:0"></span>โหลด
-              </span>
-              <span class="tdLoad" style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)"></span>
+              <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);flex-shrink:0"></span>โหลด</span>
+              <span class="t4Load" style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)"></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+              <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:50%;background:var(--chart-1);flex-shrink:0"></span>แบตเตอรี่</span>
+              <span class="t4Batt" style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)"></span>
+            </div>
+            <div style="display:flex;justify-content:space-between;gap:1rem;align-items:center">
+              <span style="display:flex;align-items:center;gap:0.375rem;font-size:11px;color:var(--muted-foreground)"><span style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);opacity:0.7;flex-shrink:0"></span>กริด</span>
+              <span class="t4Grid" style="font-family:var(--font-mono);font-size:11px;color:var(--foreground)"></span>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ICONOGRAPHY + VOICE -->
+      <!-- 07 ENERGY FLOW -->
       <section>
-        <p class="eyebrow">07 — Iconography &amp; Voice</p>
+        <p class="eyebrow">07 — Energy Flow</p>
+        <h2 class="serif">การไหลของพลังงาน</h2>
+        <p class="muted" style="margin-bottom:1.5rem">
+          Svelte 5 island (<code class="mono">client:load</code>) — SVG fan layout + animated dots (<code class="mono">animateMotion</code>) ·
+          Home เป็น hub ตรงกลาง, Solar บน, Battery ล่างซ้าย, Grid ล่างขวา
+        </p>
+
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem">
+          <!-- Static preview -->
+          <div class="card" style="display:flex;flex-direction:column">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.75rem">
+              <h3 class="serif" style="font-size:1.1rem;margin:0;font-weight:300">การไหลของพลังงาน</h3>
+              <span style="display:flex;align-items:center;gap:0.5rem;font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground)">
+                <span style="width:6px;height:6px;border-radius:50%;background:var(--chart-1);animation:pulse 2s infinite"></span>เรียลไทม์
+              </span>
+            </div>
+            <svg viewBox="0 0 360 380" style="width:100%;height:auto" role="img" aria-label="ตัวอย่าง energy flow">
+              <defs>
+                <path id="ds-sh" d="M180,66 L180,130" />
+                <path id="ds-hb" d="M162,180 L98,256" />
+                <path id="ds-gh" d="M262,256 L198,180" />
+              </defs>
+              <!-- dormant conduits -->
+              <use href="#ds-sh" fill="none" stroke="var(--border)" stroke-width="3.5" stroke-opacity="0.07" />
+              <use href="#ds-sh" fill="none" stroke="var(--border)" stroke-width="1" stroke-opacity="0.45" />
+              <use href="#ds-hb" fill="none" stroke="var(--border)" stroke-width="3.5" stroke-opacity="0.07" />
+              <use href="#ds-hb" fill="none" stroke="var(--border)" stroke-width="1" stroke-opacity="0.45" />
+              <use href="#ds-gh" fill="none" stroke="var(--border)" stroke-width="3.5" stroke-opacity="0.07" />
+              <use href="#ds-gh" fill="none" stroke="var(--border)" stroke-width="1" stroke-opacity="0.45" />
+              <!-- active: solar → home -->
+              <use href="#ds-sh" fill="none" stroke="var(--chart-2)" stroke-width="1.5" stroke-opacity="0.5" />
+              <!-- active: charging conduit (home → batt) -->
+              <use href="#ds-hb" fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-opacity="0.5" />
+
+              <!-- Solar node (top) -->
+              <foreignObject x="120" y="10" width="120" height="110">
+                <div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;flex-direction:column;align-items:center;text-align:center">
+                  <div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid color-mix(in oklch,var(--chart-2) 40%,transparent);background:color-mix(in oklch,var(--chart-2) 10%,transparent);color:var(--chart-2)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="7.05" y2="7.05"/><line x1="16.95" y1="16.95" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.22" y1="19.78" x2="7.05" y2="16.95"/><line x1="16.95" y1="7.05" x2="19.78" y2="4.22"/></svg>
+                  </div>
+                  <p style="margin-top:8px;font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground)">แผงโซลาร์</p>
+                  <p style="margin-top:4px;font-family:var(--font-serif);font-size:1rem;font-weight:300;line-height:1">2.45 kW</p>
+                </div>
+              </foreignObject>
+
+              <!-- Home node (center) -->
+              <foreignObject x="120" y="130" width="120" height="110">
+                <div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;flex-direction:column;align-items:center;text-align:center">
+                  <div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid color-mix(in oklch,var(--foreground) 30%,transparent);background:var(--foreground);color:var(--card)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                  </div>
+                  <p style="margin-top:8px;font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground)">โหลดในบ้าน</p>
+                  <p style="margin-top:4px;font-family:var(--font-serif);font-size:1rem;font-weight:300;line-height:1">0.82 kW</p>
+                </div>
+              </foreignObject>
+
+              <!-- Battery node (bottom-left) -->
+              <foreignObject x="20" y="250" width="120" height="120">
+                <div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;flex-direction:column;align-items:center;text-align:center">
+                  <div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid color-mix(in oklch,var(--chart-1) 40%,transparent);background:color-mix(in oklch,var(--chart-1) 10%,transparent);color:var(--chart-1)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h3"/><path d="M11 7h3"/><path d="M11 17h3"/><path d="M17 7h1a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-1"/><line x1="22" y1="11" x2="22" y2="13"/><polyline points="11 11 13 12 11 13"/></svg>
+                  </div>
+                  <p style="margin-top:8px;font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground)">แบตเตอรี่</p>
+                  <p style="margin-top:4px;font-family:var(--font-serif);font-size:1rem;font-weight:300;line-height:1">78%</p>
+                  <p style="margin-top:4px;font-size:10px;color:var(--muted-foreground)">กำลังชาร์จ</p>
+                </div>
+              </foreignObject>
+
+              <!-- Grid node (bottom-right) -->
+              <foreignObject x="220" y="250" width="120" height="120">
+                <div xmlns="http://www.w3.org/1999/xhtml" style="display:flex;flex-direction:column;align-items:center;text-align:center">
+                  <div style="width:56px;height:56px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:1px solid var(--border);background:var(--card);color:var(--muted-foreground)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                  </div>
+                  <p style="margin-top:8px;font-size:10px;text-transform:uppercase;letter-spacing:var(--tracking-luxury);color:var(--muted-foreground)">การไฟฟ้า</p>
+                  <p style="margin-top:4px;font-family:var(--font-serif);font-size:1rem;font-weight:300;line-height:1">0.00 kW</p>
+                  <p style="margin-top:4px;font-size:10px;color:var(--muted-foreground)">ไม่ได้ซื้อไฟ</p>
+                </div>
+              </foreignObject>
+            </svg>
+            <p style="margin-top:auto;border-top:1px solid color-mix(in oklch,var(--border) 60%,transparent);padding-top:1rem;font-size:0.875rem;color:var(--muted-foreground);line-height:1.6">
+              แผงผลิตได้ <strong style="font-weight:500;color:var(--foreground)">2.45 kW</strong>
+              · บ้านใช้ <strong style="font-weight:500;color:var(--foreground)">0.82 kW</strong>
+              · โซลาร์เหลือ ชาร์จเข้าแบต <strong style="font-weight:500;color:var(--foreground)">1.63 kW</strong>
+              · <strong style="font-weight:500;color:var(--foreground)">ไม่ได้ซื้อไฟจากการไฟฟ้าเลย</strong>
+            </p>
+          </div>
+
+          <!-- Spec reference -->
+          <div style="display:flex;flex-direction:column;gap:1rem">
+            <div class="card">
+              <p class="eyebrow" style="margin-bottom:0.75rem">Layout</p>
+              <code class="mono" style="font-size:10px;display:block;line-height:1.8;color:var(--foreground)">
+                viewBox="0 0 360 380"<br>
+                Solar: (120, 10) 120×110<br>
+                Home:  (120, 130) 120×110  ← hub<br>
+                Batt:  (20, 250) 120×120<br>
+                Grid:  (220, 250) 120×120
+              </code>
+            </div>
+            <div class="card">
+              <p class="eyebrow" style="margin-bottom:0.75rem">Conduit</p>
+              <code class="mono" style="font-size:10px;display:block;line-height:1.8;color:var(--foreground)">
+                dormant: stroke-width 3.5, opacity 7%<br>
+                        + stroke-width 1, opacity 45%<br>
+                active:  stroke chart-color 1.5, opacity 50%<br>
+                flow dots: r=3 animateMotion<br>
+                        opacity 0→1→1→0 (keyTimes 0/.15/.85/1)<br>
+                dur = max(0.8, 2.4 − kW×0.4) s
+              </code>
+            </div>
+            <div class="card">
+              <p class="eyebrow" style="margin-bottom:0.75rem">Node state</p>
+              <div style="display:flex;flex-direction:column;gap:0.5rem;font-size:12px;color:var(--muted-foreground)">
+                <span>ผลิตไฟ: <code class="mono">border-chart-2/40 bg-chart-2/10 text-chart-2</code></span>
+                <span>ชาร์จ/จ่าย: <code class="mono">border-chart-1/40 bg-chart-1/10 text-chart-1</code></span>
+                <span>นำเข้ากริด: <code class="mono">border-chart-4/40 bg-chart-4/10 text-chart-4</code></span>
+                <span>idle: <code class="mono">border-border bg-card text-muted-foreground</code></span>
+                <span>home (hub): <code class="mono">border-foreground/30 bg-foreground text-primary-foreground</code></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 08 ICONOGRAPHY & VOICE -->
+      <section>
+        <p class="eyebrow">08 — Iconography &amp; Voice</p>
         <h2 class="serif">ไอคอนและน้ำเสียง</h2>
-        <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: 1rem">
+        <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:1rem">
           <div class="card">
-            <p class="eyebrow" style="margin-bottom: 0.75rem">Icons</p>
-            <p class="muted" style="font-size: 13px">
-              <b style="color: var(--foreground); font-weight: 500">Lucide</b> (<code class="mono">@lucide/svelte</code>) · ขนาด 14–20px ·
+            <p class="eyebrow" style="margin-bottom:0.75rem">Icons</p>
+            <p class="muted" style="font-size:13px">
+              <b style="color:var(--foreground);font-weight:500">Lucide</b> (<code class="mono">@lucide/svelte</code>) · ขนาด 14–20px ·
               <code class="mono">stroke-width 1.25–1.5</code> เพื่อเส้นบางเข้ากับงานหรู · สีตาม context ผ่าน <code class="mono">text-chart-*</code>
             </p>
           </div>
           <div class="card">
-            <p class="eyebrow" style="margin-bottom: 0.75rem">Voice</p>
-            <p class="muted" style="font-size: 13px">ภาษาไทยสุภาพ กระชับ เน้นความหมายต่อเจ้าของบ้าน (“ประหยัดวันนี้”, “ไม่ได้ซื้อไฟจากการไฟฟ้าเลย”) มากกว่าศัพท์เทคนิคดิบ ตัวเลขมาพร้อมบริบทเสมอ</p>
+            <p class="eyebrow" style="margin-bottom:0.75rem">Voice</p>
+            <p class="muted" style="font-size:13px">ภาษาไทยสุภาพ กระชับ เน้นความหมายต่อเจ้าของบ้าน ("ประหยัดวันนี้", "ไม่ได้ซื้อไฟจากการไฟฟ้าเลย") มากกว่าศัพท์เทคนิคดิบ ตัวเลขมาพร้อมบริบทเสมอ</p>
           </div>
         </div>
       </section>
@@ -676,7 +821,7 @@
     </div>
 
     <script>
-      // render color swatches from the live CSS variables so this page never drifts from the tokens
+      // ── Color swatches ──────────────────────────────────────────
       const surface = [
         ['background', '--background'],
         ['foreground', '--foreground'],
@@ -684,6 +829,7 @@
         ['muted', '--muted'],
         ['muted-foreground', '--muted-foreground'],
         ['border', '--border'],
+        ['input', '--input'],
       ]
       const accent = [
         ['accent', '--accent'],
@@ -702,184 +848,280 @@
       render('sw-surface', surface)
       render('sw-accent', accent)
 
-      // Stacked bar chart demo
-      ;(function () {
-        const selfData  = [1.2,2.1,3.4,4.5,5.2,6.1,5.8,5.0,4.2,3.1,2.0,1.5,1.8,2.4,3.6,4.8,5.5,6.2,5.9,5.1,4.0,2.8,1.6,0.9,1.1,2.0,3.2,4.4,5.0,4.5]
-        const gridData  = [1.8,1.5,1.2,0.8,0.6,0.4,0.5,0.7,0.9,1.2,1.5,1.8,1.6,1.3,1.0,0.7,0.5,0.3,0.4,0.6,0.9,1.3,1.7,2.0,1.9,1.6,1.2,0.8,0.5,0.7]
-        const data = selfData.map((s, i) => [s, gridData[i]])
-        const [VW,VH,ML,MT,MR,MB] = [560,220,4,12,8,4]
-        const [px0,py0,px1,py1] = [ML,MT,VW-MR,VH-MB]
-        const n = data.length
-        const maxTotal = Math.max(...data.map(d => d[0]+d[1]))
-        const groupW = (px1-px0)/n
-        const barW = groupW*0.85
-        const ph = py1-py0
-        const gridYs = [0.25,0.5,0.75].map(f => py0+(1-f)*ph)
-
-        let bars = ''
-        data.forEach(([s,g], i) => {
-          const x = px0 + i*groupW + (groupW-barW)/2
-          const sh = (s/maxTotal)*ph, gh = (g/maxTotal)*ph
-          const hasG = gh > 0.5
-          bars += `<rect x="${x.toFixed(1)}" y="${(py1-sh-gh).toFixed(1)}" width="${barW.toFixed(1)}" height="${sh.toFixed(1)}" rx="${hasG?0:1.5}" fill="var(--chart-1)" fill-opacity="0.85"/>`
-          if (hasG) bars += `<rect x="${x.toFixed(1)}" y="${(py1-gh).toFixed(1)}" width="${barW.toFixed(1)}" height="${gh.toFixed(1)}" rx="1.5" fill="var(--chart-4)" fill-opacity="0.8"/>`
+      // ── Smooth bezier helper ────────────────────────────────────
+      const clamp = v => Math.max(0, Math.min(1, v))
+      function smoothPath(values, xMin, yMin, xMax, yMax, tension = 0.9) {
+        const n = values.length
+        if (n < 2) return ''
+        const pts = values.map((v, i) => ({
+          x: xMin + (i / (n - 1)) * (xMax - xMin),
+          y: yMin + (1 - clamp(v)) * (yMax - yMin),
+        }))
+        const cv = clamp(tension)
+        const slopes = pts.slice(0, -1).map((p, i) => (pts[i + 1].y - p.y) / (pts[i + 1].x - p.x))
+        const tg = pts.map((_, i) => {
+          if (i === 0) return slopes[0]
+          if (i === pts.length - 1) return slopes[slopes.length - 1]
+          const pr = slopes[i - 1], nx = slopes[i]
+          if (pr === 0 || nx === 0 || Math.sign(pr) !== Math.sign(nx)) return 0
+          return (2 * pr * nx) / (pr + nx)
         })
-
-        const lines = gridYs.map(y => `<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')
-        document.getElementById('bar-demo-svg').innerHTML = lines + bars
-
-        // Y-axis HTML labels
-        const yEl = document.getElementById('bar-y-axis')
-        gridYs.forEach((y, i) => {
-          const pct = (y / VH * 100).toFixed(2)
-          const label = ((i === 0 ? 0.25 : i === 1 ? 0.5 : 0.75) * maxTotal).toFixed(1)
-          yEl.innerHTML += `<span style="position:absolute;right:0;top:${pct}%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">${label}</span>`
+        slopes.forEach((s, i) => {
+          if (s === 0) { tg[i] = 0; tg[i + 1] = 0; return }
+          const a = tg[i] / s, b = tg[i + 1] / s
+          const h = Math.hypot(a, b)
+          if (h > 3) { const sc = 3 / h; tg[i] = sc * a * s; tg[i + 1] = sc * b * s }
         })
-
-        // X-axis HTML labels (every 5th day label)
-        const xEl = document.getElementById('bar-x-axis')
-        xEl.style.display = 'grid'
-        xEl.style.gridTemplateColumns = `repeat(${n},1fr)`
-        xEl.innerHTML = Array.from({length: n}, (_, i) => `<span style="text-align:center;overflow:hidden">${i+1}</span>`).join('')
-      })()
-
-      // SVG smooth bezier chart demo
-      ;(function () {
-        const clamp = (v) => Math.max(0, Math.min(1, v))
-        function smoothPath(values, xMin, yMin, xMax, yMax, tension = 0.9) {
-          const n = values.length
-          if (n < 2) return ''
-          const pts = values.map((v, i) => ({
-            x: xMin + (i / (n - 1)) * (xMax - xMin),
-            y: yMin + (1 - clamp(v)) * (yMax - yMin),
-          }))
-
-          const curve = clamp(tension)
-          const slopes = pts.slice(0, -1).map((p, i) => (pts[i + 1].y - p.y) / (pts[i + 1].x - p.x))
-          const tangents = pts.map((_, i) => {
-            if (i === 0) return slopes[0]
-            if (i === pts.length - 1) return slopes[slopes.length - 1]
-
-            const prev = slopes[i - 1]
-            const next = slopes[i]
-            if (prev === 0 || next === 0 || Math.sign(prev) !== Math.sign(next)) return 0
-            return (2 * prev * next) / (prev + next)
-          })
-
-          slopes.forEach((slope, i) => {
-            if (slope === 0) {
-              tangents[i] = 0
-              tangents[i + 1] = 0
-              return
-            }
-
-            const a = tangents[i] / slope
-            const b = tangents[i + 1] / slope
-            const h = Math.hypot(a, b)
-            if (h > 3) {
-              const scale = 3 / h
-              tangents[i] = scale * a * slope
-              tangents[i + 1] = scale * b * slope
-            }
-          })
-
-          let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`
-          for (let i = 1; i < n; i++) {
-            const p1 = pts[i - 1], p2 = pts[i]
-            const dx = (p2.x - p1.x) / 3
-            const cp1x = p1.x + dx * curve, cp1y = p1.y + tangents[i - 1] * dx * curve
-            const cp2x = p2.x - dx * curve, cp2y = p2.y - tangents[i] * dx * curve
-            d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
-          }
-          return d
+        let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`
+        for (let i = 1; i < n; i++) {
+          const p1 = pts[i - 1], p2 = pts[i], dx = (p2.x - p1.x) / 3
+          d += ` C ${(p1.x + dx * cv).toFixed(1)},${(p1.y + tg[i-1]*dx*cv).toFixed(1)} ${(p2.x - dx*cv).toFixed(1)},${(p2.y - tg[i]*dx*cv).toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
         }
+        return d
+      }
+      function areaPath(linePath, px0, px1, py1) {
+        return linePath + ` L ${px1},${py1} L ${px0},${py1} Z`
+      }
 
-        const pvData  = [0,0,0.04,0.14,0.34,0.55,0.70,0.78,0.80,0.76,0.65,0.50,0.40,0.35,0.28,0.18,0.08,0.02,0,0,0,0,0,0]
-        const loadData= [0.25,0.22,0.20,0.18,0.20,0.30,0.38,0.35,0.40,0.42,0.45,0.50,0.48,0.45,0.42,0.45,0.50,0.55,0.60,0.55,0.45,0.38,0.32,0.28]
-        const [VW,VH,ML,MT,MR,MB] = [560,160,4,8,8,24]
+      // ── 4-series line chart (ProductionCurve style) ─────────────
+      ;(function() {
+        const pv   = [0,0,0.03,0.12,0.32,0.54,0.70,0.78,0.80,0.76,0.64,0.50,0.40,0.34,0.27,0.17,0.08,0.02,0,0,0,0,0,0]
+        const load = [0.25,0.22,0.20,0.18,0.20,0.30,0.38,0.35,0.40,0.42,0.45,0.50,0.48,0.45,0.42,0.45,0.50,0.55,0.60,0.55,0.45,0.38,0.32,0.28]
+        // batt: positive when pv > load (charging solar surplus → negative), discharging when pv < load in evening
+        const batt = pv.map((p, i) => { const d = p - load[i]; return d > 0.05 ? -d * 0.6 : (d < -0.05 && i > 15 ? 0.3 : 0) })
+        // grid: import only at night / dawn when pv is very low
+        const grid = pv.map((p, i) => load[i] > p + 0.05 && i < 6 ? (load[i] - p) * 0.5 : 0)
+
+        const allVals = [...pv, ...load, ...batt, ...grid]
+        const minR = Math.min(0, ...batt, ...grid)
+        const maxR = Math.max(...pv, ...load, 0.1) * 1.1
+        const rng  = maxR - minR
+        const norm = v => (v - minR) / rng
+
+        const [VW,VH,ML,MT,MR,MB] = [560,220,4,18,8,28]
         const [px0,py0,px1,py1] = [ML,MT,VW-MR,VH-MB]
-        const ph = py1-py0
+        const ph = py1 - py0
 
-        const pvLine  = smoothPath(pvData,  px0,py0,px1,py1)
-        const pvFill  = pvLine  + ` L ${px1},${py1} L ${px0},${py1} Z`
-        const ldLine  = smoothPath(loadData, px0,py0,px1,py1)
-        const ldFill  = ldLine  + ` L ${px1},${py1} L ${px0},${py1} Z`
-        const gridYs  = [0.25,0.5,0.75].map(f => py0 + (1-f)*ph)
+        const pvLine  = smoothPath(pv.map(norm),   px0,py0,px1,py1)
+        const pvFill  = areaPath(pvLine, px0, px1, py1)
+        const ldLine  = smoothPath(load.map(norm),  px0,py0,px1,py1)
+        const ldFill  = areaPath(ldLine, px0, px1, py1)
+        const btLine  = smoothPath(batt.map(norm),  px0,py0,px1,py1)
+        const grLine  = smoothPath(grid.map(norm),  px0,py0,px1,py1)
+        const gridYs  = [0.25,0.5,0.75].map(f => py0+(1-f)*ph)
+        const gridPct = [0.25,0.5,0.75].map(f => ((MT+(1-f)*ph)/VH*100).toFixed(2))
+        const hasNeg  = minR < -0.05
+        const zeroY   = (py0 + (1 - norm(0)) * ph).toFixed(1)
 
-        document.getElementById('chart-demo-svg').innerHTML = `
+        document.getElementById('line4-svg').innerHTML = `
           <defs>
-            <linearGradient id="ds-pv"   x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stop-color="var(--chart-2)" stop-opacity="0.35"/>
+            <linearGradient id="l4pv" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--chart-2)" stop-opacity="0.35"/>
               <stop offset="100%" stop-color="var(--chart-2)" stop-opacity="0"/>
             </linearGradient>
-            <linearGradient id="ds-load" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%"   stop-color="var(--chart-4)" stop-opacity="0.2"/>
+            <linearGradient id="l4ld" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--chart-4)" stop-opacity="0.2"/>
               <stop offset="100%" stop-color="var(--chart-4)" stop-opacity="0"/>
             </linearGradient>
-            <clipPath id="ds-clip"><rect x="${px0}" y="${py0}" width="${px1-px0}" height="${ph}"/></clipPath>
+            <clipPath id="l4clip"><rect x="${px0}" y="${py0}" width="${px1-px0}" height="${ph}"/></clipPath>
           </defs>
           ${gridYs.map(y => `<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')}
           <line x1="${px0}" x2="${px1}" y1="${py1}" y2="${py1}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"/>
-          <g clip-path="url(#ds-clip)">
-            <path d="${pvFill}" fill="url(#ds-pv)"/>
-            <path d="${pvLine}" fill="none" stroke="var(--chart-2)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="${ldFill}" fill="url(#ds-load)"/>
-            <path d="${ldLine}" fill="none" stroke="var(--chart-4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          ${hasNeg ? `<line x1="${px0}" x2="${px1}" y1="${zeroY}" y2="${zeroY}" stroke="var(--border)" stroke-opacity="0.7" stroke-width="0.8"/>` : ''}
+          <g clip-path="url(#l4clip)">
+            <path d="${pvFill}" fill="url(#l4pv)"/>
+            <path d="${pvLine}" fill="none" stroke="var(--chart-2)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="${ldFill}" fill="url(#l4ld)"/>
+            <path d="${ldLine}" fill="none" stroke="var(--chart-4)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="${btLine}" fill="none" stroke="var(--chart-1)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="${grLine}" fill="none" stroke="var(--chart-4)" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 2" stroke-opacity="0.7"/>
           </g>
-          <line id="chart-demo-crosshair" x1="0" x2="0" y1="${py0}" y2="${py1}" stroke="var(--foreground)" stroke-opacity="0.18" stroke-width="0.5" visibility="hidden"/>`
+          <line id="l4cross" x1="0" x2="0" y1="${py0}" y2="${py1}" stroke="var(--foreground)" stroke-opacity="0.2" stroke-width="0.5" visibility="hidden"/>
+          <rect id="l4overlay" x="${px0}" y="${py0}" width="${px1-px0}" height="${ph}" fill="transparent" style="cursor:crosshair"/>`
 
-        // Y-axis HTML labels
-        const yEl = document.getElementById('line-y-axis')
+        // Y-axis HTML
+        const yEl = document.getElementById('line4-y-axis')
+        yEl.style.height = VH + 'px'
         gridYs.forEach((y, i) => {
           const pct = (y / VH * 100).toFixed(2)
-          const label = (i === 0 ? '25%' : i === 1 ? '50%' : '75%')
-          yEl.innerHTML += `<span style="position:absolute;right:0;top:${pct}%;transform:translateY(-50%);font-size:9px;color:var(--muted-foreground);text-align:right">${label}</span>`
+          const v = [0.25, 0.5, 0.75][i]
+          yEl.innerHTML += `<span style="top:${pct}%;color:var(--muted-foreground)">${(maxR*v).toFixed(1)}</span>`
         })
 
-        // X-axis HTML labels (all 24 hours)
-        const xEl = document.getElementById('line-x-axis')
-        xEl.innerHTML = Array.from({length:24}, (_,i) => `<span>${String(i).padStart(2,'0')}</span>`).join('')
+        // X-axis
+        document.getElementById('line4-x-axis').innerHTML = Array.from({length:24},(_,i)=>`<span>${String(i).padStart(2,'0')}</span>`).join('')
+        document.getElementById('line4-x-axis').style.paddingRight = (MR/VW*100).toFixed(2)+'%'
 
-        // Line chart interactive tooltip demo
-        ;(function lineTooltipDemo() {
-          const svg = document.getElementById("chart-demo-svg")
-          const tip = document.getElementById("tooltip-demo-tip")
-          if (!svg || !tip) return
+        // Tooltip
+        const svg   = document.getElementById('line4-svg')
+        const tip   = document.getElementById('line4-tip')
+        const cross = document.getElementById('l4cross')
+        const over  = document.getElementById('l4overlay')
+        const n = pv.length
+        svg.addEventListener('mousemove', e => {
+          const r = svg.getBoundingClientRect()
+          const sx = ((e.clientX - r.left) / r.width) * VW
+          if (sx < px0 || sx > px1) { tip.style.display='none'; cross.setAttribute('visibility','hidden'); return }
+          const idx = Math.max(0, Math.min(n-1, Math.round(((sx-px0)/(px1-px0))*(n-1))))
+          const cx = n > 1 ? (px0+(idx/(n-1))*(px1-px0)).toFixed(1) : String(px0)
+          cross.setAttribute('x1',cx); cross.setAttribute('x2',cx); cross.setAttribute('visibility','visible')
+          tip.querySelector('.t4Hour').textContent = `${String(idx).padStart(2,'0')}:00 น.`
+          tip.querySelector('.t4Pv').textContent   = (pv[idx]*6.2).toFixed(2)+' kW'
+          tip.querySelector('.t4Load').textContent = (load[idx]*3.8).toFixed(2)+' kW'
+          const bv = batt[idx]*2
+          tip.querySelector('.t4Batt').textContent = bv > 0.05 ? `+${bv.toFixed(2)} kW` : bv < -0.05 ? `−${Math.abs(bv).toFixed(2)} kW` : '0.00 kW'
+          const gv = grid[idx]*1.5
+          tip.querySelector('.t4Grid').textContent = gv > 0.01 ? `${gv.toFixed(2)} kW` : 'ไม่ซื้อ'
+          tip.style.display='block'
+          tip.style.left = Math.min(e.clientX+14, window.innerWidth-180)+'px'
+          tip.style.top  = Math.max(e.clientY-90, 8)+'px'
+        })
+        svg.addEventListener('mouseleave', () => { tip.style.display='none'; cross.setAttribute('visibility','hidden') })
+      })()
 
-          const tipPv = tip.querySelector(".tdPv")
-          const tipLd = tip.querySelector(".tdLoad")
-          const tipHr = tip.querySelector(".tdHour")
-          const crosshair = svg.querySelector("#chart-demo-crosshair")
-          const n = pvData.length
-          svg.addEventListener("mousemove", (event) => {
-            const bounds = svg.getBoundingClientRect()
-            const sx = ((event.clientX - bounds.left) / bounds.width) * VW
-            if (sx < px0 || sx > px1) {
-              tip.style.display = "none"
-              crosshair.setAttribute("visibility", "hidden")
-              return
-            }
+      // ── BatterySoC area chart ───────────────────────────────────
+      ;(function() {
+        const soc = [0.9,0.88,0.82,0.72,0.62,0.55,0.50,0.48,0.52,0.61,0.72,0.83,0.90,0.96,1.0,0.98,0.94,0.88,0.82,0.78,0.74,0.70,0.66,0.65]
+        const [VW,VH,ML,MT,MR,MB] = [560,180,4,18,8,28]
+        const [px0,py0,px1,py1] = [ML,MT,VW-MR,VH-MB]
+        const ph = py1-py0
+        const line = smoothPath(soc, px0,py0,px1,py1)
+        const fill = areaPath(line, px0, px1, py1)
+        const gridYs  = [0.25,0.5,0.75,1.0].map(f => py0+(1-f)*ph)
+        const gridPct = [0.25,0.5,0.75,1.0].map(f => ((MT+(1-f)*ph)/VH*100).toFixed(2))
+        const yLabels = [3,6,9,12]
+        document.getElementById('soc-svg').innerHTML = `
+          <defs>
+            <linearGradient id="socg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="var(--chart-1)" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="var(--chart-1)" stop-opacity="0"/>
+            </linearGradient>
+            <clipPath id="socclip"><rect x="${px0}" y="${py0}" width="${px1-px0}" height="${ph}"/></clipPath>
+          </defs>
+          ${gridYs.map(y=>`<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')}
+          <line x1="${px0}" x2="${px1}" y1="${py1}" y2="${py1}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"/>
+          <g clip-path="url(#socclip)">
+            <path d="${fill}" fill="url(#socg)"/>
+            <path d="${line}" fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>`
+        const yEl = document.getElementById('soc-y-axis')
+        yEl.style.height = VH+'px'
+        gridYs.forEach((y,i) => {
+          yEl.innerHTML += `<span style="position:absolute;right:0;top:${gridPct[i]}%;transform:translateY(-50%);font-size:9px;${i===3?'font-weight:500;color:oklch(0.52 0.012 70 / 60%)':'color:var(--muted-foreground)'};">${yLabels[i]}</span>`
+        })
+        document.getElementById('soc-x-axis').innerHTML = Array.from({length:24},(_,i)=>`<span>${String(i).padStart(2,'0')}</span>`).join('')
+        document.getElementById('soc-x-axis').style.paddingRight = (MR/VW*100).toFixed(2)+'%'
+      })()
 
-            const idx = Math.max(0, Math.min(n - 1, Math.round(((sx - px0) / (px1 - px0)) * (n - 1))))
-            const cx = n > 1 ? (px0 + (idx / (n - 1)) * (px1 - px0)).toFixed(1) : String(px0)
-            crosshair.setAttribute("x1", cx)
-            crosshair.setAttribute("x2", cx)
-            crosshair.setAttribute("visibility", "visible")
-            tipHr.textContent = `${String(idx).padStart(2, "0")}:00 น.`
-            tipPv.textContent = `${(pvData[idx] * 3.5).toFixed(2)} kW`
-            tipLd.textContent = `${(loadData[idx] * 2).toFixed(2)} kW`
-            tip.style.display = "block"
-            tip.style.left = `${Math.min(event.clientX + 14, window.innerWidth - 160)}px`
-            tip.style.top = `${Math.max(event.clientY - 80, 8)}px`
-          })
-          svg.addEventListener("mouseleave", () => {
-            tip.style.display = "none"
-            crosshair.setAttribute("visibility", "hidden")
-          })
-        })()
+      // ── Stacked bar 3-segment (EnergySourceChart) ───────────────
+      ;(function() {
+        const solar= [0,0,0.1,0.5,1.2,1.8,2.1,2.0,1.9,2.1,2.2,2.0,1.8,1.7,1.5,1.2,0.8,0.3,0,0,0,0,0,0]
+        const batt = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.2,0.5,0.6,0.5,0.4,0.3,0.2,0.1]
+        const grid = [0.5,0.5,0.4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        const totals = solar.map((s,i) => s+batt[i]+grid[i])
+        const maxT = Math.max(...totals, 0.1)
+        const [VW,VH,ML,MT,MR,MB] = [560,200,4,16,4,28]
+        const [px0,py0,px1,py1] = [ML,MT,VW-MR,VH-MB]
+        const ph = py1-py0
+        const n = 24, groupW = (px1-px0)/n, barW = groupW*0.82
+        let bars = ''
+        const gridLs = []
+        solar.forEach((s,i) => {
+          const x = px0 + i*groupW + (groupW-barW)/2
+          const sh = (s/maxT)*ph, bh = (batt[i]/maxT)*ph, gh = (grid[i]/maxT)*ph
+          const totalH = sh+bh+gh
+          if (totalH < 0.5) return
+          // solar (top)
+          if (sh > 0.5) bars += `<rect x="${x.toFixed(1)}" y="${(py1-totalH).toFixed(1)}" width="${barW.toFixed(1)}" height="${sh.toFixed(1)}" rx="${bh||gh?0:1.5}" fill="var(--chart-2)" fill-opacity="0.75"/>`
+          // batt (middle)
+          if (bh > 0.5) bars += `<rect x="${x.toFixed(1)}" y="${(py1-bh-gh).toFixed(1)}" width="${barW.toFixed(1)}" height="${bh.toFixed(1)}" rx="0" fill="var(--chart-1)" fill-opacity="0.75"/>`
+          // grid (bottom, rounded bottom)
+          if (gh > 0.5) bars += `<rect x="${x.toFixed(1)}" y="${(py1-gh).toFixed(1)}" width="${barW.toFixed(1)}" height="${gh.toFixed(1)}" rx="1.5" fill="var(--chart-4)" fill-opacity="0.75"/>`
+        })
+        const gridYs  = [0.25,0.5,0.75,1.0].map(f => py0+(1-f)*ph)
+        const gridPct = [0.25,0.5,0.75,1.0].map(f => ((MT+(1-f)*ph)/VH*100).toFixed(2))
+        const yLabels = [0.25,0.5,0.75,1.0].map(f => (maxT*f).toFixed(1))
+        document.getElementById('esrc-svg').innerHTML =
+          gridYs.map(y=>`<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')+
+          `<line x1="${px0}" x2="${px1}" y1="${py1}" y2="${py1}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"/>` + bars
+        const yEl = document.getElementById('esrc-y-axis')
+        yEl.style.height = '180px'
+        gridYs.forEach((y,i) => {
+          yEl.innerHTML += `<span style="position:absolute;right:0;top:${gridPct[i]}%;transform:translateY(-50%);font-size:9px;${i===3?'font-weight:500;color:oklch(0.52 0.012 70 / 60%)':'color:var(--muted-foreground)'};">${yLabels[i]}</span>`
+        })
+        document.getElementById('esrc-x-axis').innerHTML = Array.from({length:24},(_,i)=>`<span>${String(i).padStart(2,'0')}</span>`).join('')
+        document.getElementById('esrc-x-axis').style.paddingRight = (MR/VW*100).toFixed(2)+'%'
+      })()
+
+      // ── BattGrid ± dual-axis line ───────────────────────────────
+      ;(function() {
+        // batt: + = discharging, - = charging
+        // grid: + = buying
+        const battD = [0,0,-0.5,-1.2,-1.5,-1.3,-1.0,-0.5,0,0.3,0.6,0.8,0.9,1.0,1.1,1.0,0.8,0.6,0.4,0.2,0.1,0,0,0]
+        const gridD = [0.4,0.3,0.2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.3,0.6,0.5,0.4,0.3,0.2]
+        const absMax = Math.max(Math.max(...battD.map(Math.abs)), Math.max(...gridD), 0.5) * 1.15
+        const norm = v => 0.5 + v/(2*absMax)
+        const [VW,VH,ML,MT,MR,MB] = [560,220,4,16,8,28]
+        const [px0,py0,px1,py1] = [ML,MT,VW-MR,VH-MB]
+        const ph = py1-py0
+        const battLine = smoothPath(battD.map(norm), px0,py0,px1,py1)
+        const gridLine = smoothPath(gridD.map(norm), px0,py0,px1,py1)
+        const zeroY = (py0+(1-norm(0))*ph).toFixed(1)
+        const yTicks = [absMax, absMax*0.5, 0, -absMax*0.5, -absMax]
+        const gridYs  = yTicks.map(v => (py0+(1-norm(v))*ph).toFixed(1))
+        const gridPct = yTicks.map(v => ((MT+(1-norm(v))*ph)/VH*100).toFixed(2))
+        const yLabels = yTicks.map(v => v===0?'0':(Math.abs(v)).toFixed(1))
+        document.getElementById('batt-svg').innerHTML = `
+          <defs><clipPath id="bgclip"><rect x="${px0}" y="${py0}" width="${px1-px0}" height="${ph}"/></clipPath></defs>
+          ${gridYs.map((y,i)=>`<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="${yTicks[i]===0?'0.6':'0.4'}" stroke-width="${yTicks[i]===0?'0.8':'0.5'}" ${yTicks[i]===0?'':'stroke-dasharray="2 4"'}/>`).join('')}
+          <line x1="${px0}" x2="${px1}" y1="${py1}" y2="${py1}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"/>
+          <text x="${px0+4}" y="${+zeroY-6}" font-size="8" fill="var(--muted-foreground)" letter-spacing="0.5">จ่ายออก / ซื้อ</text>
+          <text x="${px0+4}" y="${+zeroY+12}" font-size="8" fill="var(--muted-foreground)" letter-spacing="0.5">ชาร์จ / ไม่ซื้อ</text>
+          <g clip-path="url(#bgclip)">
+            <path d="${gridLine}" fill="none" stroke="var(--chart-4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 2"/>
+            <path d="${battLine}" fill="none" stroke="var(--chart-1)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </g>`
+        const yEl = document.getElementById('batt-y-axis')
+        yEl.style.height = '200px'
+        yTicks.forEach((v,i) => {
+          yEl.innerHTML += `<span style="position:absolute;right:0;top:${gridPct[i]}%;transform:translateY(-50%);font-size:9px;${v===0?'font-weight:500;color:oklch(0.52 0.012 70 / 60%)':'color:var(--muted-foreground)'};">${v<0?'−':''}${yLabels[i]}</span>`
+        })
+        document.getElementById('batt-x-axis').innerHTML = Array.from({length:24},(_,i)=>`<span>${String(i).padStart(2,'0')}</span>`).join('')
+        document.getElementById('batt-x-axis').style.paddingRight = (MR/VW*100).toFixed(2)+'%'
+      })()
+
+      // ── GridUsage single bar ────────────────────────────────────
+      ;(function() {
+        const gd = [0.4,0.3,0.2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.3,0.6,0.5,0.4,0.2]
+        const maxG = Math.max(...gd, 0.1)
+        const [VW,VH,ML,MT,MR,MB] = [560,160,4,16,4,28]
+        const [px0,py0,px1,py1] = [ML,MT,VW-MR,VH-MB]
+        const ph = py1-py0
+        const n = 24, groupW = (px1-px0)/n, barW = groupW*0.82
+        let bars = ''
+        gd.forEach((v,i) => {
+          const x = px0+i*groupW+(groupW-barW)/2
+          if (v > 0.01) {
+            const h = (v/maxG)*ph
+            bars += `<rect x="${x.toFixed(1)}" y="${(py1-h).toFixed(1)}" width="${barW.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="var(--chart-4)" fill-opacity="0.75"/>`
+          } else {
+            bars += `<rect x="${x.toFixed(1)}" y="${(py1-2).toFixed(1)}" width="${barW.toFixed(1)}" height="2" rx="1" fill="var(--border)" fill-opacity="0.5"/>`
+          }
+        })
+        const gridYs  = [0.5,1.0].map(f => py0+(1-f)*ph)
+        const gridPct = [0.5,1.0].map(f => ((MT+(1-f)*ph)/VH*100).toFixed(2))
+        const yLabels = [0.5,1.0].map(f => (maxG*f).toFixed(2))
+        document.getElementById('gu-svg').innerHTML =
+          gridYs.map(y=>`<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.4" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')+
+          `<line x1="${px0}" x2="${px1}" y1="${py1}" y2="${py1}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"/>`+bars
+        const yEl = document.getElementById('gu-y-axis')
+        yEl.style.height = '130px'
+        gridYs.forEach((y,i) => {
+          yEl.innerHTML += `<span style="position:absolute;right:0;top:${gridPct[i]}%;transform:translateY(-50%);font-size:9px;${i===1?'font-weight:500;color:oklch(0.52 0.012 70 / 60%)':'color:var(--muted-foreground)'};">${yLabels[i]}</span>`
+        })
+        document.getElementById('gu-x-axis').innerHTML = Array.from({length:24},(_,i)=>`<span>${String(i).padStart(2,'0')}</span>`).join('')
+        document.getElementById('gu-x-axis').style.paddingRight = (MR/VW*100).toFixed(2)+'%'
       })()
     </script>
-
-
   </body>
 </html>

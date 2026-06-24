@@ -115,8 +115,11 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
   }
 }
 
-/** counters วันนี้ */
-export async function getToday(): Promise<TodayData> {
+/** counters วันนี้ หรือ date ที่กำหนด */
+export async function getToday(date?: Date): Promise<TodayData> {
+  const d = date ?? new Date()
+  const dayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
   const rows = await sql<{ attr: string; value: string }[]>`
     SELECT attr,
            MAX(value::numeric) as value
@@ -124,16 +127,16 @@ export async function getToday(): Promise<TodayData> {
     WHERE device_id = ${DEVICE}
       AND attr IN ('loadDayElectricityConsumption', 'dayPurchaseElectricityConsumption',
                    'totalPowerGeneration')
-      AND recorded_at >= date_trunc('day', now() AT TIME ZONE ${TZ}) AT TIME ZONE ${TZ}
+      AND (recorded_at AT TIME ZONE ${TZ})::date = ${dayStr}::date
     GROUP BY attr
   `
   const cur = Object.fromEntries(rows.map((r) => [r.attr, n(r.value)]))
 
-  // generated today = delta totalPowerGeneration (last - first of day)
+  // generated = delta totalPowerGeneration (max - min of day)
   const [startRow] = await sql<{ value: string }[]>`
     SELECT value FROM stash.solar_record
     WHERE device_id = ${DEVICE} AND attr = 'totalPowerGeneration'
-      AND recorded_at >= date_trunc('day', now() AT TIME ZONE ${TZ}) AT TIME ZONE ${TZ}
+      AND (recorded_at AT TIME ZONE ${TZ})::date = ${dayStr}::date
     ORDER BY recorded_at ASC LIMIT 1
   `
   const generated = Math.max(0, (cur.totalPowerGeneration ?? 0) - n(startRow?.value))
@@ -146,7 +149,7 @@ export async function getToday(): Promise<TodayData> {
 }
 
 export type MinutePoint = {
-  slot: number // 0-287 (5-min slots from midnight)
+  minuteOfDay: number // actual minutes from midnight (0-1439)
   pv: number
   load: number
   soc: number
@@ -154,14 +157,14 @@ export type MinutePoint = {
   gridPower: number
 }
 
-/** 288 จุด 5 นาทีของ date ที่กำหนด (default วันนี้) */
+/** จุดข้อมูลตาม recorded_at จริง (ข้อมูลเข้าทุก ~5 นาที) */
 export async function get5Min(date?: Date): Promise<MinutePoint[]> {
   const d = date ?? new Date()
   const dayStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-  const rows = await sql<{ slot: string; pv: string; load: string; soc: string; battery_power: string; grid_power: string }[]>`
+  const rows = await sql<{ minute_of_day: string; pv: string; load: string; soc: string; battery_power: string; grid_power: string }[]>`
     SELECT
-      FLOOR(EXTRACT(EPOCH FROM (recorded_at AT TIME ZONE ${TZ} - date_trunc('day', recorded_at AT TIME ZONE ${TZ}))) / 300)::int as slot,
+      EXTRACT(EPOCH FROM (recorded_at AT TIME ZONE ${TZ} - date_trunc('day', recorded_at AT TIME ZONE ${TZ})))::int / 60 as minute_of_day,
       AVG(CASE WHEN attr = 'generationPower'   THEN value::numeric END) as pv,
       AVG(CASE WHEN attr = 'totalLoadPower'    THEN value::numeric END) as load,
       AVG(CASE WHEN attr = 'batterySOC'        THEN value::numeric END) as soc,
@@ -171,11 +174,11 @@ export async function get5Min(date?: Date): Promise<MinutePoint[]> {
     WHERE device_id = ${DEVICE}
       AND attr IN ('generationPower', 'totalLoadPower', 'batterySOC', 'batteryPower', 'aPhaseFeederPower')
       AND (recorded_at AT TIME ZONE ${TZ})::date = ${dayStart}::date
-    GROUP BY slot
-    ORDER BY slot
+    GROUP BY minute_of_day
+    ORDER BY minute_of_day
   `
   return rows.map((r) => ({
-    slot: Number(r.slot),
+    minuteOfDay: Number(r.minute_of_day),
     pv: n(r.pv),
     load: n(r.load),
     soc: n(r.soc),

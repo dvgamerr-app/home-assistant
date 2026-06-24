@@ -159,9 +159,9 @@
         color: var(--chart-2);
       }
       .icon-ring.batt-c {
-        border-color: color-mix(in oklch, var(--chart-2) 40%, transparent);
-        background: color-mix(in oklch, var(--chart-2) 10%, transparent);
-        color: var(--chart-2);
+        border-color: color-mix(in oklch, var(--chart-1) 40%, transparent);
+        background: color-mix(in oklch, var(--chart-1) 10%, transparent);
+        color: var(--chart-1);
       }
       .icon-ring.batt-d {
         border-color: color-mix(in oklch, var(--chart-1) 40%, transparent);
@@ -516,60 +516,19 @@
           </g>
 
           <!-- home → battery (charging surplus) -->
+          <use id="line-hb" href="#p-hb" fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-opacity="0.5" style="display:none"/>
           <g id="f-hb" style="display: none">
-            <circle r="3" fill="var(--chart-2)">
-              <animateMotion
-                dur="1.8s"
-                begin="0s"
-                repeatCount="indefinite"
-                calcMode="linear"
-              >
-                <mpath href="#p-hb" />
-              </animateMotion>
-              <animate
-                attributeName="opacity"
-                dur="1.8s"
-                begin="0s"
-                repeatCount="indefinite"
-                values="0;1;1;0"
-                keyTimes="0;0.15;0.85;1"
-              />
+            <circle r="3" fill="var(--chart-1)">
+              <animateMotion dur="1.8s" begin="0s" repeatCount="indefinite" calcMode="linear"><mpath href="#p-hb" /></animateMotion>
+              <animate attributeName="opacity" dur="1.8s" begin="0s" repeatCount="indefinite" values="0;1;1;0" keyTimes="0;0.15;0.85;1" />
             </circle>
-            <circle r="3" fill="var(--chart-2)">
-              <animateMotion
-                dur="1.8s"
-                begin="0.6s"
-                repeatCount="indefinite"
-                calcMode="linear"
-              >
-                <mpath href="#p-hb" />
-              </animateMotion>
-              <animate
-                attributeName="opacity"
-                dur="1.8s"
-                begin="0.6s"
-                repeatCount="indefinite"
-                values="0;1;1;0"
-                keyTimes="0;0.15;0.85;1"
-              />
+            <circle r="3" fill="var(--chart-1)">
+              <animateMotion dur="1.8s" begin="0.6s" repeatCount="indefinite" calcMode="linear"><mpath href="#p-hb" /></animateMotion>
+              <animate attributeName="opacity" dur="1.8s" begin="0.6s" repeatCount="indefinite" values="0;1;1;0" keyTimes="0;0.15;0.85;1" />
             </circle>
-            <circle r="3" fill="var(--chart-2)">
-              <animateMotion
-                dur="1.8s"
-                begin="1.2s"
-                repeatCount="indefinite"
-                calcMode="linear"
-              >
-                <mpath href="#p-hb" />
-              </animateMotion>
-              <animate
-                attributeName="opacity"
-                dur="1.8s"
-                begin="1.2s"
-                repeatCount="indefinite"
-                values="0;1;1;0"
-                keyTimes="0;0.15;0.85;1"
-              />
+            <circle r="3" fill="var(--chart-1)">
+              <animateMotion dur="1.8s" begin="1.2s" repeatCount="indefinite" calcMode="linear"><mpath href="#p-hb" /></animateMotion>
+              <animate attributeName="opacity" dur="1.8s" begin="1.2s" repeatCount="indefinite" values="0;1;1;0" keyTimes="0;0.15;0.85;1" />
             </circle>
           </g>
 
@@ -847,18 +806,40 @@
         },
       };
 
+      const _timers = {};
+      function animateTo(id, target, step) {
+        clearInterval(_timers[id]);
+        const el = document.getElementById(id);
+        let cur = parseFloat(el.textContent) || 0;
+        const dir = Math.sign(target - cur);
+        if (!dir || Math.abs(target - cur) <= step) {
+          el.textContent = step < 1 ? target.toFixed(2) : Math.round(target);
+          return;
+        }
+        _timers[id] = setInterval(() => {
+          cur += dir * step;
+          if (dir * (cur - target) >= 0) {
+            el.textContent = step < 1 ? target.toFixed(2) : Math.round(target);
+            clearInterval(_timers[id]);
+          } else {
+            el.textContent = step < 1 ? cur.toFixed(2) : Math.round(cur);
+          }
+        }, 16);
+      }
+
       function applyScene(key) {
         const s = SCENES[key];
-        document.getElementById("val-solar").textContent = s.solar;
-        document.getElementById("val-batt").textContent = s.batt;
+        animateTo("val-solar", parseFloat(s.solar), 0.01);
+        animateTo("val-batt",  parseFloat(s.batt),  1);
+        animateTo("val-load",  parseFloat(s.load),  0.01);
+        animateTo("val-grid",  parseFloat(s.grid),  0.01);
         document.getElementById("lbl-batt").textContent = s.battLbl;
-        document.getElementById("val-load").textContent = s.load;
-        document.getElementById("val-grid").textContent = s.grid;
         document.getElementById("lbl-grid").textContent = s.gridLbl;
         document.getElementById("ef-summary").innerHTML = s.summary;
 
         for (const [id, on] of Object.entries(s.flows))
           document.getElementById(`f-${id}`).style.display = on ? "" : "none";
+        document.getElementById("line-hb").style.display = s.flows.hb ? "" : "none";
 
         document.getElementById("icon-solar").className =
           "icon-ring" + (s.flows.sh || s.flows.hb ? " solar" : "");
