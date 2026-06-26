@@ -151,6 +151,8 @@ export async function getToday(date?: Date): Promise<TodayData> {
 export type MinutePoint = {
   minuteOfDay: number // actual minutes from midnight (0-1439)
   pv: number
+  pv1: number
+  pv2: number
   load: number
   soc: number
   batteryPower: number
@@ -162,17 +164,19 @@ export async function get5Min(date?: Date): Promise<MinutePoint[]> {
   const d = date ?? new Date()
   const dayStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-  const rows = await sql<{ minute_of_day: string; pv: string; load: string; soc: string; battery_power: string; grid_power: string }[]>`
+  const rows = await sql<{ minute_of_day: string; pv: string; pv1: string; pv2: string; load: string; soc: string; battery_power: string; grid_power: string }[]>`
     SELECT
       EXTRACT(EPOCH FROM (recorded_at AT TIME ZONE ${TZ} - date_trunc('day', recorded_at AT TIME ZONE ${TZ})))::int / 60 as minute_of_day,
       AVG(CASE WHEN attr = 'generationPower'   THEN value::numeric END) as pv,
+      AVG(CASE WHEN attr = 'pv1Power'          THEN value::numeric END) as pv1,
+      AVG(CASE WHEN attr = 'pv2Power'          THEN value::numeric END) as pv2,
       AVG(CASE WHEN attr = 'totalLoadPower'    THEN value::numeric END) as load,
       AVG(CASE WHEN attr = 'batterySOC'        THEN value::numeric END) as soc,
       AVG(CASE WHEN attr = 'batteryPower'      THEN value::numeric END) as battery_power,
       AVG(CASE WHEN attr = 'aPhaseFeederPower' THEN value::numeric END) as grid_power
     FROM stash.solar_record
     WHERE device_id = ${DEVICE}
-      AND attr IN ('generationPower', 'totalLoadPower', 'batterySOC', 'batteryPower', 'aPhaseFeederPower')
+      AND attr IN ('generationPower', 'pv1Power', 'pv2Power', 'totalLoadPower', 'batterySOC', 'batteryPower', 'aPhaseFeederPower')
       AND (recorded_at AT TIME ZONE ${TZ})::date = ${dayStart}::date
     GROUP BY minute_of_day
     ORDER BY minute_of_day
@@ -180,6 +184,8 @@ export async function get5Min(date?: Date): Promise<MinutePoint[]> {
   return rows.map((r) => ({
     minuteOfDay: Number(r.minute_of_day),
     pv: n(r.pv),
+    pv1: n(r.pv1),
+    pv2: n(r.pv2),
     load: n(r.load),
     soc: n(r.soc),
     batteryPower: n(r.battery_power),

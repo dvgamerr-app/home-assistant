@@ -10,6 +10,9 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.APP_BASE_URL ?? 'http://localhost:4321',
   basePath: '/api/auth',
+  onAPIError: {
+    errorURL: new URL('/login', process.env.APP_BASE_URL ?? 'http://localhost:4321').toString(),
+  },
   emailAndPassword: { enabled: true },
   ...(githubId && githubSecret
     ? {

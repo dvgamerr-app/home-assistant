@@ -1,8 +1,8 @@
 <script>
-  let { githubEnabled = false } = $props()
+  let { githubEnabled = false, initialError = '' } = $props()
   let email = $state('')
   let password = $state('')
-  let error = $state('')
+  let error = $state(initialError)
   let loading = $state(false)
 
   async function signIn(e) {

@@ -152,6 +152,8 @@ export async function getAll(date?: Date) {
     minuteOfDay: s.minuteOfDay,
     time: `${String(Math.floor(s.minuteOfDay / 60)).padStart(2, '0')}:${String(s.minuteOfDay % 60).padStart(2, '0')}`,
     pv: s.pv,
+    pv1: s.pv1,
+    pv2: s.pv2,
     load: s.load,
     net: +(s.pv - s.load).toFixed(2),
     batt: s.batteryPower,

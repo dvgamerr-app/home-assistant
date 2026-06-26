@@ -4,67 +4,36 @@ import type { SolarData } from '@/lib/solar-data'
 import ChartCard from '@/components/ui/ChartCard.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
 import DatePicker from '@/components/ui/DatePicker.svelte'
+import { buildFiveMinChartPayload } from '@/lib/solar-fivemin'
 
-const { fiveMin: POINTS, date } = Astro.props as Pick<SolarData, 'fiveMin'> & { date: string }
+const { fiveMin: POINTS, date, isToday, socketUrl } = Astro.props as Pick<SolarData, 'fiveMin'> & { date: string; isToday: boolean; socketUrl: string }
 
-const [VW, VH, ML, MT, MR, MB] = [560, 220, 4, 18, 8, 28]
-const [py0, py1] = [MT, VH - MB]
-const ph = py1 - py0
+const [VW, ML, MR] = [560, 4, 8]
 
 const now = new Date()
-const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-const isToday = date === todayISO
 const currentMinute = isToday ? now.getHours() * 60 + now.getMinutes() : 1439
-// ข้อมูลมาจาก recorded_at จริง จึงใช้ทุก point ที่ <= เวลาปัจจุบัน
-const active = POINTS.filter((p) => p.minuteOfDay <= currentMinute)
-
-// unified scale รองรับค่าลบ (battery charging)
-const battVals = active.map((h) => h.batt ?? 0)
-const gridVals = active.map((h) => h.grid ?? 0) // negative = importing from grid
-
-const dataMax = Math.max(...active.map((h) => Math.max(h.pv, h.load)), 1)
-const dataMin = Math.min(0, ...battVals, ...gridVals)
-
-// nice step: round up to 1 sig fig → equal interval both sides
-const rawStep = dataMax / 4
-const mag = Math.pow(10, Math.floor(Math.log10(rawStep)))
-const step = Math.ceil(rawStep / mag) * mag
-
-const numPos = Math.ceil(dataMax / step)
-const hasNegative = dataMin < -0.05
-const numNeg = hasNegative ? Math.ceil(Math.abs(dataMin) / step) : 0
-const scaleMax = numPos * step
-const scaleMin = -numNeg * step
-const range = scaleMax - scaleMin
-const norm = (v: number) => (v - scaleMin) / range
-
-const peakPv = Math.max(...POINTS.map((h) => h.pv))
-const peakLoad = Math.max(...POINTS.map((h) => h.load))
-const peakBattDis = Math.max(...battVals, 0)
-
-// y-axis ticks: equal interval, include 0 (JS draws grid lines; server only needs gridPct for HTML labels)
-const yTicks = [...Array.from({ length: numPos }, (_, i) => (numPos - i) * step), 0, ...(hasNegative ? Array.from({ length: numNeg }, (_, i) => -(i + 1) * step) : [])]
-const gridPct = yTicks.map((v) => +(((MT + (1 - norm(v)) * ph) / VH) * 100).toFixed(2))
-const yLabels = yTicks.map((v) => (v < 0 ? '−' : '') + num(Math.abs(v), 1))
-const tickNorms = yTicks.map((v) => norm(v))
+const initialChart = buildFiveMinChartPayload(
+  POINTS.map((point) => ({
+    minuteOfDay: point.minuteOfDay,
+    pv: point.pv,
+    pv1: point.pv1 ?? 0,
+    pv2: point.pv2 ?? 0,
+    load: point.load,
+    batt: point.batt ?? 0,
+    grid: point.grid ?? 0,
+  })),
+  currentMinute,
+)
+const { peakPv, peakLoad, peakBattDis, gridPct, yLabels } = initialChart
 const xLabels = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'))
 const padLeft = +((ML / VW) * 100).toFixed(2)
 const padRight = +((MR / VW) * 100).toFixed(2)
 
 // data passed to client-side draw()
 const chartJson = JSON.stringify({
-  pv: active.map((h) => h.pv),
-  load: active.map((h) => h.load),
-  batt: active.map((h) => h.batt ?? 0),
-  grid: active.map((h) => h.grid ?? 0),
-  times: active.map((h) => h.minuteOfDay),
-  scaleMin,
-  scaleMax,
-  hasNeg: hasNegative,
-  tickNorms,
-  gridPct,
-  yLabels,
+  ...initialChart,
   isToday,
+  socketUrl,
 })
 ---
 
@@ -158,6 +127,9 @@ const chartJson = JSON.stringify({
 </div>
 
 <script>
+  import { io } from 'socket.io-client'
+  import { SOCKET_CHANNELS } from '@/lib/socket'
+
   {
     const wrapEl = document.querySelector<HTMLElement>('.pv-chart-wrapper')
     const svg = wrapEl?.querySelector<SVGSVGElement>('svg')
@@ -177,6 +149,7 @@ const chartJson = JSON.stringify({
     let hasNeg: boolean = J.hasNeg
     let tickNorms: number[] = J.tickNorms
     const isToday: boolean = J.isToday
+    const socketUrl: string = J.socketUrl
 
     const nm = (v: number) => (v - scaleMin) / (scaleMax - scaleMin)
 
@@ -345,32 +318,53 @@ const chartJson = JSON.stringify({
         )
         .join('')
     }
-    async function refresh() {
-      try {
-        const r = await fetch('/api/solar/fivemin')
-        if (!r.ok) return
-        const d = await r.json()
-        pvAll = d.pv
-        loadAll = d.load
-        battAll = d.batt
-        gridAll = d.grid
-        times = d.times
-        scaleMin = d.scaleMin
-        scaleMax = d.scaleMax
-        hasNeg = d.hasNeg
-        tickNorms = d.tickNorms
-        draw()
-        updateYAxis(d.gridPct, d.yLabels)
-        const ppv = document.getElementById('pv-peak-pv')
-        if (ppv) ppv.textContent = numFmt(d.peakPv, 2)
-        const pld = document.getElementById('pv-peak-load')
-        if (pld) pld.textContent = numFmt(d.peakLoad, 2)
-        const pbt = document.getElementById('pv-peak-batt')
-        if (pbt) pbt.textContent = numFmt(d.peakBattDis, 2)
-      } catch {
-        /* network error — skip this tick */
-      }
+    function applyRealtime(d: {
+      pv: number[]
+      load: number[]
+      batt: number[]
+      grid: number[]
+      times: number[]
+      scaleMin: number
+      scaleMax: number
+      hasNeg: boolean
+      tickNorms: number[]
+      gridPct: number[]
+      yLabels: string[]
+      peakPv: number
+      peakLoad: number
+      peakBattDis: number
+    }) {
+      pvAll = d.pv
+      loadAll = d.load
+      battAll = d.batt
+      gridAll = d.grid
+      times = d.times
+      scaleMin = d.scaleMin
+      scaleMax = d.scaleMax
+      hasNeg = d.hasNeg
+      tickNorms = d.tickNorms
+      draw()
+      updateYAxis(d.gridPct, d.yLabels)
+      const ppv = document.getElementById('pv-peak-pv')
+      if (ppv) ppv.textContent = numFmt(d.peakPv, 2)
+      const pld = document.getElementById('pv-peak-load')
+      if (pld) pld.textContent = numFmt(d.peakLoad, 2)
+      const pbt = document.getElementById('pv-peak-batt')
+      if (pbt) pbt.textContent = numFmt(d.peakBattDis, 2)
     }
-    if (isToday) setInterval(refresh, 60_000)
+    if (isToday) {
+      const socket = io(socketUrl, { transports: ['websocket'] })
+      socket.on('connect', () => {
+        socket.emit('subscribe', SOCKET_CHANNELS.solarFiveMin)
+      })
+      socket.on(SOCKET_CHANNELS.solarFiveMin, applyRealtime)
+      window.addEventListener(
+        'pagehide',
+        () => {
+          socket.disconnect()
+        },
+        { once: true },
+      )
+    }
   }
 </script>

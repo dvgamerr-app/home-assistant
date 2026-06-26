@@ -3,6 +3,7 @@
   import { io } from 'socket.io-client'
   import { num } from '@/lib/electricity'
   import type { LiveSnapshot } from '@/lib/db'
+  import { SOCKET_CHANNELS } from '@/lib/socket'
   import Sun from '@lucide/svelte/icons/sun'
   import BatteryCharging from '@lucide/svelte/icons/battery-charging'
   import Battery from '@lucide/svelte/icons/battery'
@@ -55,11 +56,12 @@
     const socket = io(socketUrl, { transports: ['websocket'] })
     socket.on('connect', () => {
       connected = true
+      socket.emit('subscribe', SOCKET_CHANNELS.live)
     })
     socket.on('disconnect', () => {
       connected = false
     })
-    socket.on('live', (data: LiveSnapshot) => {
+    socket.on(SOCKET_CHANNELS.live, (data: LiveSnapshot) => {
       animateTo(
         'pv',
         () => pv,

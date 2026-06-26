@@ -1,0 +1,413 @@
+---
+import { num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
+import ChartCard from '@/components/ui/ChartCard.astro'
+import LegendRow from '@/components/ui/LegendRow.astro'
+import { buildFiveMinChartPayload } from '@/lib/solar-fivemin'
+
+const {
+  fiveMin: POINTS,
+  isToday,
+  ratedPowerKw,
+  socketUrl,
+} = Astro.props as Pick<SolarData, 'fiveMin'> & {
+  isToday: boolean
+  ratedPowerKw: number
+  socketUrl: string
+}
+
+const [VH, MT, MB] = [220, 18, 28]
+
+const now = new Date()
+const currentMinute = isToday ? now.getHours() * 60 + now.getMinutes() : 1439
+const initialChart = buildFiveMinChartPayload(
+  POINTS.map((point) => ({
+    minuteOfDay: point.minuteOfDay,
+    pv: point.pv,
+    pv1: point.pv1 ?? 0,
+    pv2: point.pv2 ?? 0,
+    load: point.load,
+    batt: point.batt ?? 0,
+    grid: point.grid ?? 0,
+  })),
+  currentMinute,
+)
+
+const safeRatedPowerKw = ratedPowerKw > 0 ? ratedPowerKw : 1
+const totalKwSeries = initialChart.pv2.map((value, index) => value + (initialChart.pv1[index] ?? 0))
+const latestPv1Kw = initialChart.pv1.at(-1) ?? 0
+const latestPv2Kw = initialChart.pv2.at(-1) ?? 0
+const latestPv1Pct = (latestPv1Kw / safeRatedPowerKw) * 100
+const latestPv2Pct = (latestPv2Kw / safeRatedPowerKw) * 100
+const peakPct = Math.max(...totalKwSeries.map((value) => (value / safeRatedPowerKw) * 100), 0)
+const latestMinute = initialChart.times.at(-1)
+const latestTimeLabel = latestMinute === undefined ? 'ยังไม่มีข้อมูล' : `${String(Math.floor(latestMinute / 60)).padStart(2, '0')}:${String(latestMinute % 60).padStart(2, '0')} น.`
+
+function scaleTopForPeak(peakPercent: number) {
+  return Math.max(100, Math.ceil(Math.max(peakPercent, 1) / 25) * 25)
+}
+
+function buildYAxis(scaleTop: number) {
+  const ticks = Array.from({ length: 5 }, (_, index) => scaleTop - (scaleTop / 4) * index)
+  const ph = VH - MT - MB
+  return {
+    yLabels: ticks.map((value) => `${num(value, 0)}%`),
+    gridPct: ticks.map((value) => +(((MT + (1 - value / scaleTop) * ph) / VH) * 100).toFixed(2)),
+  }
+}
+
+const { yLabels, gridPct } = buildYAxis(scaleTopForPeak(peakPct))
+
+const chartJson = JSON.stringify({
+  pv1: initialChart.pv1,
+  pv2: initialChart.pv2,
+  times: initialChart.times,
+  ratedPowerKw: safeRatedPowerKw,
+  isToday,
+  socketUrl,
+})
+---
+
+<ChartCard eyebrow="กำลังผลิต" title="อัตราการผลิตของโซลาร์" subtitle="แสดง MPPT 1 และ MPPT 2 ในกราฟเดียวกัน โดยให้ MPPT 2 เป็นฐานล่าง" class="overflow-hidden">
+  <div class="grid gap-4 border-b border-border/60 pb-5 md:grid-cols-3">
+    <div class="space-y-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">MPPT 1 ล่าสุด</p>
+      <p class="font-serif text-4xl font-light leading-none">
+        <span id="solar-rate-pv1-pct">{num(latestPv1Pct, 0)}</span><span class="ml-1 text-base text-muted-foreground">%</span>
+      </p>
+      <p class="text-sm text-chart-4"><span id="solar-rate-pv1-kw">{num(latestPv1Kw, 2)}</span> kW</p>
+    </div>
+    <div class="space-y-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">MPPT 2 ล่าสุด</p>
+      <p class="font-serif text-4xl font-light leading-none">
+        <span id="solar-rate-pv2-pct">{num(latestPv2Pct, 0)}</span><span class="ml-1 text-base text-muted-foreground">%</span>
+      </p>
+      <p class="text-sm text-chart-1"><span id="solar-rate-pv2-kw">{num(latestPv2Kw, 2)}</span> kW</p>
+    </div>
+    <div class="space-y-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">อ้างอิงกำลังติดตั้ง</p>
+      <p class="font-serif text-2xl font-light leading-none text-foreground">{num(safeRatedPowerKw, 0)} kW</p>
+      <p id="solar-rate-latest-time" class="text-sm text-muted-foreground">{latestTimeLabel}</p>
+    </div>
+  </div>
+
+  <div class="mt-5 flex items-start gap-1">
+    <div id="solar-rate-y-axis" class="relative h-56 shrink-0 overflow-visible md:h-60" style="width:2.1rem">
+      {
+        yLabels.map((label, index) => (
+          <span
+            class:list={['absolute right-0 text-right text-[9px] leading-none', index === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
+            style={`top:${gridPct[index]}%;transform:translateY(-50%)`}
+          >
+            {label}
+          </span>
+        ))
+      }
+    </div>
+    <div class="min-w-0 flex-1">
+      <div class="solar-rate-chart-wrapper h-56 w-full md:h-60" data-chart={chartJson}>
+        <svg width="100%" height="100%"></svg>
+      </div>
+      <div id="solar-rate-x-axis" class="mt-1 flex justify-between text-[9px] text-muted-foreground" style="padding-left:0.72%;padding-right:1.44%">
+        {Array.from({ length: 24 }, (_, i) => <span>{String(i).padStart(2, '0')}</span>)}
+      </div>
+    </div>
+  </div>
+
+  <LegendRow
+    class="mt-3"
+    items={[
+      { label: 'MPPT 1', color: 'var(--chart-4)' },
+      { label: 'MPPT 2', color: 'var(--chart-1)' },
+    ]}
+  >
+    <span class="flex items-center gap-2 text-xs text-muted-foreground">
+      <span class="inline-block h-px w-5 border-t-2 border-dashed opacity-70" style="border-color:var(--foreground)"></span>
+      MPPT 2 เป็นฐานล่าง และ MPPT 1 ซ้อนด้านบน
+    </span>
+  </LegendRow>
+</ChartCard>
+
+<div class="solar-rate-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:184px">
+  <p class="solar-rate-tip-hour mb-2 text-[10px] uppercase tracking-luxury text-muted-foreground"></p>
+  <div class="space-y-1.5">
+    <div class="flex items-center justify-between gap-4">
+      <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span class="inline-block h-px w-3 border-t-2 border-dashed opacity-80" style="border-color:var(--chart-4)"></span>MPPT 1
+      </span>
+      <span class="solar-rate-tip-pv1 font-mono text-[11px] text-foreground"></span>
+    </div>
+    <div class="flex items-center justify-between gap-4">
+      <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span class="inline-block h-px w-3 border-t-2 border-dashed opacity-80" style="border-color:var(--chart-1)"></span>MPPT 2
+      </span>
+      <span class="solar-rate-tip-pv2 font-mono text-[11px] text-foreground"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { io } from 'socket.io-client'
+  import { SOCKET_CHANNELS } from '@/lib/socket'
+
+  {
+    const wrapEl = document.querySelector('.solar-rate-chart-wrapper')
+    const svg = wrapEl?.querySelector('svg')
+    const tip = document.querySelector('.solar-rate-tip')
+    const xAxis = document.getElementById('solar-rate-x-axis')
+    const yAxis = document.getElementById('solar-rate-y-axis')
+    if (!wrapEl || !svg || !tip || !xAxis || !yAxis) throw new Error('solar-rate-chart: elements not found')
+
+    const J = JSON.parse(wrapEl.dataset.chart)
+    let pv1All = J.pv1
+    let pv2All = J.pv2
+    let times = J.times
+    const ratedPowerKw = J.ratedPowerKw
+    const isToday = J.isToday
+    const socketUrl = J.socketUrl
+
+    const clamp01 = (value) => Math.max(0, Math.min(1, value))
+    const toPct = (kw) => (ratedPowerKw > 0 ? (kw / ratedPowerKw) * 100 : 0)
+    const fmtKw = (kw) => `${kw.toFixed(2)} kW`
+    const fmtPct = (pct) => `${pct.toFixed(0)}%`
+    const fmtTime = (minuteOfDay) => `${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')} น.`
+
+    function totalSeries() {
+      return pv2All.map((value, index) => value + (pv1All[index] ?? 0))
+    }
+
+    function scaleTop() {
+      const peakPct = Math.max(...totalSeries().map(toPct), 0)
+      return Math.max(100, Math.ceil(Math.max(peakPct, 1) / 25) * 25)
+    }
+
+    function renderYAxis(maxPct) {
+      const ticks = Array.from({ length: 5 }, (_, index) => maxPct - (maxPct / 4) * index)
+      const chartHeight = 220
+      const topInset = 18
+      const bottomInset = 28
+      const plotHeight = chartHeight - topInset - bottomInset
+      yAxis.innerHTML = ticks
+        .map((value, index) => {
+          const top = (((topInset + (1 - value / maxPct) * plotHeight) / chartHeight) * 100).toFixed(2)
+          const cls = index === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground'
+          return `<span class="absolute right-0 text-right text-[9px] leading-none ${cls}" style="top:${top}%;transform:translateY(-50%)">${value.toFixed(0)}%</span>`
+        })
+        .join('')
+    }
+
+    function buildPoints(values, xMin, yMin, xMax, yMax, maxPct) {
+      return values.map((value, index) => ({
+        x: xMin + (times[index] / 1439) * (xMax - xMin),
+        y: yMin + (1 - clamp01(value / maxPct)) * (yMax - yMin),
+      }))
+    }
+
+    function smoothPath(values, xMin, yMin, xMax, yMax, maxPct) {
+      if (values.length < 2) return ''
+      const tension = 0.9
+      const pts = buildPoints(values, xMin, yMin, xMax, yMax, maxPct)
+      const slopes = pts.slice(0, -1).map((point, index) => (pts[index + 1].y - point.y) / (pts[index + 1].x - point.x))
+      const tangents = pts.map((_, index) => {
+        if (index === 0) return slopes[0]
+        if (index === pts.length - 1) return slopes[slopes.length - 1]
+        const prev = slopes[index - 1]
+        const next = slopes[index]
+        if (prev === 0 || next === 0 || Math.sign(prev) !== Math.sign(next)) return 0
+        return (2 * prev * next) / (prev + next)
+      })
+      slopes.forEach((slope, index) => {
+        if (slope === 0) {
+          tangents[index] = 0
+          tangents[index + 1] = 0
+          return
+        }
+        const a = tangents[index] / slope
+        const b = tangents[index + 1] / slope
+        const hypot = Math.hypot(a, b)
+        if (hypot > 3) {
+          const scale = 3 / hypot
+          tangents[index] = scale * a * slope
+          tangents[index + 1] = scale * b * slope
+        }
+      })
+      let path = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`
+      for (let index = 1; index < pts.length; index++) {
+        const prev = pts[index - 1]
+        const next = pts[index]
+        const dx = (next.x - prev.x) / 3
+        path += ` C ${(prev.x + dx * tension).toFixed(1)},${(prev.y + tangents[index - 1] * dx * tension).toFixed(1)} ${(next.x - dx * tension).toFixed(1)},${(next.y - tangents[index] * dx * tension).toFixed(1)} ${next.x.toFixed(1)},${next.y.toFixed(1)}`
+      }
+      return path
+    }
+
+    function stackAreaPath(topValues, bottomValues, xMin, yMin, xMax, yMax, maxPct) {
+      if (topValues.length === 0) return ''
+      const top = buildPoints(topValues, xMin, yMin, xMax, yMax, maxPct)
+      const bottom = buildPoints(bottomValues, xMin, yMin, xMax, yMax, maxPct).reverse()
+      return `M ${top.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' L ')} L ${bottom.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' L ')} Z`
+    }
+
+    let curPx0 = 0
+    let curPx1 = 0
+    let curW = 0
+    let crosshair = null
+
+    function syncSummary() {
+      const latestMinute = times.at(-1)
+      const latestPv1Kw = pv1All.at(-1) ?? 0
+      const latestPv2Kw = pv2All.at(-1) ?? 0
+      const latestPv1Pct = toPct(latestPv1Kw)
+      const latestPv2Pct = toPct(latestPv2Kw)
+
+      const pv1PctEl = document.getElementById('solar-rate-pv1-pct')
+      if (pv1PctEl) pv1PctEl.textContent = latestPv1Pct.toFixed(0)
+      const pv1KwEl = document.getElementById('solar-rate-pv1-kw')
+      if (pv1KwEl) pv1KwEl.textContent = latestPv1Kw.toFixed(2)
+      const pv2PctEl = document.getElementById('solar-rate-pv2-pct')
+      if (pv2PctEl) pv2PctEl.textContent = latestPv2Pct.toFixed(0)
+      const pv2KwEl = document.getElementById('solar-rate-pv2-kw')
+      if (pv2KwEl) pv2KwEl.textContent = latestPv2Kw.toFixed(2)
+      const latestTimeEl = document.getElementById('solar-rate-latest-time')
+      if (latestTimeEl) latestTimeEl.textContent = latestMinute === undefined ? 'ยังไม่มีข้อมูล' : fmtTime(latestMinute)
+    }
+
+    function draw() {
+      const w = wrapEl.clientWidth
+      const h = wrapEl.clientHeight
+      curW = w
+      const [ML, MT, MR, MB] = [4, 18, 8, 28]
+      const px0 = ML
+      const py0 = MT
+      const px1 = w - MR
+      const py1 = h - MB
+      const plotHeight = py1 - py0
+      curPx0 = px0
+      curPx1 = px1
+
+      svg.setAttribute('viewBox', `0 0 ${w} ${h}`)
+
+      const mppt1Pct = pv1All.map((value) => Math.max(0, toPct(value)))
+      const mppt2Pct = pv2All.map((value) => Math.max(0, toPct(value)))
+      const totalPct = mppt2Pct.map((value, index) => value + (mppt1Pct[index] ?? 0))
+      const maxPct = scaleTop()
+      renderYAxis(maxPct)
+
+      const mppt2Line = smoothPath(mppt2Pct, px0, py0, px1, py1, maxPct)
+      const mppt1TopLine = smoothPath(totalPct, px0, py0, px1, py1, maxPct)
+      const baseArea = stackAreaPath(
+        mppt2Pct,
+        mppt2Pct.map(() => 0),
+        px0,
+        py0,
+        px1,
+        py1,
+        maxPct,
+      )
+      const topArea = stackAreaPath(totalPct, mppt2Pct, px0, py0, px1, py1, maxPct)
+      const gridYs = Array.from({ length: 5 }, (_, index) => py0 + (plotHeight * index) / 4).map((value) => value.toFixed(1))
+
+      svg.innerHTML = `
+        <defs>
+          <linearGradient id="solar-rate-mppt2-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--chart-1)" stop-opacity="0.24"/>
+            <stop offset="100%" stop-color="var(--chart-1)" stop-opacity="0.04"/>
+          </linearGradient>
+          <linearGradient id="solar-rate-mppt1-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--chart-4)" stop-opacity="0.28"/>
+            <stop offset="100%" stop-color="var(--chart-4)" stop-opacity="0.04"/>
+          </linearGradient>
+          <clipPath id="solar-rate-clip"><rect x="${px0}" y="${py0}" width="${px1 - px0}" height="${plotHeight}"/></clipPath>
+        </defs>
+        <line x1="${px0}" x2="${px1}" y1="${py1}" y2="${py1}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"/>
+        ${gridYs.map((y) => `<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')}
+        <g clip-path="url(#solar-rate-clip)">
+          <path d="${baseArea}" fill="url(#solar-rate-mppt2-grad)"/>
+          <path d="${topArea}" fill="url(#solar-rate-mppt1-grad)"/>
+          <path d="${mppt2Line}" fill="none" stroke="var(--chart-1)" stroke-width="0.95" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" stroke-opacity="0.9"/>
+          <path d="${mppt1TopLine}" fill="none" stroke="var(--chart-4)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 3" stroke-opacity="0.9"/>
+        </g>
+        <line class="solar-rate-crosshair" x1="0" x2="0" y1="${py0}" y2="${py1}" stroke="var(--foreground)" stroke-opacity="0.2" stroke-width="0.5" visibility="hidden"/>
+        <rect x="${px0}" y="${py0}" width="${px1 - px0}" height="${plotHeight}" fill="transparent" style="cursor:crosshair"/>
+      `
+
+      crosshair = svg.querySelector('.solar-rate-crosshair')
+      xAxis.style.paddingLeft = ((ML / w) * 100).toFixed(2) + '%'
+      xAxis.style.paddingRight = ((MR / w) * 100).toFixed(2) + '%'
+      syncSummary()
+    }
+
+    let resizeTimer
+    const ro = new ResizeObserver(() => {
+      clearTimeout(resizeTimer)
+      resizeTimer = setTimeout(draw, 150)
+    })
+    ro.observe(wrapEl)
+    draw()
+
+    svg.addEventListener('mousemove', (event) => {
+      if (!crosshair) return
+      if (times.length === 0) {
+        tip.classList.add('hidden')
+        crosshair.setAttribute('visibility', 'hidden')
+        return
+      }
+      const rect = svg.getBoundingClientRect()
+      const sx = ((event.clientX - rect.left) / rect.width) * curW
+      if (sx < curPx0 || sx > curPx1) {
+        tip.classList.add('hidden')
+        crosshair.setAttribute('visibility', 'hidden')
+        return
+      }
+
+      const targetMin = ((sx - curPx0) / (curPx1 - curPx0)) * 1439
+      const idx = times.reduce((best, minuteOfDay, index) => (Math.abs(minuteOfDay - targetMin) < Math.abs(times[best] - targetMin) ? index : best), 0)
+      const cx = (curPx0 + (times[idx] / 1439) * (curPx1 - curPx0)).toFixed(1)
+
+      crosshair.setAttribute('x1', cx)
+      crosshair.setAttribute('x2', cx)
+      crosshair.setAttribute('visibility', 'visible')
+
+      tip.querySelector('.solar-rate-tip-hour').textContent = fmtTime(times[idx])
+      tip.querySelector('.solar-rate-tip-pv1').textContent = `${fmtPct(toPct(pv1All[idx] ?? 0))} • ${fmtKw(pv1All[idx] ?? 0)}`
+      tip.querySelector('.solar-rate-tip-pv2').textContent = `${fmtPct(toPct(pv2All[idx] ?? 0))} • ${fmtKw(pv2All[idx] ?? 0)}`
+      tip.classList.remove('hidden')
+      tip.style.left = Math.min(event.clientX + 14, window.innerWidth - 204) + 'px'
+      tip.style.top = Math.max(event.clientY - 96, 8) + 'px'
+    })
+
+    svg.addEventListener('mouseleave', () => {
+      tip.classList.add('hidden')
+      crosshair?.setAttribute('visibility', 'hidden')
+    })
+
+    if (isToday) {
+      const socket = io(socketUrl, { transports: ['websocket'] })
+      socket.on('connect', () => {
+        socket.emit('subscribe', SOCKET_CHANNELS.solarFiveMin)
+      })
+      socket.on(SOCKET_CHANNELS.solarFiveMin, (payload) => {
+        pv1All = payload.pv1 ?? pv1All
+        pv2All = payload.pv2 ?? pv2All
+        times = payload.times ?? times
+        draw()
+      })
+      window.addEventListener(
+        'pagehide',
+        () => {
+          ro.disconnect()
+          socket.disconnect()
+        },
+        { once: true },
+      )
+    } else {
+      window.addEventListener(
+        'pagehide',
+        () => {
+          ro.disconnect()
+        },
+        { once: true },
+      )
+    }
+  }
+</script>

@@ -5,6 +5,20 @@ import { auth } from '@/lib/auth'
 
 const session = await auth.api.getSession({ headers: Astro.request.headers })
 if (session) return Astro.redirect('/')
+
+const errorCode = Astro.url.searchParams.get('error')
+const errorDescription = Astro.url.searchParams.get('error_description')
+
+const ERROR_MESSAGES: Record<string, string> = {
+  email_not_found: 'ไม่พบบัญชีอีเมลจากผู้ให้บริการที่ใช้เข้าสู่ระบบ กรุณาใช้บัญชีที่เปิดเผยอีเมล หรือเข้าสู่ระบบด้วยอีเมลและรหัสผ่านแทน',
+  invalid_callback_request: 'คำขอเข้าสู่ระบบไม่สมบูรณ์ กรุณาเริ่มต้นใหม่อีกครั้ง',
+  oauth_provider_not_found: 'ยังไม่พบผู้ให้บริการที่ใช้เข้าสู่ระบบในระบบนี้ กรุณาลองใหม่อีกครั้ง',
+  invalid_code: 'รหัสยืนยันจากผู้ให้บริการไม่ถูกต้องหรือหมดอายุแล้ว กรุณาเริ่มต้นเข้าสู่ระบบใหม่อีกครั้ง',
+  unable_to_get_user_info: 'ไม่สามารถดึงข้อมูลบัญชีจากผู้ให้บริการได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง',
+  no_callback_url: 'ไม่พบปลายทางสำหรับกลับเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง',
+}
+
+const initialError = (errorCode && ERROR_MESSAGES[errorCode]) || errorDescription || (errorCode ? 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง' : '')
 ---
 
 <Layout title="เข้าสู่ระบบ — บ้าน">
@@ -16,7 +30,7 @@ if (session) return Astro.redirect('/')
       </div>
 
       <div class="rounded-xl border border-border/70 bg-card p-8">
-        <LoginForm client:load githubEnabled={!!process.env.GITHUB_CLIENT_ID} />
+        <LoginForm client:load githubEnabled={!!process.env.GITHUB_CLIENT_ID} initialError={initialError} />
       </div>
     </div>
   </main>

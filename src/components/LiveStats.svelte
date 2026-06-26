@@ -3,6 +3,7 @@
   import { onMount } from 'svelte'
   import { io } from 'socket.io-client'
   import { num } from '@/lib/electricity'
+  import { SOCKET_CHANNELS } from '@/lib/socket'
 
   let { socketUrl, pvPowerKw, batterySoc, gridPowerKw } = $props()
   // ponytail: untrack = intentional initial-value-only capture; socket overrides these
@@ -12,7 +13,10 @@
 
   onMount(() => {
     const socket = io(socketUrl, { transports: ['websocket'] })
-    socket.on('live', (data) => {
+    socket.on('connect', () => {
+      socket.emit('subscribe', SOCKET_CHANNELS.live)
+    })
+    socket.on(SOCKET_CHANNELS.live, (data) => {
       pv = data.pvPowerKw
       soc = data.batterySoc
       grid = data.gridPowerKw

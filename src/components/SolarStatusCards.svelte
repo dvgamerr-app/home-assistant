@@ -14,6 +14,7 @@
   import SunMedium from '@lucide/svelte/icons/sun-medium'
   import type { SolarData } from '@/lib/solar-data'
   import type { LiveSnapshot } from '@/lib/db'
+  import { SOCKET_CHANNELS } from '@/lib/socket'
 
   let { live: init, pvStrings, system, socketUrl }: { live: LiveSnapshot; pvStrings: SolarData['pvStrings']; system: SolarData['system']; socketUrl: string } = $props()
 
@@ -36,7 +37,10 @@
 
   onMount(() => {
     const socket = io(socketUrl, { transports: ['websocket'] })
-    socket.on('live', (d) => {
+    socket.on('connect', () => {
+      socket.emit('subscribe', SOCKET_CHANNELS.live)
+    })
+    socket.on(SOCKET_CHANNELS.live, (d) => {
       live = d
     })
     return () => socket.disconnect()

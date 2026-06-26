@@ -2,6 +2,8 @@ import { createServer } from 'http'
 import { Server } from 'socket.io'
 import { logger } from '../src/lib/logger.ts'
 import { getLiveSnapshot } from '../src/lib/db.ts'
+import { getTodayFiveMinChartPayload } from '../src/lib/solar-fivemin.ts'
+import { SOCKET_CHANNELS, isSocketChannel, normalizeSocketChannels } from '../src/lib/socket.ts'
 
 const PORT = parseInt(process.env.SOCKET_PORT ?? '3000')
 const POLL_MS = 60_000
@@ -13,22 +15,62 @@ const io = new Server(httpServer, {
 
 async function broadcast() {
   try {
-    const live = await getLiveSnapshot()
-    io.emit('live', live)
-    logger.debug({ clients: io.engine.clientsCount }, 'broadcast live')
+    const channels = [...io.sockets.adapter.rooms.keys()].filter((room) => isSocketChannel(room) && io.sockets.adapter.rooms.get(room)?.size)
+    await Promise.all(channels.map(async (channel) => emitChannel(io.to(channel), channel)))
+    logger.debug({ channels, clients: io.engine.clientsCount }, 'broadcast socket channels')
   } catch (err) {
     logger.error({ err }, 'broadcast error')
   }
 }
 
-io.on('connection', async (socket) => {
-  logger.info({ id: socket.id }, 'client connected')
-  try {
-    const live = await getLiveSnapshot()
-    socket.emit('live', live)
-  } catch (err) {
-    logger.error({ err }, 'initial snapshot error')
+async function getChannelPayload(channel) {
+  switch (channel) {
+    case SOCKET_CHANNELS.live:
+      return getLiveSnapshot()
+    case SOCKET_CHANNELS.solarFiveMin:
+      return getTodayFiveMinChartPayload()
+    default:
+      return null
   }
+}
+
+async function emitChannel(target, channel) {
+  const payload = await getChannelPayload(channel)
+  if (payload) target.emit(channel, payload)
+}
+
+io.on('connection', (socket) => {
+  logger.info({ id: socket.id }, 'client connected')
+
+  socket.on('subscribe', async (value) => {
+    const channels = normalizeSocketChannels(value)
+    if (channels.length === 0) return
+
+    try {
+      await Promise.all(
+        channels.map(async (channel) => {
+          await socket.join(channel)
+          await emitChannel(socket, channel)
+        }),
+      )
+      logger.debug({ id: socket.id, channels }, 'client subscribed')
+    } catch (err) {
+      logger.error({ err, id: socket.id, channels }, 'subscribe error')
+    }
+  })
+
+  socket.on('unsubscribe', async (value) => {
+    const channels = normalizeSocketChannels(value)
+    if (channels.length === 0) return
+
+    try {
+      await Promise.all(channels.map((channel) => socket.leave(channel)))
+      logger.debug({ id: socket.id, channels }, 'client unsubscribed')
+    } catch (err) {
+      logger.error({ err, id: socket.id, channels }, 'unsubscribe error')
+    }
+  })
+
   socket.on('disconnect', () => logger.info({ id: socket.id }, 'client disconnected'))
 })
 
