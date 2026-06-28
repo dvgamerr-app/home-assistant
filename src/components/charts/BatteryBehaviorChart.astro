@@ -1,0 +1,267 @@
+---
+import ChartCard from '@/components/ui/ChartCard.astro'
+import LegendRow from '@/components/ui/LegendRow.astro'
+import { num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
+
+type BatteryPoint = {
+  minuteOfDay: number
+  soc: number
+  batt: number
+  gridImport: number
+}
+
+const { fiveMin: points, dayFlow } = Astro.props as Pick<SolarData, 'fiveMin' | 'dayFlow'>
+
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
+const fmtMinute = (minuteOfDay: number) => `${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')}`
+
+function smoothLine(points: Array<{ x: number; y: number }>, tension = 0.9) {
+  if (points.length < 2) return ''
+
+  const curve = clamp01(tension)
+  const slopes = points.slice(0, -1).map((point, index) => {
+    const next = points[index + 1]
+    return (next.y - point.y) / Math.max(next.x - point.x, 1)
+  })
+  const tangents = points.map((_, index) => {
+    if (index === 0) return slopes[0]
+    if (index === points.length - 1) return slopes[slopes.length - 1]
+
+    const prev = slopes[index - 1]
+    const next = slopes[index]
+    if (prev === 0 || next === 0 || Math.sign(prev) !== Math.sign(next)) return 0
+    return (2 * prev * next) / (prev + next)
+  })
+
+  slopes.forEach((slope, index) => {
+    if (slope === 0) {
+      tangents[index] = 0
+      tangents[index + 1] = 0
+      return
+    }
+
+    const a = tangents[index] / slope
+    const b = tangents[index + 1] / slope
+    const h = Math.hypot(a, b)
+    if (h > 3) {
+      const scale = 3 / h
+      tangents[index] = scale * a * slope
+      tangents[index + 1] = scale * b * slope
+    }
+  })
+
+  let d = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`
+  for (let index = 1; index < points.length; index++) {
+    const previous = points[index - 1]
+    const current = points[index]
+    const dx = (current.x - previous.x) / 3
+    d += ` C ${(previous.x + dx * curve).toFixed(1)},${(previous.y + tangents[index - 1] * dx * curve).toFixed(1)} ${(current.x - dx * curve).toFixed(1)},${(current.y - tangents[index] * dx * curve).toFixed(1)} ${current.x.toFixed(1)},${current.y.toFixed(1)}`
+  }
+  return d
+}
+
+const rawBatteryPoints: BatteryPoint[] = points.map((point) => ({
+  minuteOfDay: point.minuteOfDay,
+  soc: point.soc ?? 0,
+  batt: point.batt ?? 0,
+  gridImport: Math.max(-(point.grid ?? 0), 0),
+}))
+
+const SOC_EPSILON = 0.35
+const POWER_EPSILON = 0.08
+const DISPLAY_START_MINUTE = 5 * 60 + 30
+const DISPLAY_END_MINUTE = 24 * 60
+
+const windowPoints = rawBatteryPoints.filter((point) => point.minuteOfDay >= DISPLAY_START_MINUTE && point.minuteOfDay <= DISPLAY_END_MINUTE - 1)
+
+const sameState = (left: BatteryPoint, right: BatteryPoint) =>
+  Math.abs(left.soc - right.soc) < SOC_EPSILON && Math.abs(left.batt - right.batt) < POWER_EPSILON && Math.abs(left.gridImport - right.gridImport) < POWER_EPSILON
+
+const focusPoints = windowPoints.filter((point, index, source) => {
+  if (source.length <= 2 || index === 0 || index === source.length - 1) return true
+  return !sameState(point, source[index - 1]) || !sameState(point, source[index + 1])
+})
+
+const fallbackPoint = windowPoints.at(-1) ?? rawBatteryPoints.at(-1) ?? { minuteOfDay: DISPLAY_START_MINUTE, soc: 0, batt: 0, gridImport: 0 }
+const chartPoints =
+  focusPoints.length > 1
+    ? focusPoints
+    : [
+        { ...fallbackPoint, minuteOfDay: DISPLAY_START_MINUTE },
+        { ...fallbackPoint, minuteOfDay: Math.max(DISPLAY_START_MINUTE + 5, Math.min(DISPLAY_END_MINUTE - 1, fallbackPoint.minuteOfDay || DISPLAY_START_MINUTE + 5)) },
+      ]
+
+const startMinute = DISPLAY_START_MINUTE
+const endMinute = DISPLAY_END_MINUTE
+const minuteRange = endMinute - startMinute
+
+const [VW, VH, ML, MT, MR, MB] = [560, 220, 4, 16, 8, 28]
+const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
+const ph = py1 - py0
+
+const xForMinute = (minuteOfDay: number) => px0 + ((minuteOfDay - startMinute) / minuteRange) * (px1 - px0)
+const yForNormalized = (value: number) => py0 + (1 - clamp01(value)) * ph
+
+const socLinePoints = chartPoints.map((point) => ({
+  x: xForMinute(point.minuteOfDay),
+  y: yForNormalized(point.soc / 100),
+}))
+const socPath = smoothLine(socLinePoints)
+const socArea = `${socPath} L ${socLinePoints.at(-1)?.x.toFixed(1)},${py1} L ${socLinePoints[0]?.x.toFixed(1)},${py1} Z`
+
+const battAbsMax = Math.max(...windowPoints.map((point) => Math.abs(point.batt)), ...windowPoints.map((point) => point.gridImport), 0.5)
+const scaleMin = -battAbsMax
+const scaleMax = battAbsMax
+const normPower = (value: number) => (value - scaleMin) / (scaleMax - scaleMin)
+
+const battLinePoints = chartPoints.map((point) => ({
+  x: xForMinute(point.minuteOfDay),
+  y: yForNormalized(normPower(point.batt)),
+}))
+const gridLinePoints = chartPoints.map((point) => ({
+  x: xForMinute(point.minuteOfDay),
+  y: yForNormalized(normPower(point.gridImport)),
+}))
+
+const battPath = smoothLine(battLinePoints)
+const gridPath = smoothLine(gridLinePoints)
+const zeroY = yForNormalized(normPower(0))
+const powerTicks = [battAbsMax, battAbsMax * 0.5, 0, -battAbsMax * 0.5, -battAbsMax]
+const powerTickLabels = powerTicks.map((tick) => (tick < 0 ? '−' : '') + num(Math.abs(tick), 1))
+const powerGridYs = powerTicks.map((tick) => yForNormalized(normPower(tick)))
+
+const chargeMinutes = windowPoints.reduce((total, point, index, source) => {
+  const next = source[index + 1]
+  if (!next || point.batt >= -POWER_EPSILON) return total
+  return total + Math.max(next.minuteOfDay - point.minuteOfDay, 0)
+}, 0)
+const activeWindowLabel = `${fmtMinute(startMinute)}–${fmtMinute(endMinute)}`
+const maxGridImportKw = Math.max(...windowPoints.map((point) => point.gridImport), 0)
+const socTicks = [100, 50, 0]
+const socGridYs = socTicks.map((tick) => yForNormalized(tick / 100))
+const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
+---
+
+<ChartCard eyebrow="แบตเตอรี่" title="พฤติกรรมการชาร์จและการจ่ายไฟ" subtitle="ดูระดับแบตเตอรี่ควบคู่กับจังหวะที่แบตตอบสนองโหลดของบ้าน โดยแสดงเฉพาะช่วงที่ค่ามีการเปลี่ยนแปลง">
+  <div class="grid gap-4 border-b border-border/60 pb-5 md:grid-cols-4">
+    <div class="space-y-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">SOC ล่าสุด</p>
+      <p class="font-serif text-4xl font-light leading-none text-foreground">{num(points.at(-1)?.soc ?? 0, 0)}<span class="ml-1 text-base text-muted-foreground">%</span></p>
+    </div>
+    <div class="space-y-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">จ่ายออกสูงสุด</p>
+      <p class="font-serif text-2xl font-light leading-none text-foreground" style="color:var(--chart-1)">
+        {num(dayFlow.peakBatteryDischargeKw, 2)}<span class="ml-1 text-base text-muted-foreground">kW</span>
+      </p>
+    </div>
+    <div class="space-y-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ซื้อไฟสูงสุด</p>
+      <p class="font-serif text-2xl font-light leading-none text-foreground" style="color:var(--chart-4)">{num(maxGridImportKw, 2)}<span class="ml-1 text-base text-muted-foreground">kW</span></p>
+    </div>
+    <div class="space-y-1 md:text-right">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ช่วงที่แสดง</p>
+      <p class="font-serif text-xl font-light leading-none text-foreground">{activeWindowLabel}</p>
+      <p class="text-sm text-muted-foreground">ชาร์จอยู่ประมาณ {num(chargeMinutes / 60, 1)} ชม.</p>
+    </div>
+  </div>
+
+  <div class="mt-5 grid gap-5 lg:grid-cols-2">
+    <div>
+      <div class="mb-2 flex items-center justify-between text-[10px] uppercase tracking-luxury text-muted-foreground">
+        <span>ระดับแบตเตอรี่</span>
+        <span>100% / 50% / 0%</span>
+      </div>
+      <div class="flex items-start gap-1">
+        <div class="relative h-44 shrink-0 overflow-visible" style="width:1.75rem">
+          {
+            socGridYs.map((tickY, index) => (
+              <span class="absolute right-0 text-right text-[9px] leading-none text-muted-foreground" style={`top:${((tickY / VH) * 100).toFixed(2)}%;transform:translateY(-50%)`}>
+                {socTicks[index]}%
+              </span>
+            ))
+          }
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="h-44 w-full">
+            <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
+              <defs>
+                <linearGradient id="battery-soc-grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="var(--chart-1)" stop-opacity="0.3"></stop>
+                  <stop offset="100%" stop-color="var(--chart-1)" stop-opacity="0"></stop>
+                </linearGradient>
+              </defs>
+              {
+                socTicks.map((tick) => (
+                  <line x1={px0} x2={px1} y1={py0 + (1 - tick / 100) * ph} y2={py0 + (1 - tick / 100) * ph} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />
+                ))
+              }
+              <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
+              <path d={socArea} fill="url(#battery-soc-grad)"></path>
+              <path d={socPath} fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap={'round' as const} stroke-linejoin={'round' as const}></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+      <div class="mt-1 grid grid-cols-5 text-[9px] text-muted-foreground">
+        {xLabels.map((label, index) => <span class:list={['text-center', index === 0 ? 'text-left' : index === xLabels.length - 1 ? 'text-right' : '']}>{label}</span>)}
+      </div>
+    </div>
+
+    <div>
+      <div class="mb-2 flex items-center justify-between text-[10px] uppercase tracking-luxury text-muted-foreground">
+        <span>แบตเตอรี่เทียบกับการซื้อไฟ</span>
+        <span>+ จ่ายออก / − ชาร์จ</span>
+      </div>
+      <div class="flex items-start gap-1">
+        <div class="relative h-44 shrink-0 overflow-visible" style="width:1.75rem">
+          {
+            powerGridYs.map((tickY, index) => (
+              <span
+                class:list={['absolute right-0 text-right text-[9px] leading-none', powerTicks[index] === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
+                style={`top:${((tickY / VH) * 100).toFixed(2)}%;transform:translateY(-50%)`}
+              >
+                {powerTickLabels[index]}
+              </span>
+            ))
+          }
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="h-44 w-full">
+            <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
+              {
+                powerGridYs.map((tickY, index) => (
+                  <line
+                    x1={px0}
+                    x2={px1}
+                    y1={tickY}
+                    y2={tickY}
+                    stroke="var(--border)"
+                    stroke-opacity={powerTicks[index] === 0 ? '0.6' : '0.4'}
+                    stroke-width={powerTicks[index] === 0 ? '0.8' : '0.5'}
+                    stroke-dasharray={powerTicks[index] === 0 ? undefined : '2 4'}
+                  />
+                ))
+              }
+              <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
+              <text x={px0 + 4} y={zeroY - 6} font-size="8" fill="var(--muted-foreground)" letter-spacing="0.5">จ่ายออก / ซื้อ</text>
+              <text x={px0 + 4} y={zeroY + 12} font-size="8" fill="var(--muted-foreground)" letter-spacing="0.5">ชาร์จ / ไม่ซื้อ</text>
+              <path d={gridPath} fill="none" stroke="var(--chart-4)" stroke-width="1.1" stroke-linecap={'round' as const} stroke-linejoin={'round' as const} stroke-dasharray="5 2"></path>
+              <path d={battPath} fill="none" stroke="var(--chart-1)" stroke-width="1.9" stroke-linecap={'round' as const} stroke-linejoin={'round' as const}></path>
+            </svg>
+          </div>
+          <div class="mt-1 grid grid-cols-5 text-[9px] text-muted-foreground">
+            {xLabels.map((label, index) => <span class:list={['text-center', index === 0 ? 'text-left' : index === xLabels.length - 1 ? 'text-right' : '']}>{label}</span>)}
+          </div>
+        </div>
+      </div>
+
+      <LegendRow class="mt-3" items={[{ label: 'แบตเตอรี่ (kW) · บวก=จ่ายออก ลบ=ชาร์จ', color: 'var(--chart-1)' }]}>
+        <span class="flex items-center gap-2 text-xs text-muted-foreground">
+          <span class="inline-block h-px w-5 border-t-2 border-dashed" style="border-color:var(--chart-4)"></span>
+          กริด (kW) · บวก=ซื้อไฟ
+        </span>
+      </LegendRow>
+    </div>
+  </div>
+</ChartCard>

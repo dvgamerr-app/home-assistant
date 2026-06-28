@@ -7,7 +7,7 @@ import StatCard from './StatCard.astro'
 import ChartCard from './ui/ChartCard.astro'
 import LegendRow from './ui/LegendRow.astro'
 import { svgStackedBars } from '@/lib/chart'
-import { thb, num } from '@/lib/electricity'
+import { calculateMonthlyBill, num, thb } from '@/lib/electricity'
 import type { MonthLoad } from '@/lib/solar-data'
 
 interface Props {
@@ -24,7 +24,6 @@ interface Props {
 
 const { today: TODAY, day: DAY, monthDays: MONTH_DAYS, monthLabel, isCurrentMonth = true, selMonthTotals, prevMonthSummary, availableMonths, selectedMonth } = Astro.props
 
-// สถิติสำหรับ stat cards — today สำหรับเดือนปัจจุบัน, สรุปรวมสำหรับเดือนที่ผ่านมา
 const S = isCurrentMonth
   ? {
       generated: TODAY.generated,
@@ -38,22 +37,76 @@ const S = isCurrentMonth
       generationHours: TODAY.generationHours,
     }
   : { ...selMonthTotals!, generationHours: undefined }
-const period = isCurrentMonth ? 'วันนี้' : 'เดือนรวม'
 
-// SVG stacked bar: [gridImport, selfUse] per day — grid อยู่ล่าง
-const VW = 560,
-  VH = 280,
-  ML = 4,
-  MT = 8,
-  MR = 8,
-  MB = 24
+const period = isCurrentMonth ? 'วันนี้' : 'รวมทั้งเดือน'
+
+const monthRollup = MONTH_DAYS.reduce(
+  (acc, dayPoint) => ({
+    generated: acc.generated + dayPoint.generated,
+    consumed: acc.consumed + dayPoint.consumed,
+    gridImport: acc.gridImport + dayPoint.gridImport,
+    selfUse: acc.selfUse + dayPoint.selfUse,
+  }),
+  {
+    generated: 0,
+    consumed: 0,
+    gridImport: 0,
+    selfUse: 0,
+  },
+)
+
+const monthBillWithSolar = calculateMonthlyBill(monthRollup.gridImport)
+const monthBillWithoutSolar = calculateMonthlyBill(monthRollup.consumed)
+const currentMonthSummary = {
+  ...monthRollup,
+  savedTHB: Math.max(0, monthBillWithoutSolar.total - monthBillWithSolar.total),
+}
+
+const pctChange = (current: number, previous: number) => (previous > 0 ? ((current - previous) / previous) * 100 : null)
+
+const monthComparison = prevMonthSummary && [
+  {
+    label: 'ผลิตได้',
+    current: `${num(currentMonthSummary.generated, 1)} kWh`,
+    previous: `${num(prevMonthSummary.totals.generated, 1)} kWh`,
+    delta: pctChange(currentMonthSummary.generated, prevMonthSummary.totals.generated),
+    accent: 'text-chart-2',
+  },
+  {
+    label: 'ใช้ไฟรวม',
+    current: `${num(currentMonthSummary.consumed, 1)} kWh`,
+    previous: `${num(prevMonthSummary.totals.consumed, 1)} kWh`,
+    delta: pctChange(currentMonthSummary.consumed, prevMonthSummary.totals.consumed),
+    accent: 'text-foreground',
+  },
+  {
+    label: 'ซื้อจากกริด',
+    current: `${num(currentMonthSummary.gridImport, 1)} kWh`,
+    previous: `${num(prevMonthSummary.totals.gridImport, 1)} kWh`,
+    delta: pctChange(currentMonthSummary.gridImport, prevMonthSummary.totals.gridImport),
+    accent: 'text-chart-4',
+  },
+  {
+    label: 'ประหยัดได้',
+    current: thb(currentMonthSummary.savedTHB, 0),
+    previous: thb(prevMonthSummary.totals.savedTHB, 0),
+    delta: pctChange(currentMonthSummary.savedTHB, prevMonthSummary.totals.savedTHB),
+    accent: 'text-chart-1',
+  },
+]
+
+const VW = 560
+const VH = 280
+const ML = 4
+const MT = 8
+const MR = 8
+const MB = 24
 const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
 const ph = py1 - py0
 
-const maxTotal = Math.max(...MONTH_DAYS.map((d) => d.selfUse + d.gridImport), 1)
-
+const maxTotal = Math.max(...MONTH_DAYS.map((dayPoint) => dayPoint.selfUse + dayPoint.gridImport), 1)
 const bars = svgStackedBars(
-  MONTH_DAYS.map((d) => [d.gridImport, d.selfUse]),
+  MONTH_DAYS.map((dayPoint) => [dayPoint.gridImport, dayPoint.selfUse]),
   px0,
   py0,
   px1,
@@ -61,21 +114,19 @@ const bars = svgStackedBars(
   0.15,
 )
 
-const gridLines = [0.25, 0.5, 0.75, 1].map((f) => ({
-  y: +(py0 + (1 - f) * ph).toFixed(1),
-  label: num(+(f * maxTotal).toFixed(1), 1),
-  isMax: f === 1,
+const gridLines = [0.25, 0.5, 0.75, 1].map((fraction) => ({
+  y: +(py0 + (1 - fraction) * ph).toFixed(1),
+  label: num(+(fraction * maxTotal).toFixed(1), 1),
+  isMax: fraction === 1,
 }))
 
 const padLeft = +((ML / VW) * 100).toFixed(2)
 const padRight = +((MR / VW) * 100).toFixed(2)
-
 const segColors = ['var(--chart-4)', 'var(--chart-1)']
 const segOpacity = [0.35, 0.85]
 ---
 
 <div class="space-y-6">
-  <!-- Stat cards -->
   <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
     <StatCard
       label={`ผลิตไฟ${period}`}
@@ -85,10 +136,10 @@ const segOpacity = [0.35, 0.85]
     >
       <Sun slot="icon" size={18} strokeWidth={1.25} />
     </StatCard>
-    <StatCard label={`ใช้ไฟ${period}`} value={`${num(S.consumed, 1)} kWh`} sub={`ใช้จากแสงอาทิตย์ ${num(S.selfUse, 1)} kWh`} accent="blue">
+    <StatCard label={`ใช้ไฟ${period}`} value={`${num(S.consumed, 1)} kWh`} sub={`ใช้จากโซลาร์ ${num(S.selfUse, 1)} kWh`} accent="blue">
       <Plug slot="icon" size={18} strokeWidth={1.25} />
     </StatCard>
-    <StatCard label={`ประหยัด${period}`} value={thb(S.savedTHB, 0)} sub={`ถ้าไม่มีโซลาร์จ่าย ${thb(S.wouldHaveCostTHB, 0)}`} trend={`${num(S.selfSufficiency, 0)}% พึ่งตัวเอง`} accent="sage">
+    <StatCard label={`ประหยัด${period}`} value={thb(S.savedTHB, 0)} sub={`หากไม่มีโซลาร์จะจ่าย ${thb(S.wouldHaveCostTHB, 0)}`} trend={`${num(S.selfSufficiency, 0)}% พึ่งพาตัวเอง`} accent="sage">
       <PiggyBank slot="icon" size={18} strokeWidth={1.25} />
     </StatCard>
     <StatCard label={`ค่าไฟจากกริด${period}`} value={thb(S.gridCostTHB, 0)} sub={`ซื้อจากการไฟฟ้า ${num(S.gridImport, 1)} kWh`} accent="terracotta">
@@ -96,8 +147,7 @@ const segOpacity = [0.35, 0.85]
     </StatCard>
   </div>
 
-  <!-- Bar chart -->
-  <ChartCard title="ไฟที่ใช้แต่ละวัน — จากโซลาร์ เทียบกับ ซื้อ" subtitle={`เดือน${monthLabel} · หน่วยเป็น kWh ต่อวัน`}>
+  <ChartCard title="ไฟที่ใช้แต่ละวัน จากโซลาร์เทียบกับที่ซื้อ" subtitle={`เดือน${monthLabel} · หน่วยเป็น kWh ต่อวัน`}>
     {
       availableMonths && availableMonths.length > 0 && (
         <label slot="header-action" class="relative inline-flex items-center">
@@ -105,9 +155,9 @@ const segOpacity = [0.35, 0.85]
             onchange="location.href='?m='+this.value"
             class="min-w-28 cursor-pointer appearance-none rounded border border-border/60 bg-card py-1.5 pl-3 pr-7 text-[10px] uppercase tracking-luxury text-muted-foreground outline-none transition-colors hover:border-foreground/30 hover:text-foreground focus:border-foreground/30 focus:text-foreground"
           >
-            {availableMonths.map((m) => (
-              <option value={m.value} selected={m.value === selectedMonth}>
-                {m.label}
+            {availableMonths.map((month) => (
+              <option value={month.value} selected={month.value === selectedMonth}>
+                {month.label}
               </option>
             ))}
           </select>
@@ -127,39 +177,51 @@ const segOpacity = [0.35, 0.85]
         </label>
       )
     }
+
     <div class="flex items-start gap-1">
       <div class="relative shrink-0 overflow-visible" style="width:1.75rem;height:280px">
         {
-          gridLines.map((g) => (
+          gridLines.map((gridLine) => (
             <span
-              class:list={['absolute right-0 text-right text-[9px] leading-none', g.isMax ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
-              style={`top:${((g.y / VH) * 100).toFixed(2)}%;transform:translateY(-50%)`}
+              class:list={['absolute right-0 text-right text-[9px] leading-none', gridLine.isMax ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
+              style={`top:${((gridLine.y / VH) * 100).toFixed(2)}%;transform:translateY(-50%)`}
             >
-              {g.label}
+              {gridLine.label}
             </span>
           ))
         }
       </div>
+
       <div class="min-w-0 flex-1">
         <div class="chart-frame">
           <svg class="daily-chart-svg" viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
-            {gridLines.map((g) => <line x1={px0} x2={px1} y1={g.y} y2={g.y} stroke="var(--border)" stroke-opacity={g.isMax ? '0.4' : '0.8'} stroke-width="0.5" stroke-dasharray="2 4" />)}
-            {bars.map((segs) => segs.map((seg, j) => (seg.h > 0 ? <rect x={seg.x} y={seg.y} width={seg.w} height={seg.h} rx={seg.rx} fill={segColors[j]} fill-opacity={segOpacity[j]} /> : null)))}
+            {
+              gridLines.map((gridLine) => (
+                <line x1={px0} x2={px1} y1={gridLine.y} y2={gridLine.y} stroke="var(--border)" stroke-opacity={gridLine.isMax ? '0.4' : '0.8'} stroke-width="0.5" stroke-dasharray="2 4" />
+              ))
+            }
+            {
+              bars.map((segments) =>
+                segments.map((segment, index) =>
+                  segment.h > 0 ? <rect x={segment.x} y={segment.y} width={segment.w} height={segment.h} rx={segment.rx} fill={segColors[index]} fill-opacity={segOpacity[index]} /> : null,
+                ),
+              )
+            }
             <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5"></line>
             <line x1={px0} x2={px0} y1={py0} y2={py1} stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5"></line>
             {
-              bars.map((segs, i) => (
+              bars.map((segments, index) => (
                 <rect
                   class="bar-hit"
-                  x={segs[0].x}
+                  x={segments[0].x}
                   y={py0}
-                  width={segs[0].w}
+                  width={segments[0].w}
                   height={ph}
                   fill="transparent"
-                  data-day={MONTH_DAYS[i].day}
-                  data-solar={num(MONTH_DAYS[i].selfUse, 1)}
-                  data-grid={num(MONTH_DAYS[i].gridImport, 1)}
-                  data-total={num(MONTH_DAYS[i].selfUse + MONTH_DAYS[i].gridImport, 1)}
+                  data-day={MONTH_DAYS[index].day}
+                  data-solar={num(MONTH_DAYS[index].selfUse, 1)}
+                  data-grid={num(MONTH_DAYS[index].gridImport, 1)}
+                  data-total={num(MONTH_DAYS[index].selfUse + MONTH_DAYS[index].gridImport, 1)}
                   style="cursor:crosshair"
                 />
               ))
@@ -167,7 +229,7 @@ const segOpacity = [0.35, 0.85]
           </svg>
         </div>
         <div class="mt-1 grid text-[9px] text-muted-foreground" style={`grid-template-columns:repeat(${MONTH_DAYS.length},1fr);padding-left:${padLeft}%;padding-right:${padRight}%`}>
-          {MONTH_DAYS.map((d) => <span class="truncate text-center">{d.day}</span>)}
+          {MONTH_DAYS.map((dayPoint) => <span class="truncate text-center">{dayPoint.day}</span>)}
         </div>
       </div>
     </div>
@@ -181,7 +243,33 @@ const segOpacity = [0.35, 0.85]
     />
   </ChartCard>
 
-  <!-- Tooltip -->
+  {
+    monthComparison && (
+      <section class="rounded-lg border border-border/70 bg-card px-6 py-5">
+        <div class="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+          <div>
+            <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">เทียบเดือนที่กำลังดู</p>
+            <h2 class="mt-1 font-serif text-lg font-light text-foreground">
+              {monthLabel} เทียบกับ {prevMonthSummary.label}
+            </h2>
+          </div>
+          <p class="text-xs text-muted-foreground">ช่วยดูทั้งการผลิต การใช้ การซื้อจากกริด และมูลค่าที่ประหยัดได้ในมุมเดียว</p>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {monthComparison.map((item) => (
+            <div class="rounded-md border border-border/60 p-4">
+              <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">{item.label}</p>
+              <p class:list={['mt-2 font-serif text-2xl font-light', item.accent]}>{item.current}</p>
+              <p class="mt-1 text-xs text-muted-foreground">เดือนก่อน {item.previous}</p>
+              <p class="mt-1 text-xs text-muted-foreground">{item.delta === null ? 'ยังไม่มีค่าที่เทียบได้' : `${item.delta > 0 ? '+' : ''}${num(item.delta, 0)}% จากเดือนก่อน`}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+    )
+  }
+
   <div class="daily-chart-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:140px;transition:opacity 0.1s">
     <p class="tip-day mb-2 text-[10px] uppercase tracking-luxury text-muted-foreground"></p>
     <div class="space-y-1.5">
@@ -204,7 +292,6 @@ const segOpacity = [0.35, 0.85]
     </div>
   </div>
 
-  <!-- Previous month summary -->
   {
     prevMonthSummary && (
       <section class="rounded-lg border border-border/70 bg-card px-6 py-5">
@@ -231,7 +318,7 @@ const segOpacity = [0.35, 0.85]
           <div>
             <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ประหยัดได้</p>
             <p class="mt-1.5 font-serif text-2xl font-light text-chart-1">{thb(prevMonthSummary.totals.savedTHB, 0)}</p>
-            <p class="mt-0.5 text-xs text-muted-foreground">เทียบไม่มีโซลาร์</p>
+            <p class="mt-0.5 text-xs text-muted-foreground">เทียบกรณีไม่มีโซลาร์</p>
           </div>
         </div>
       </section>
@@ -248,22 +335,22 @@ const segOpacity = [0.35, 0.85]
       const gridEl = tip.querySelector('.tip-grid')!
       const totalEl = tip.querySelector('.tip-total')!
 
-      document.querySelectorAll<SVGRectElement>('.bar-hit').forEach((r) => {
-        r.addEventListener('mouseenter', (e) => {
-          const d = (e.currentTarget as SVGRectElement).dataset
-          dayEl.textContent = 'วันที่ ' + d.day
-          solarEl.textContent = d.solar + ' kWh'
-          gridEl.textContent = d.grid + ' kWh'
-          totalEl.textContent = d.total + ' kWh'
+      document.querySelectorAll<SVGRectElement>('.bar-hit').forEach((rect) => {
+        rect.addEventListener('mouseenter', (event) => {
+          const data = (event.currentTarget as SVGRectElement).dataset
+          dayEl.textContent = 'วันที่ ' + data.day
+          solarEl.textContent = data.solar + ' kWh'
+          gridEl.textContent = data.grid + ' kWh'
+          totalEl.textContent = data.total + ' kWh'
           tip.classList.remove('hidden')
         })
-        r.addEventListener('mousemove', (e) => {
-          const x = Math.min(e.clientX + 14, window.innerWidth - 160)
-          const y = Math.max(e.clientY - 70, 8)
+        rect.addEventListener('mousemove', (event) => {
+          const x = Math.min(event.clientX + 14, window.innerWidth - 160)
+          const y = Math.max(event.clientY - 70, 8)
           tip.style.left = x + 'px'
           tip.style.top = y + 'px'
         })
-        r.addEventListener('mouseleave', () => tip.classList.add('hidden'))
+        rect.addEventListener('mouseleave', () => tip.classList.add('hidden'))
       })
     }
   }

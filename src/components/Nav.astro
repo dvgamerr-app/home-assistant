@@ -13,16 +13,14 @@ const parts = displayName.split(/\s+/).filter(Boolean)
 const initials = (parts.length > 1 ? parts[0][0] + parts[1][0] : displayName.slice(0, 2)).toUpperCase()
 
 const path = Astro.url.pathname
-// real routes are wired; Rooms/Scenes/Security are shell placeholders (luxury home-hub framing)
 const NAV = [
-  { label: 'Overview', href: '/' },
-  { label: 'Rooms', href: '#' },
-  { label: 'Scenes', href: '#' },
-  { label: 'Energy', href: '/electricity' },
-  { label: 'Security', href: '#' },
+  { label: 'ภาพรวม', href: '/' },
+  { label: 'ห้องต่าง ๆ', href: '#' },
+  { label: 'โหมดบ้าน', href: '#' },
+  { label: 'พลังงาน', href: '/electricity' },
+  { label: 'ความปลอดภัย', href: '#' },
 ]
 const isActive = (href: string) => (href === '/' ? path === '/' : href !== '#' && path.startsWith(href))
-// literal const avoids string-widening from the custom LibraryManagedAttributes in env.d.ts
 const btn = 'button' as const
 ---
 
@@ -35,7 +33,7 @@ const btn = 'button' as const
       <span class="font-serif text-xl tracking-wide">OurKK</span>
     </a>
 
-    <nav aria-label="Primary" class="hidden items-center gap-8 md:flex">
+    <nav aria-label="เมนูหลัก" class="hidden items-center gap-8 md:flex">
       {
         NAV.map((item) => (
           <a
@@ -51,19 +49,18 @@ const btn = 'button' as const
   </div>
 
   <div class="flex items-center gap-2">
-    {/* ponytail: Search/Bell/Settings are shell placeholders — wire them when those features exist */}
-    <button type={btn} aria-label="Search" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+    <button type={btn} aria-label="ค้นหา" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
       <Search size={16} strokeWidth={1.25} />
     </button>
     <button
       type={btn}
-      aria-label="Notifications"
+      aria-label="การแจ้งเตือน"
       class="relative flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
     >
       <Bell size={16} strokeWidth={1.25} />
       <span class="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent"></span>
     </button>
-    <button type={btn} aria-label="Settings" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+    <button type={btn} aria-label="ตั้งค่า" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
       <Settings size={16} strokeWidth={1.25} />
     </button>
     <ThemeToggle client:load />
@@ -71,7 +68,7 @@ const btn = 'button' as const
     <div class="ml-3 hidden items-center gap-3 border-l border-border/60 pl-4 md:flex">
       <div class="text-right">
         <p class="max-w-35 truncate text-xs font-medium leading-none text-foreground">{displayName}</p>
-        <p class="mt-1 text-[10px] uppercase tracking-luxury text-muted-foreground">Owner</p>
+        <p class="mt-1 text-[10px] uppercase tracking-luxury text-muted-foreground">เจ้าของบ้าน</p>
       </div>
       <div aria-hidden={true} class="flex h-9 w-9 items-center justify-center rounded-full bg-foreground text-[11px] uppercase tracking-widest text-primary-foreground">
         {initials}

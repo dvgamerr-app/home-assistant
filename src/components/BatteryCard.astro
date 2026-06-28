@@ -18,7 +18,7 @@ const statusLabel = STATUS[b.status as keyof typeof STATUS]
 const metrics = [
   { Icon: Clock, label: 'สำรองได้อีก', value: num(b.backupHours, 1), unit: 'ชม.', hint: 'ถ้าไฟดับ' },
   { Icon: Heart, label: 'สุขภาพแบต', value: `${b.soh}`, unit: '%', hint: 'SOH' },
-  { Icon: RefreshCw, label: 'รอบชาร์จ', value: `${b.cyclePeriod}`, unit: '', hint: 'cycles' },
+  { Icon: RefreshCw, label: 'รอบชาร์จ', value: `${b.cyclePeriod}`, unit: '', hint: 'รอบ' },
 ]
 ---
 

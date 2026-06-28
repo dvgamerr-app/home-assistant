@@ -8,7 +8,12 @@
   const DOW_TH = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา']
 
   const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const shift = (iso: string, days: number) => {
+    const [y, m, d] = iso.split('-').map(Number)
+    return toISO(new Date(y, m - 1, d + days))
+  }
   const today = toISO(new Date())
+  const yesterday = shift(today, -1)
 
   function displayDate(iso: string) {
     const [y, m, d] = iso.split('-').map(Number)
@@ -18,13 +23,13 @@
   const [selY, selM] = selected.split('-').map(Number)
   let open = $state(false)
   let viewYear = $state(selY)
-  let viewMonth = $state(selM - 1) // 0-based
+  let viewMonth = $state(selM - 1)
 
   const calDays = $derived(
     (() => {
       const first = new Date(viewYear, viewMonth, 1)
       const last = new Date(viewYear, viewMonth + 1, 0)
-      const startDow = (first.getDay() + 6) % 7 // Mon=0
+      const startDow = (first.getDay() + 6) % 7
       const cells: (number | null)[] = Array(startDow).fill(null)
       for (let d = 1; d <= last.getDate(); d++) cells.push(d)
       return cells
@@ -39,8 +44,7 @@
   }
 
   function offset(days: number) {
-    const [y, m, d] = selected.split('-').map(Number)
-    navigate(toISO(new Date(Date.UTC(y, m - 1, d + days))))
+    navigate(shift(selected, days))
   }
 
   function prevMonth() {
@@ -74,7 +78,7 @@
   })
 </script>
 
-<div class="relative flex items-center gap-0.5" bind:this={rootEl}>
+<div class="relative flex flex-wrap items-center gap-1" bind:this={rootEl}>
   <button onclick={() => offset(-1)} class="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground" aria-label="วันก่อน">
     <ChevronLeft size={14} />
   </button>
@@ -82,6 +86,18 @@
   <button onclick={() => (open = !open)} class="rounded px-2 py-1 font-serif font-light text-foreground hover:bg-muted">
     {displayDate(selected)}
   </button>
+
+  {#if selected !== today}
+    <button onclick={() => navigate(today)} class="rounded border border-border/70 px-2 py-1 text-[10px] uppercase tracking-luxury text-muted-foreground hover:bg-muted hover:text-foreground">
+      วันนี้
+    </button>
+  {/if}
+
+  {#if selected !== yesterday}
+    <button onclick={() => navigate(yesterday)} class="rounded border border-border/70 px-2 py-1 text-[10px] uppercase tracking-luxury text-muted-foreground hover:bg-muted hover:text-foreground">
+      เมื่อวาน
+    </button>
+  {/if}
 
   <button
     onclick={() => offset(1)}

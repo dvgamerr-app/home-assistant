@@ -5,7 +5,13 @@ const PUBLIC = ['/login', '/no-permission', '/api/auth']
 
 export const onRequest = defineMiddleware(async ({ request, redirect }, next) => {
   const { pathname } = new URL(request.url)
-  if (PUBLIC.some((p) => pathname.startsWith(p))) return next()
+  if (PUBLIC.some((p) => pathname.startsWith(p))) {
+    const response = await next()
+    if (response.headers.get('content-type')?.includes('text/html')) {
+      response.headers.set('content-type', 'text/html; charset=utf-8')
+    }
+    return response
+  }
 
   const session = await auth.api.getSession({ headers: request.headers })
   if (!session) return redirect('/login')
@@ -16,5 +22,9 @@ export const onRequest = defineMiddleware(async ({ request, redirect }, next) =>
     .filter(Boolean)
   if (allowed.length > 0 && !allowed.includes(session.user.email ?? '')) return redirect('/no-permission')
 
-  return next()
+  const response = await next()
+  if (response.headers.get('content-type')?.includes('text/html')) {
+    response.headers.set('content-type', 'text/html; charset=utf-8')
+  }
+  return response
 })

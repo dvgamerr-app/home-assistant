@@ -8,7 +8,7 @@ const tabs = [
 ]
 ---
 
-<div class="mb-8 flex gap-6 border-b border-border/60">
+<div class="mb-8 flex gap-4 overflow-x-auto border-b border-border/60 pb-1">
   {
     tabs.map((t) => (
       <a href={t.href} class:list={['lbl', { active: t.id === active }]}>
@@ -20,6 +20,7 @@ const tabs = [
 
 <style>
   .lbl {
+    white-space: nowrap;
     padding-bottom: 0.75rem;
     margin-bottom: -1px;
     border-bottom: 1px solid transparent;

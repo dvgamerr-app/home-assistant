@@ -7,20 +7,32 @@ import Plug from '@lucide/svelte/icons/plug'
 import PiggyBank from '@lucide/svelte/icons/piggy-bank'
 import Gauge from '@lucide/svelte/icons/gauge'
 import Receipt from '@lucide/svelte/icons/receipt'
+import Coins from '@lucide/svelte/icons/coins'
+import Landmark from '@lucide/svelte/icons/landmark'
+import CalendarRange from '@lucide/svelte/icons/calendar-range'
+import Target from '@lucide/svelte/icons/target'
 import { getAll } from '@/lib/solar-data'
-import { thb, num, MONTH_SHORT_TH } from '@/lib/electricity'
+import { MONTH_SHORT_TH, num, thb } from '@/lib/electricity'
 
 const data = await getAll()
 
-const billRows = data.bills.map((b) => ({
-  month: MONTH_SHORT_TH[parseInt(b.month.slice(4)) - 1] ?? b.month,
-  kwh: b.kwh,
-  paid: b.paid,
-  withoutSolar: b.withoutSolar,
-  saved: b.savedTHB,
+const billRows = data.bills.map((bill) => ({
+  month: MONTH_SHORT_TH[parseInt(bill.month.slice(4)) - 1] ?? bill.month,
+  kwh: bill.kwh,
+  paid: bill.paid,
+  withoutSolar: bill.withoutSolar,
+  saved: bill.savedTHB,
 }))
-const totalSaved = billRows.reduce((s: number, r: (typeof billRows)[0]) => s + r.saved, 0)
+
+const totalSaved = billRows.reduce((sum: number, row: (typeof billRows)[0]) => sum + row.saved, 0)
 const latestBill = billRows[0]
+const previousBill = billRows[1]
+const latestVsPrevious = previousBill
+  ? {
+      paid: latestBill ? latestBill.paid - previousBill.paid : 0,
+      saved: latestBill ? latestBill.saved - previousBill.saved : 0,
+    }
+  : null
 ---
 
 <Layout title="การจ่ายค่าไฟ — บ้าน">
@@ -41,7 +53,12 @@ const latestBill = billRows[0]
         <StatCard label="ถ้าไม่มีโซลาร์" value={thb(latestBill?.withoutSolar ?? 0, 0)} sub="ประมาณการตามอัตรา MEA" accent="blue">
           <Plug slot="icon" size={18} strokeWidth={1.25} />
         </StatCard>
-        <StatCard label="ประหยัดเดือนล่าสุด" value={thb(latestBill?.saved ?? 0, 0)} sub="" accent="sage">
+        <StatCard
+          label="ประหยัดเดือนล่าสุด"
+          value={thb(latestBill?.saved ?? 0, 0)}
+          sub={latestVsPrevious ? `เทียบเดือนก่อน ${latestVsPrevious.saved >= 0 ? '+' : ''}${thb(latestVsPrevious.saved, 0)}` : ''}
+          accent="sage"
+        >
           <PiggyBank slot="icon" size={18} strokeWidth={1.25} />
         </StatCard>
         <StatCard label="ประหยัดสะสม (MEA)" value={thb(totalSaved, 0)} sub={`ใน ${billRows.length} เดือน`} accent="brass">
@@ -49,10 +66,66 @@ const latestBill = billRows[0]
         </StatCard>
       </div>
 
+      <section class="rounded-lg border border-border/70 bg-card p-6">
+        <div class="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-5">
+          <div>
+            <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ระยะคืนทุน</p>
+            <h2 class="mt-1 font-serif text-lg font-light text-foreground">มูลค่าที่ระบบช่วยคืนกลับมา</h2>
+            <p class="mt-1 text-sm text-muted-foreground">ช่วยดูทั้งจำนวนเงินที่ประหยัดได้จริงและเวลาที่เหลือก่อนการลงทุนจะคืนครบ</p>
+          </div>
+          <div class="text-right">
+            <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ความคืบหน้าการคืนทุน</p>
+            <p class="mt-1 font-serif text-3xl font-light text-foreground">{num(data.payback.progressPct, 1)}%</p>
+          </div>
+        </div>
+
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div class="rounded-md border border-border/60 p-4">
+            <div class="mb-2 flex items-center gap-2 text-muted-foreground">
+              <Coins size={16} strokeWidth={1.25} />
+              <span class="text-[10px] uppercase tracking-luxury">เฉลี่ยต่อเดือน</span>
+            </div>
+            <p class="font-serif text-2xl font-light text-foreground">{thb(data.payback.monthlyAvgSaving, 0)}</p>
+            <p class="mt-1 text-xs text-muted-foreground">คิดเป็นประมาณ {thb(data.payback.annualSaving, 0)} ต่อปี</p>
+          </div>
+          <div class="rounded-md border border-border/60 p-4">
+            <div class="mb-2 flex items-center gap-2 text-muted-foreground">
+              <Landmark size={16} strokeWidth={1.25} />
+              <span class="text-[10px] uppercase tracking-luxury">ประหยัดสะสม</span>
+            </div>
+            <p class="font-serif text-2xl font-light text-foreground">{thb(data.payback.totalSavedToDate, 0)}</p>
+            <p class="mt-1 text-xs text-muted-foreground">อิงจากข้อมูลการจ่ายจริงและค่าประมาณที่ระบบคำนวณ</p>
+          </div>
+          <div class="rounded-md border border-border/60 p-4">
+            <div class="mb-2 flex items-center gap-2 text-muted-foreground">
+              <CalendarRange size={16} strokeWidth={1.25} />
+              <span class="text-[10px] uppercase tracking-luxury">คงเหลืออีก</span>
+            </div>
+            <p class="font-serif text-2xl font-light text-foreground">{num(data.payback.yearsToPayback, 1)}<span class="ml-1 text-base text-muted-foreground">ปี</span></p>
+            <p class="mt-1 text-xs text-muted-foreground">หรือราว {num(data.payback.monthsToPayback, 0)} เดือน หากอัตราประหยัดใกล้เคียงเดิม</p>
+          </div>
+          <div class="rounded-md border border-border/60 p-4">
+            <div class="mb-2 flex items-center gap-2 text-muted-foreground">
+              <Target size={16} strokeWidth={1.25} />
+              <span class="text-[10px] uppercase tracking-luxury">เงินลงทุนที่เหลือ</span>
+            </div>
+            <p class="font-serif text-2xl font-light text-foreground">{thb(data.payback.remaining, 0)}</p>
+            <p class="mt-1 text-xs text-muted-foreground">จากเงินลงทุนระบบ {thb(data.system.investmentTHB, 0)}</p>
+          </div>
+        </div>
+      </section>
+
       <section class="rounded-lg border border-border/70 bg-card">
         <div class="border-b border-border/60 px-6 py-4">
           <h2 class="font-serif text-lg font-light text-foreground">บิลค่าไฟ (MEA) รายเดือน</h2>
-          <p class="mt-1 text-sm text-muted-foreground">ข้อมูลจริงจากการไฟฟ้านครหลวง · เทียบกับประมาณการถ้าไม่มีโซลาร์</p>
+          <p class="mt-1 text-sm text-muted-foreground">ข้อมูลจริงจากการไฟฟ้านครหลวง และเทียบกับประมาณการหากบ้านยังไม่มีโซลาร์</p>
+          {
+            latestVsPrevious && (
+              <p class="mt-2 text-xs text-muted-foreground">
+                เดือนล่าสุดจ่าย {latestVsPrevious.paid >= 0 ? 'มากขึ้น' : 'น้อยลง'} {thb(Math.abs(latestVsPrevious.paid), 0)} จากเดือนก่อน
+              </p>
+            )
+          }
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -67,13 +140,13 @@ const latestBill = billRows[0]
             </thead>
             <tbody>
               {
-                billRows.map((r) => (
+                billRows.map((row) => (
                   <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
-                    <td class="px-6 py-3 text-muted-foreground">{r.month}</td>
-                    <td class="px-4 py-3 text-right tabular-nums">{num(r.kwh, 0)}</td>
-                    <td class="px-4 py-3 text-right tabular-nums text-foreground">{thb(r.paid, 0)}</td>
-                    <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(r.withoutSolar, 0)}</td>
-                    <td class="px-6 py-3 text-right tabular-nums text-chart-1">{thb(r.saved, 0)}</td>
+                    <td class="px-6 py-3 text-muted-foreground">{row.month}</td>
+                    <td class="px-4 py-3 text-right tabular-nums">{num(row.kwh, 0)}</td>
+                    <td class="px-4 py-3 text-right tabular-nums text-foreground">{thb(row.paid, 0)}</td>
+                    <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(row.withoutSolar, 0)}</td>
+                    <td class="px-6 py-3 text-right tabular-nums text-chart-1">{thb(row.saved, 0)}</td>
                   </tr>
                 ))
               }
@@ -83,6 +156,6 @@ const latestBill = billRows[0]
       </section>
     </div>
 
-    <p class="text-pretty pb-4 text-center text-xs leading-relaxed text-muted-foreground">ค่าไฟประมาณการคำนวณตามอัตราค่าไฟฟ้าบ้านอยู่อาศัย ประเภท 1.2 แบบขั้นบันไดของ MEA รวมค่า Ft และ VAT 7%</p>
+    <p class="text-pretty pb-4 text-center text-xs leading-relaxed text-muted-foreground">ค่าประมาณอ้างอิงตามอัตราค่าไฟบ้านอยู่อาศัยประเภท 1.2 ของ MEA รวมค่า Ft และ VAT 7%</p>
   </main>
 </Layout>

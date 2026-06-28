@@ -104,7 +104,7 @@
           <span class="text-[10px] uppercase tracking-wider">รอบชาร์จ</span>
         </div>
         <p class="font-mono text-lg font-medium leading-none text-foreground">{live.cyclePeriod}</p>
-        <p class="mt-1.5 text-[11px] text-muted-foreground">cycles</p>
+        <p class="mt-1.5 text-[11px] text-muted-foreground">รอบ</p>
       </div>
     </div>
   </section>

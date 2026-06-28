@@ -36,6 +36,13 @@ export type TodayData = {
   gridImport: number // kWh today (dayPurchaseElectricityConsumption max)
 }
 
+export type DailyTotal = {
+  date: string // YYYY-MM-DD
+  generated: number
+  consumed: number
+  gridImport: number
+}
+
 export type HourlyPoint = {
   hour: number // 0-23
   pv: number // kW avg
@@ -78,6 +85,7 @@ export type Bill = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const n = (v: unknown) => Number(v ?? 0)
+const toDayString = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
 // ── Queries ───────────────────────────────────────────────────────────────────
 
@@ -118,7 +126,7 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
 /** counters วันนี้ หรือ date ที่กำหนด */
 export async function getToday(date?: Date): Promise<TodayData> {
   const d = date ?? new Date()
-  const dayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const dayStr = toDayString(d)
 
   const rows = await sql<{ attr: string; value: string }[]>`
     SELECT attr,
@@ -162,7 +170,7 @@ export type MinutePoint = {
 /** จุดข้อมูลตาม recorded_at จริง (ข้อมูลเข้าทุก ~5 นาที) */
 export async function get5Min(date?: Date): Promise<MinutePoint[]> {
   const d = date ?? new Date()
-  const dayStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const dayStart = toDayString(d)
 
   const rows = await sql<{ minute_of_day: string; pv: string; pv1: string; pv2: string; load: string; soc: string; battery_power: string; grid_power: string }[]>`
     SELECT
@@ -196,7 +204,7 @@ export async function get5Min(date?: Date): Promise<MinutePoint[]> {
 /** 24 จุดรายชั่วโมงของ date ที่กำหนด (default วันนี้) */
 export async function getHourly(date?: Date): Promise<HourlyPoint[]> {
   const d = date ?? new Date()
-  const dayStart = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const dayStart = toDayString(d)
 
   const rows = await sql<{ hour: string; pv: string; load: string; soc: string; battery_power: string; grid_power: string }[]>`
     SELECT
@@ -267,6 +275,45 @@ export async function getMonthDays(year: number, month: number): Promise<DayPoin
     generated: n(r.generated),
     consumed: n(r.consumed),
     gridImport: n(r.grid_import),
+  }))
+}
+
+/** Daily totals in a date window ending at endDate, inclusive. */
+export async function getRecentDailyTotals(endDate: Date, days = 8): Promise<DailyTotal[]> {
+  const end = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate())
+  const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (days - 1))
+  const startStr = toDayString(start)
+  const endStr = toDayString(end)
+
+  const rows = await sql<{ day: string; generated: string; consumed: string; grid_import: string }[]>`
+    WITH daily AS (
+      SELECT
+        (recorded_at AT TIME ZONE ${TZ})::date as day,
+        attr,
+        MIN(value::numeric) as v_min,
+        MAX(value::numeric) as v_max
+      FROM stash.solar_record
+      WHERE device_id = ${DEVICE}
+        AND attr IN ('totalPowerGeneration', 'loadDayElectricityConsumption',
+                     'dayPurchaseElectricityConsumption')
+        AND (recorded_at AT TIME ZONE ${TZ})::date BETWEEN ${startStr}::date AND ${endStr}::date
+      GROUP BY day, attr
+    )
+    SELECT
+      day::text,
+      MAX(CASE WHEN attr = 'totalPowerGeneration' THEN GREATEST(v_max - v_min, 0) END) as generated,
+      MAX(CASE WHEN attr = 'loadDayElectricityConsumption' THEN v_max END) as consumed,
+      MAX(CASE WHEN attr = 'dayPurchaseElectricityConsumption' THEN v_max END) as grid_import
+    FROM daily
+    GROUP BY day
+    ORDER BY day
+  `
+
+  return rows.map((row) => ({
+    date: row.day,
+    generated: n(row.generated),
+    consumed: n(row.consumed),
+    gridImport: n(row.grid_import),
   }))
 }
 
