@@ -13,6 +13,7 @@
         "pino": "^10.3.1",
         "postgres": "^3.4.9",
         "socket.io": "^4.8.3",
+        "socket.io-client": "^4.8.3",
       },
       "devDependencies": {
         "@astrojs/check": "^0.9.9",
@@ -36,7 +37,6 @@
         "prettier": "^3.8.4",
         "prettier-plugin-astro": "^0.14.1",
         "prettier-plugin-svelte": "^4.1.1",
-        "socket.io-client": "^4.8.3",
         "svelte": "^5.56.3",
         "tailwindcss": "^4.3.1",
         "typescript": "^6.0.3",
