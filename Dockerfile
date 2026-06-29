@@ -9,6 +9,7 @@ FROM oven/bun:slim
 WORKDIR /app
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server ./server
+COPY --from=builder /app/src ./src
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production --ignore-scripts
 ENV HOST=0.0.0.0 PORT=4321

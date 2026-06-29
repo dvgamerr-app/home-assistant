@@ -2,7 +2,7 @@
 import { defineConfig } from 'astro/config'
 import tailwindcss from '@tailwindcss/vite'
 import svelte from '@astrojs/svelte'
-import bun from '@nurodev/astro-bun'
+import node from '@astrojs/node'
 import { spawn } from 'child_process'
 
 /** @type {import('vite').Plugin} */
@@ -18,7 +18,7 @@ const socketServer = {
 
 // https://astro.build/config
 export default defineConfig({
-  adapter: bun(),
+  adapter: node({ mode: 'standalone' }),
   output: 'server',
   integrations: [svelte()],
   vite: {
