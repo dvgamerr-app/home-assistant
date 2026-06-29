@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte'
   import ChevronLeft from '@lucide/svelte/icons/chevron-left'
   import ChevronRight from '@lucide/svelte/icons/chevron-right'
 
@@ -20,7 +21,7 @@
     return `${d} ${MONTH_TH[m - 1]} ${y + 543}`
   }
 
-  const [selY, selM] = selected.split('-').map(Number)
+  const [selY, selM] = untrack(() => selected.split('-').map(Number))
   let open = $state(false)
   let viewYear = $state(selY)
   let viewMonth = $state(selM - 1)

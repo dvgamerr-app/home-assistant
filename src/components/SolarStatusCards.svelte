@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
+  import { onMount, untrack } from 'svelte'
   import { io } from 'socket.io-client'
   import { num } from '@/lib/electricity'
   import BatteryCharging from '@lucide/svelte/icons/battery-charging'
@@ -18,7 +18,7 @@
 
   let { live: init, pvStrings, system, socketUrl }: { live: LiveSnapshot; pvStrings: SolarData['pvStrings']; system: SolarData['system']; socketUrl: string } = $props()
 
-  let live = $state(init)
+  let live = $state(untrack(() => init))
 
   // Battery derived
   const battStatus = $derived(live.batteryPowerKw < -0.05 ? 'charging' : live.batteryPowerKw > 0.05 ? 'discharging' : 'idle')
@@ -32,7 +32,7 @@
   const gridVoltageOk = $derived(live.gridVoltage >= 210 && live.gridVoltage <= 245)
 
   // PV strings derived
-  const perStringMax = system.ratedPowerKw / pvStrings.length
+  const perStringMax = untrack(() => system.ratedPowerKw / pvStrings.length)
   const totalPower = $derived(live.pv1.power + live.pv2.power)
 
   onMount(() => {
