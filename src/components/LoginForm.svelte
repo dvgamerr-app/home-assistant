@@ -1,9 +1,31 @@
 <script>
   let { githubEnabled = false, initialError = '' } = $props()
+  let mode = $state('signin')
+  let name = $state('')
   let email = $state('')
   let password = $state('')
   let error = $state(initialError)
   let loading = $state(false)
+
+  function toThaiError(message, currentMode) {
+    if (!message) {
+      return currentMode === 'signup' ? 'สมัครสมาชิกไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' : 'เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบอีเมลและรหัสผ่าน'
+    }
+
+    const normalized = String(message).toLowerCase()
+    if (normalized.includes('user already exists')) return 'อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบหรือใช้อีเมลอื่น'
+    if (normalized.includes('invalid email')) return 'รูปแบบอีเมลไม่ถูกต้อง'
+    if (normalized.includes('password too short')) return 'รหัสผ่านสั้นเกินไป กรุณาตั้งอย่างน้อย 8 ตัวอักษร'
+    if (normalized.includes('password too long')) return 'รหัสผ่านยาวเกินไป กรุณาลองใหม่อีกครั้ง'
+    if (normalized.includes('invalid password')) return 'รหัสผ่านไม่ถูกต้อง'
+    if (normalized.includes('sign up is not enabled')) return 'ระบบยังไม่เปิดรับสมัครด้วยอีเมล'
+    return message
+  }
+
+  function switchMode(nextMode) {
+    mode = nextMode
+    error = ''
+  }
 
   async function signIn(e) {
     e.preventDefault()
@@ -19,7 +41,30 @@
         window.location.href = '/'
       } else {
         const data = await res.json().catch(() => ({}))
-        error = data.message ?? 'เข้าสู่ระบบไม่สำเร็จ กรุณาตรวจสอบอีเมลและรหัสผ่าน'
+        error = toThaiError(data.message, 'signin')
+      }
+    } catch {
+      error = 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'
+    } finally {
+      loading = false
+    }
+  }
+
+  async function signUp(e) {
+    e.preventDefault()
+    loading = true
+    error = ''
+    try {
+      const res = await fetch('/api/auth/sign-up/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      })
+      if (res.ok) {
+        window.location.href = '/'
+      } else {
+        const data = await res.json().catch(() => ({}))
+        error = toThaiError(data.message, 'signup')
       }
     } catch {
       error = 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'
@@ -51,9 +96,40 @@
   }
 </script>
 
-<form onsubmit={signIn} class="space-y-5">
+<div class="mb-5 grid grid-cols-2 gap-2 rounded-lg border border-border/60 bg-background/60 p-1">
+  <button
+    type="button"
+    onclick={() => switchMode('signin')}
+    class:list={['rounded-md px-3 py-2 text-sm transition-colors', mode === 'signin' ? 'border border-accent/60 bg-accent/10 text-foreground' : 'text-muted-foreground hover:bg-card']}
+  >
+    เข้าสู่ระบบ
+  </button>
+  <button
+    type="button"
+    onclick={() => switchMode('signup')}
+    class:list={['rounded-md px-3 py-2 text-sm transition-colors', mode === 'signup' ? 'border border-accent/60 bg-accent/10 text-foreground' : 'text-muted-foreground hover:bg-card']}
+  >
+    สมัครสมาชิก
+  </button>
+</div>
+
+<form onsubmit={mode === 'signup' ? signUp : signIn} class="space-y-5">
   {#if error}
     <p class="rounded-md border border-destructive/50 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</p>
+  {/if}
+
+  {#if mode === 'signup'}
+    <div class="space-y-1.5">
+      <label for="name" class="text-[10px] uppercase tracking-luxury text-muted-foreground">ชื่อที่แสดง</label>
+      <input
+        id="name"
+        type="text"
+        bind:value={name}
+        required={mode === 'signup'}
+        autocomplete="name"
+        class="w-full rounded-md border border-border/70 bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-accent"
+      />
+    </div>
   {/if}
 
   <div class="space-y-1.5">
@@ -75,9 +151,12 @@
       type="password"
       bind:value={password}
       required
-      autocomplete="current-password"
+      autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
       class="w-full rounded-md border border-border/70 bg-background px-4 py-2.5 text-sm text-foreground outline-none focus:border-accent"
     />
+    {#if mode === 'signup'}
+      <p class="text-xs text-muted-foreground">แนะนำอย่างน้อย 8 ตัวอักษร เพื่อให้ระบบสร้างบัญชีได้สมบูรณ์</p>
+    {/if}
   </div>
 
   <button
@@ -85,7 +164,11 @@
     disabled={loading}
     class="w-full rounded-md border border-accent/60 bg-accent/10 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent/20 disabled:opacity-50"
   >
-    {loading ? 'กำลังเข้าสู่ระบบ…' : 'เข้าสู่ระบบ'}
+    {#if loading}
+      {mode === 'signup' ? 'กำลังสร้างบัญชี…' : 'กำลังเข้าสู่ระบบ…'}
+    {:else}
+      {mode === 'signup' ? 'สร้างบัญชีด้วยอีเมล' : 'เข้าสู่ระบบ'}
+    {/if}
   </button>
 </form>
 
