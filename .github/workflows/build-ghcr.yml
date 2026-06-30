@@ -112,7 +112,8 @@ jobs:
             -e MEA_HOUSE_CA=${{ vars.MEA_HOUSE_CA }} \
             -e ALLOWED_EMAILS=${{ vars.ALLOWED_EMAILS }} \
             -e SOCKET_PORT=${{ vars.SOCKET_PORT }} \
-            -p 3003:4321 \
+            -p ${{ vars.PORT }}:4321 \
+            -p ${{ vars.SOCKET_PORT }}:3000 \
             ${{ needs.build.outputs.docker_image }}:${{ needs.build.outputs.version }}
 
       - name: Alert

@@ -13,8 +13,9 @@ import { getAll } from '@/lib/solar-data'
 import { thb, num } from '@/lib/electricity'
 
 const data = await getAll()
-const { protocol, hostname } = new URL(Astro.request.url)
-const socketUrl = `${protocol}//${hostname}:${process.env.SOCKET_PORT ?? '3000'}`
+const base = new URL(process.env.APP_BASE_URL ?? Astro.request.url)
+const wsProtocol = base.protocol === 'https:' ? 'wss:' : 'ws:'
+const socketUrl = `${wsProtocol}//${base.hostname}:${process.env.SOCKET_PORT ?? '3000'}`
 ---
 
 <Layout title="ภาพรวมพลังงานในบ้าน">
