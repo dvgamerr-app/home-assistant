@@ -113,7 +113,6 @@ jobs:
             -e ALLOWED_EMAILS=${{ vars.ALLOWED_EMAILS }} \
             -e SOCKET_PORT=${{ vars.SOCKET_PORT }} \
             -p ${{ vars.PORT }}:4321 \
-            -p ${{ vars.SOCKET_PORT }}:3000 \
             ${{ needs.build.outputs.docker_image }}:${{ needs.build.outputs.version }}
 
       - name: Alert

@@ -15,7 +15,8 @@ import { thb, num } from '@/lib/electricity'
 const data = await getAll()
 const base = new URL(process.env.APP_BASE_URL ?? Astro.request.url)
 const wsProtocol = base.protocol === 'https:' ? 'wss:' : 'ws:'
-const socketUrl = `${wsProtocol}//${base.hostname}:${process.env.SOCKET_PORT ?? '3000'}`
+// ponytail: same-origin, reverse proxy routes /socket.io/ → socket server
+const socketUrl = `${wsProtocol}//${base.host}`
 ---
 
 <Layout title="ภาพรวมพลังงานในบ้าน">
