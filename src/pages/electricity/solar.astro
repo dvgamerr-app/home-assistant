@@ -21,8 +21,9 @@ const selectedDate = parseISODate(selectedISO)
 const isToday = selectedISO === todayISO
 const data = await getAll(selectedDate)
 
-const { protocol, hostname } = Astro.url
-const socketUrl = `${protocol}//${hostname}:${process.env.SOCKET_PORT ?? '3000'}`
+const base = new URL(process.env.APP_BASE_URL ?? Astro.request.url)
+const wsProtocol = base.protocol === 'https:' ? 'wss:' : 'ws:'
+const socketUrl = `${wsProtocol}//${base.host}`
 ---
 
 <Layout title="ผลิตไฟ — บ้าน">
