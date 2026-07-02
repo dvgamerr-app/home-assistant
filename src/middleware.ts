@@ -21,5 +21,6 @@ export const onRequest = defineMiddleware(async ({ request, redirect }, next) =>
   if (response.headers.get('content-type')?.includes('text/html')) {
     response.headers.set('content-type', 'text/html; charset=utf-8')
   }
+
   return response
 })

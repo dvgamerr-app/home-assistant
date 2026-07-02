@@ -7,7 +7,7 @@ import StatCard from './StatCard.astro'
 import ChartCard from './ui/ChartCard.astro'
 import LegendRow from './ui/LegendRow.astro'
 import { svgStackedBars } from '@/lib/chart'
-import { calculateMonthlyBill, num, thb } from '@/lib/electricity'
+import { num, thb } from '@/lib/electricity'
 import type { MonthLoad } from '@/lib/solar-data'
 
 interface Props {
@@ -17,12 +17,13 @@ interface Props {
   monthLabel: string
   isCurrentMonth?: boolean
   selMonthTotals?: MonthLoad['totals']
-  prevMonthSummary?: MonthLoad
+  lastMonth: MonthLoad
+  twoMonthsAgo: MonthLoad
   availableMonths?: Array<{ value: string; label: string }>
   selectedMonth?: string
 }
 
-const { today: TODAY, day: DAY, monthDays: MONTH_DAYS, monthLabel, isCurrentMonth = true, selMonthTotals, prevMonthSummary, availableMonths, selectedMonth } = Astro.props
+const { today: TODAY, day: DAY, monthDays: MONTH_DAYS, monthLabel, isCurrentMonth = true, selMonthTotals, lastMonth, twoMonthsAgo, availableMonths, selectedMonth } = Astro.props
 
 const S = isCurrentMonth
   ? {
@@ -40,57 +41,35 @@ const S = isCurrentMonth
 
 const period = isCurrentMonth ? 'วันนี้' : 'รวมทั้งเดือน'
 
-const monthRollup = MONTH_DAYS.reduce(
-  (acc, dayPoint) => ({
-    generated: acc.generated + dayPoint.generated,
-    consumed: acc.consumed + dayPoint.consumed,
-    gridImport: acc.gridImport + dayPoint.gridImport,
-    selfUse: acc.selfUse + dayPoint.selfUse,
-  }),
-  {
-    generated: 0,
-    consumed: 0,
-    gridImport: 0,
-    selfUse: 0,
-  },
-)
-
-const monthBillWithSolar = calculateMonthlyBill(monthRollup.gridImport)
-const monthBillWithoutSolar = calculateMonthlyBill(monthRollup.consumed)
-const currentMonthSummary = {
-  ...monthRollup,
-  savedTHB: Math.max(0, monthBillWithoutSolar.total - monthBillWithSolar.total),
-}
-
 const pctChange = (current: number, previous: number) => (previous > 0 ? ((current - previous) / previous) * 100 : null)
 
-const monthComparison = prevMonthSummary && [
+const monthComparison = [
   {
     label: 'ผลิตได้',
-    current: `${num(currentMonthSummary.generated, 1)} kWh`,
-    previous: `${num(prevMonthSummary.totals.generated, 1)} kWh`,
-    delta: pctChange(currentMonthSummary.generated, prevMonthSummary.totals.generated),
+    current: `${num(lastMonth.totals.generated, 1)} kWh`,
+    previous: `${num(twoMonthsAgo.totals.generated, 1)} kWh`,
+    delta: pctChange(lastMonth.totals.generated, twoMonthsAgo.totals.generated),
     accent: 'text-chart-2',
   },
   {
     label: 'ใช้ไฟรวม',
-    current: `${num(currentMonthSummary.consumed, 1)} kWh`,
-    previous: `${num(prevMonthSummary.totals.consumed, 1)} kWh`,
-    delta: pctChange(currentMonthSummary.consumed, prevMonthSummary.totals.consumed),
+    current: `${num(lastMonth.totals.consumed, 1)} kWh`,
+    previous: `${num(twoMonthsAgo.totals.consumed, 1)} kWh`,
+    delta: pctChange(lastMonth.totals.consumed, twoMonthsAgo.totals.consumed),
     accent: 'text-foreground',
   },
   {
     label: 'ซื้อจากกริด',
-    current: `${num(currentMonthSummary.gridImport, 1)} kWh`,
-    previous: `${num(prevMonthSummary.totals.gridImport, 1)} kWh`,
-    delta: pctChange(currentMonthSummary.gridImport, prevMonthSummary.totals.gridImport),
+    current: `${num(lastMonth.totals.gridImport, 1)} kWh`,
+    previous: `${num(twoMonthsAgo.totals.gridImport, 1)} kWh`,
+    delta: pctChange(lastMonth.totals.gridImport, twoMonthsAgo.totals.gridImport),
     accent: 'text-chart-4',
   },
   {
     label: 'ประหยัดได้',
-    current: thb(currentMonthSummary.savedTHB, 0),
-    previous: thb(prevMonthSummary.totals.savedTHB, 0),
-    delta: pctChange(currentMonthSummary.savedTHB, prevMonthSummary.totals.savedTHB),
+    current: thb(lastMonth.totals.savedTHB, 0),
+    previous: thb(twoMonthsAgo.totals.savedTHB, 0),
+    delta: pctChange(lastMonth.totals.savedTHB, twoMonthsAgo.totals.savedTHB),
     accent: 'text-chart-1',
   },
 ]
@@ -243,32 +222,30 @@ const segOpacity = [0.35, 0.85]
     />
   </ChartCard>
 
-  {
-    monthComparison && (
-      <section class="rounded-lg border border-border/70 bg-card px-6 py-5">
-        <div class="mb-5 flex flex-wrap items-baseline justify-between gap-3">
-          <div>
-            <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">เทียบเดือนที่กำลังดู</p>
-            <h2 class="mt-1 font-serif text-lg font-light text-foreground">
-              {monthLabel} เทียบกับ {prevMonthSummary.label}
-            </h2>
-          </div>
-          <p class="text-xs text-muted-foreground">ช่วยดูทั้งการผลิต การใช้ การซื้อจากกริด และมูลค่าที่ประหยัดได้ในมุมเดียว</p>
-        </div>
+  <section class="rounded-lg border border-border/70 bg-card px-6 py-5">
+    <div class="mb-5 flex flex-wrap items-baseline justify-between gap-3">
+      <div>
+        <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">เทียบเดือนล่าสุด</p>
+        <h2 class="mt-1 font-serif text-lg font-light text-foreground">
+          {lastMonth.label} เทียบกับ {twoMonthsAgo.label}
+        </h2>
+      </div>
+      <p class="text-xs text-muted-foreground">ช่วยดูทั้งการผลิต การใช้ การซื้อจากกริด และมูลค่าที่ประหยัดได้ในมุมเดียว</p>
+    </div>
 
-        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {monthComparison.map((item) => (
-            <div class="rounded-md border border-border/60 p-4">
-              <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">{item.label}</p>
-              <p class:list={['mt-2 font-serif text-2xl font-light', item.accent]}>{item.current}</p>
-              <p class="mt-1 text-xs text-muted-foreground">เดือนก่อน {item.previous}</p>
-              <p class="mt-1 text-xs text-muted-foreground">{item.delta === null ? 'ยังไม่มีค่าที่เทียบได้' : `${item.delta > 0 ? '+' : ''}${num(item.delta, 0)}% จากเดือนก่อน`}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-    )
-  }
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {
+        monthComparison.map((item) => (
+          <div class="rounded-md border border-border/60 p-4">
+            <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">{item.label}</p>
+            <p class:list={['mt-2 font-serif text-2xl font-light', item.accent]}>{item.current}</p>
+            <p class="mt-1 text-xs text-muted-foreground">เดือนก่อน {item.previous}</p>
+            <p class="mt-1 text-xs text-muted-foreground">{item.delta === null ? 'ยังไม่มีค่าที่เทียบได้' : `${item.delta > 0 ? '+' : ''}${num(item.delta, 0)}% จากเดือนก่อน`}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
 
   <div class="daily-chart-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:140px;transition:opacity 0.1s">
     <p class="tip-day mb-2 text-[10px] uppercase tracking-luxury text-muted-foreground"></p>
@@ -291,39 +268,6 @@ const segOpacity = [0.35, 0.85]
       </div>
     </div>
   </div>
-
-  {
-    prevMonthSummary && (
-      <section class="rounded-lg border border-border/70 bg-card px-6 py-5">
-        <div class="mb-5 flex items-baseline gap-2">
-          <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">สรุปเดือนก่อนหน้า</p>
-          <span class="text-xs text-muted-foreground">· {prevMonthSummary.label}</span>
-        </div>
-        <div class="grid grid-cols-2 gap-x-8 gap-y-5 sm:grid-cols-4">
-          <div>
-            <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ผลิตได้</p>
-            <p class="mt-1.5 font-serif text-2xl font-light text-foreground">{num(prevMonthSummary.totals.generated, 1)}</p>
-            <p class="mt-0.5 text-xs text-muted-foreground">kWh</p>
-          </div>
-          <div>
-            <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ใช้ในบ้าน</p>
-            <p class="mt-1.5 font-serif text-2xl font-light text-foreground">{num(prevMonthSummary.totals.consumed, 1)}</p>
-            <p class="mt-0.5 text-xs text-muted-foreground">kWh</p>
-          </div>
-          <div>
-            <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ซื้อจากกริด</p>
-            <p class="mt-1.5 font-serif text-2xl font-light text-foreground">{num(prevMonthSummary.totals.gridImport, 1)}</p>
-            <p class="mt-0.5 text-xs text-muted-foreground">kWh</p>
-          </div>
-          <div>
-            <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ประหยัดได้</p>
-            <p class="mt-1.5 font-serif text-2xl font-light text-chart-1">{thb(prevMonthSummary.totals.savedTHB, 0)}</p>
-            <p class="mt-0.5 text-xs text-muted-foreground">เทียบกรณีไม่มีโซลาร์</p>
-          </div>
-        </div>
-      </section>
-    )
-  }
 </div>
 
 <script>

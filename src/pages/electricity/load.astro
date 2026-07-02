@@ -19,12 +19,16 @@ if (mParam && /^\d{6}$/.test(mParam)) {
 const isCurrentMonth = selYear === curYear && selMonth === curMonth
 const selectedMonthStr = `${selYear}${String(selMonth).padStart(2, '0')}`
 
-// prev month of selected
-const prevDate = new Date(selYear, selMonth - 2, 1)
-const prevYear = prevDate.getFullYear()
-const prevMonth = prevDate.getMonth() + 1
+// เดือนล่าสุดที่ข้อมูลครบ (M-1) กับเดือนก่อนหน้านั้น (M-2) — ใช้เทียบกันเสมอ ไม่ขึ้นกับเดือนที่กำลังดู
+const lastFullDate = new Date(curYear, curMonth - 2, 1)
+const twoMonthsAgoDate = new Date(curYear, curMonth - 3, 1)
 
-const [data, selMonthData, prevMonthData] = await Promise.all([getAll(), isCurrentMonth ? Promise.resolve(null) : getMonthLoad(selYear, selMonth), getMonthLoad(prevYear, prevMonth)])
+const [data, selMonthData, lastMonthData, twoMonthsAgoData] = await Promise.all([
+  getAll(),
+  isCurrentMonth ? Promise.resolve(null) : getMonthLoad(selYear, selMonth),
+  getMonthLoad(lastFullDate.getFullYear(), lastFullDate.getMonth() + 1),
+  getMonthLoad(twoMonthsAgoDate.getFullYear(), twoMonthsAgoDate.getMonth() + 1),
+])
 
 // เดือนที่มีข้อมูลจริงใน DB (จาก getMonths(12) ใน getAll)
 const availableMonths = data.monthPicker
@@ -50,7 +54,8 @@ const monthLabel = isCurrentMonth ? data.monthLabel : selMonthData!.label
       monthLabel={monthLabel}
       isCurrentMonth={isCurrentMonth}
       selMonthTotals={selMonthData?.totals}
-      prevMonthSummary={prevMonthData}
+      lastMonth={lastMonthData}
+      twoMonthsAgo={twoMonthsAgoData}
       availableMonths={availableMonths}
       selectedMonth={selectedMonthStr}
     />

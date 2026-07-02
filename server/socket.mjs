@@ -40,7 +40,7 @@ async function emitChannel(target, channel) {
 }
 
 io.on('connection', (socket) => {
-  logger.info({ id: socket.id }, 'client connected')
+  logger.info(`client: ${socket.id} connected`)
 
   socket.on('subscribe', async (value) => {
     const channels = normalizeSocketChannels(value)
@@ -71,10 +71,10 @@ io.on('connection', (socket) => {
     }
   })
 
-  socket.on('disconnect', () => logger.info({ id: socket.id }, 'client disconnected'))
+  socket.on('disconnect', () => logger.info(`client: ${socket.id}, disconnected`))
 })
 
 await broadcast()
 setInterval(broadcast, POLL_MS)
 
-httpServer.listen(PORT, () => logger.info({ port: PORT }, 'socket.io server started'))
+httpServer.listen(PORT, () => logger.info(`socket.io server port:${PORT} started`))
