@@ -1,6 +1,7 @@
 ---
 import ChartCard from '@/components/ui/ChartCard.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
+import { svgPathFromPoints } from '@/lib/chart'
 import { num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
 
@@ -15,51 +16,6 @@ const { fiveMin: points, dayFlow } = Astro.props as Pick<SolarData, 'fiveMin' | 
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
 const fmtMinute = (minuteOfDay: number) => `${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')}`
-
-function smoothLine(points: Array<{ x: number; y: number }>, tension = 0.9) {
-  if (points.length < 2) return ''
-
-  const curve = clamp01(tension)
-  const slopes = points.slice(0, -1).map((point, index) => {
-    const next = points[index + 1]
-    return (next.y - point.y) / Math.max(next.x - point.x, 1)
-  })
-  const tangents = points.map((_, index) => {
-    if (index === 0) return slopes[0]
-    if (index === points.length - 1) return slopes[slopes.length - 1]
-
-    const prev = slopes[index - 1]
-    const next = slopes[index]
-    if (prev === 0 || next === 0 || Math.sign(prev) !== Math.sign(next)) return 0
-    return (2 * prev * next) / (prev + next)
-  })
-
-  slopes.forEach((slope, index) => {
-    if (slope === 0) {
-      tangents[index] = 0
-      tangents[index + 1] = 0
-      return
-    }
-
-    const a = tangents[index] / slope
-    const b = tangents[index + 1] / slope
-    const h = Math.hypot(a, b)
-    if (h > 3) {
-      const scale = 3 / h
-      tangents[index] = scale * a * slope
-      tangents[index + 1] = scale * b * slope
-    }
-  })
-
-  let d = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`
-  for (let index = 1; index < points.length; index++) {
-    const previous = points[index - 1]
-    const current = points[index]
-    const dx = (current.x - previous.x) / 3
-    d += ` C ${(previous.x + dx * curve).toFixed(1)},${(previous.y + tangents[index - 1] * dx * curve).toFixed(1)} ${(current.x - dx * curve).toFixed(1)},${(current.y - tangents[index] * dx * curve).toFixed(1)} ${current.x.toFixed(1)},${current.y.toFixed(1)}`
-  }
-  return d
-}
 
 const rawBatteryPoints: BatteryPoint[] = points.map((point) => ({
   minuteOfDay: point.minuteOfDay,
@@ -107,7 +63,7 @@ const socLinePoints = chartPoints.map((point) => ({
   x: xForMinute(point.minuteOfDay),
   y: yForNormalized(point.soc / 100),
 }))
-const socPath = smoothLine(socLinePoints)
+const socPath = svgPathFromPoints(socLinePoints)
 const socArea = `${socPath} L ${socLinePoints.at(-1)?.x.toFixed(1)},${py1} L ${socLinePoints[0]?.x.toFixed(1)},${py1} Z`
 
 const battAbsMax = Math.max(...windowPoints.map((point) => Math.abs(point.batt)), ...windowPoints.map((point) => point.gridImport), 0.5)
@@ -124,8 +80,8 @@ const gridLinePoints = chartPoints.map((point) => ({
   y: yForNormalized(normPower(point.gridImport)),
 }))
 
-const battPath = smoothLine(battLinePoints)
-const gridPath = smoothLine(gridLinePoints)
+const battPath = svgPathFromPoints(battLinePoints)
+const gridPath = svgPathFromPoints(gridLinePoints)
 const zeroY = yForNormalized(normPower(0))
 const powerTicks = [battAbsMax, battAbsMax * 0.5, 0, -battAbsMax * 0.5, -battAbsMax]
 const powerTickLabels = powerTicks.map((tick) => (tick < 0 ? '−' : '') + num(Math.abs(tick), 1))

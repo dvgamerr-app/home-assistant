@@ -27,44 +27,22 @@
     error = ''
   }
 
-  async function signIn(e) {
+  async function submitEmail(e) {
     e.preventDefault()
     loading = true
     error = ''
+    const signup = mode === 'signup'
     try {
-      const res = await fetch('/api/auth/sign-in/email', {
+      const res = await fetch(signup ? '/api/auth/sign-up/email' : '/api/auth/sign-in/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify(signup ? { name, email, password } : { email, password }),
       })
       if (res.ok) {
         window.location.href = '/'
       } else {
         const data = await res.json().catch(() => ({}))
-        error = toThaiError(data.message, 'signin')
-      }
-    } catch {
-      error = 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'
-    } finally {
-      loading = false
-    }
-  }
-
-  async function signUp(e) {
-    e.preventDefault()
-    loading = true
-    error = ''
-    try {
-      const res = await fetch('/api/auth/sign-up/email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
-      })
-      if (res.ok) {
-        window.location.href = '/'
-      } else {
-        const data = await res.json().catch(() => ({}))
-        error = toThaiError(data.message, 'signup')
+        error = toThaiError(data.message, mode)
       }
     } catch {
       error = 'เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง'
@@ -113,7 +91,7 @@
   </button>
 </div>
 
-<form onsubmit={mode === 'signup' ? signUp : signIn} class="space-y-5">
+<form onsubmit={submitEmail} class="space-y-5">
   {#if error}
     <p class="rounded-md border border-destructive/50 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</p>
   {/if}

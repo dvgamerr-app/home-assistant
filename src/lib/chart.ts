@@ -1,17 +1,12 @@
-// Pure-math helpers for server-rendered SVG charts (Astro frontmatter, no JS at runtime).
+// Pure-math helpers for SVG charts — used server-side in Astro frontmatter and client-side in chart scripts.
 
 const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
 
-/** Smooth cubic-bezier SVG line path.
- *  values: normalized 0..1 (0 = bottom, 1 = top).
- *  Plot area: (xMin,yMin) → (xMax,yMax) in SVG coordinate space.
- */
-export function svgLine(values: number[], xMin: number, yMin: number, xMax: number, yMax: number, tension = 0.9): string {
-  if (values.length < 2) return ''
-  const pts = values.map((v, i) => ({
-    x: xMin + (i / (values.length - 1)) * (xMax - xMin),
-    y: yMin + (1 - clamp01(v)) * (yMax - yMin),
-  }))
+export type ChartPoint = { x: number; y: number }
+
+/** Smooth monotone-cubic SVG path through points (x ascending). Overshoot-limited so the curve stays inside data range. */
+export function svgPathFromPoints(pts: ChartPoint[], tension = 0.9): string {
+  if (pts.length < 2) return ''
 
   const curve = clamp01(tension)
   const slopes = pts.slice(0, -1).map((p, i) => (pts[i + 1].y - p.y) / (pts[i + 1].x - p.x))
@@ -54,6 +49,21 @@ export function svgLine(values: number[], xMin: number, yMin: number, xMax: numb
     d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`
   }
   return d
+}
+
+/** Smooth cubic-bezier SVG line path.
+ *  values: normalized 0..1 (0 = bottom, 1 = top), spread evenly across the x range.
+ *  Plot area: (xMin,yMin) → (xMax,yMax) in SVG coordinate space.
+ */
+export function svgLine(values: number[], xMin: number, yMin: number, xMax: number, yMax: number, tension = 0.9): string {
+  if (values.length < 2) return ''
+  return svgPathFromPoints(
+    values.map((v, i) => ({
+      x: xMin + (i / (values.length - 1)) * (xMax - xMin),
+      y: yMin + (1 - clamp01(v)) * (yMax - yMin),
+    })),
+    tension,
+  )
 }
 
 /** svgLine closed to the bottom — for area gradient fills. */

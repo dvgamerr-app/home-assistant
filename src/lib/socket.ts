@@ -15,3 +15,12 @@ export function normalizeSocketChannels(value: SocketChannel | SocketChannel[] |
   const raw = Array.isArray(value) ? value : [value]
   return raw.filter((channel): channel is SocketChannel => typeof channel === 'string' && isSocketChannel(channel))
 }
+
+// ponytail: dev has no reverse proxy in front of astro, so hit the socket server directly instead of relying on same-origin routing
+export function getSocketUrl(requestUrl: string) {
+  if (import.meta.env.DEV) return `http://localhost:${process.env.SOCKET_PORT ?? 3000}`
+
+  const base = new URL(process.env.APP_BASE_URL ?? requestUrl)
+  const wsProtocol = base.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${wsProtocol}//${base.host}`
+}

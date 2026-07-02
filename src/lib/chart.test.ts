@@ -1,3 +1,4 @@
+/// <reference types="bun" />
 import { test, expect } from 'bun:test'
 import { svgLine, svgArea, svgStackedBars } from './chart'
 

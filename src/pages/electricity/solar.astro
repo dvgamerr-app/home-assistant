@@ -13,6 +13,7 @@ import SolarProductionRateCurve from '@/components/charts/SolarProductionRateCur
 import SelfSufficiencyChart from '@/components/charts/SelfSufficiencyChart.astro'
 import { getBangkokISODate, isISODate, parseISODate } from '@/lib/date'
 import { getAll } from '@/lib/solar-data'
+import { getSocketUrl } from '@/lib/socket'
 
 const dateParam = Astro.url.searchParams.get('date')
 const todayISO = getBangkokISODate()
@@ -21,9 +22,7 @@ const selectedDate = parseISODate(selectedISO)
 const isToday = selectedISO === todayISO
 const data = await getAll(selectedDate)
 
-const base = new URL(process.env.APP_BASE_URL ?? Astro.request.url)
-const wsProtocol = base.protocol === 'https:' ? 'wss:' : 'ws:'
-const socketUrl = `${wsProtocol}//${base.host}`
+const socketUrl = getSocketUrl(Astro.request.url)
 ---
 
 <Layout title="ผลิตไฟ — บ้าน">

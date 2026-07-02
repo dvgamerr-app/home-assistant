@@ -1,6 +1,6 @@
 import { formatBangkokDateTime, formatISODate, getBangkokISODate } from './date'
-import { calculateMonthlyBill, marginalRate, MONTH_SHORT_TH } from './electricity'
-import { getBatteryCharge, getBills, get5Min, getHourly, getLifetime, getLiveSnapshot, getMonthDays, getMonths, getPvPeak, getRecentDailyTotals, getToday } from './db'
+import { calculateMonthlyBill, marginalRate, MONTH_LONG_TH, MONTH_SHORT_TH } from './electricity'
+import { getBatteryCharge, getBills, get5Min, getHourly, getLifetime, getLiveSnapshot, getMonthDays, getMonths, getPvPeak, getRecentDailyTotals, getToday, type DayPoint } from './db'
 
 export const SYSTEM = {
   name: 'บ้าน 75/63',
@@ -11,7 +11,6 @@ export const SYSTEM = {
   serialNumber: 'LIBIPS08EEEAF618',
 }
 
-const MONTH_LONG_TH = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม']
 const thMonth = (yyyymm: string) => MONTH_SHORT_TH[parseInt(yyyymm.slice(4)) - 1] ?? yyyymm
 const round = (value: number, digits = 1) => Number(value.toFixed(digits))
 const clampZero = (value: number) => Math.max(0, value)
@@ -44,6 +43,28 @@ function average(values: number[], digits = 1) {
   return round(values.reduce((sum, value) => sum + value, 0) / values.length, digits)
 }
 
+/** เติมวันที่ขาดให้ครบทั้งเดือน + คิดมูลค่าประหยัดต่อวันด้วย marginal rate ของเดือนนั้น */
+function formatMonthDays(monthDays: DayPoint[], year: number, month: number) {
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const dayMap = new Map(monthDays.map((dayPoint) => [dayPoint.day, dayPoint]))
+  const monthlyGridKwh = monthDays.reduce((sum, dayPoint) => sum + dayPoint.gridImport, 0)
+  const rate = marginalRate(monthlyGridKwh || 320)
+
+  return Array.from({ length: daysInMonth }, (_, index) => {
+    const dayPoint = dayMap.get(index + 1) ?? { day: index + 1, generated: 0, consumed: 0, gridImport: 0 }
+    const selfUse = clampZero(dayPoint.consumed - dayPoint.gridImport)
+
+    return {
+      day: String(dayPoint.day),
+      generated: dayPoint.generated,
+      consumed: dayPoint.consumed,
+      selfUse,
+      gridImport: dayPoint.gridImport,
+      saved: +(selfUse * rate).toFixed(1),
+    }
+  })
+}
+
 export async function getAll(date?: Date) {
   const selectedDate = date ?? new Date()
   const year = selectedDate.getFullYear()
@@ -67,34 +88,11 @@ export async function getAll(date?: Date) {
   ])
 
   const storedKwh = (SYSTEM.batteryCapacityKwh * live.batterySoc) / 100
-  const battery = {
-    soc: live.batterySoc,
-    soh: live.batterySoh,
-    powerKw: live.batteryPowerKw,
-    voltage: live.batteryVoltage,
-    current: live.batteryCurrent,
-    cyclePeriod: live.cyclePeriod,
-    status: live.batteryPowerKw < -0.05 ? 'charging' : live.batteryPowerKw > 0.05 ? 'discharging' : 'idle',
-    storedKwh,
-    backupHours: live.loadPowerKw > 0 ? storedKwh / live.loadPowerKw : 0,
-  }
 
   const pvStrings = [
     { name: 'แผง MPPT 1', power: live.pv1.power, voltage: live.pv1.voltage, current: live.pv1.current, installed: true, peakKw: pvPeak.pv1 },
     { name: 'แผง MPPT 2', power: live.pv2.power, voltage: live.pv2.voltage, current: live.pv2.current, installed: true, peakKw: pvPeak.pv2 },
   ]
-
-  const ratedKw = live.powerRating || SYSTEM.ratedPowerKw
-  const systemHealth = {
-    gridVoltage: live.gridVoltage,
-    gridFrequency: 50,
-    inverterVoltage: live.gridVoltage,
-    totalGenerationHours: live.totalGenerationTime,
-    ratedPowerKw: ratedKw,
-    loadFactorPct: ratedKw > 0 ? (live.pvPowerKw / ratedKw) * 100 : 0,
-    gridVoltageOk: live.gridVoltage >= 210 && live.gridVoltage <= 245,
-    gridFrequencyOk: true,
-  }
 
   const selfUseToday = clampZero(today.consumed - today.gridImport)
   const monthlyGridKwh = monthDays.reduce((sum, dayPoint) => sum + dayPoint.gridImport, 0)
@@ -108,23 +106,7 @@ export async function getAll(date?: Date) {
     wouldHaveCostTHB: billNoSolarToday.total - billNoElecToday.total,
     selfSufficiency: today.consumed > 0 ? (selfUseToday / today.consumed) * 100 : 0,
   }
-  const rate = marginalRate(monthlyGridKwh || 320)
-
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const dayMap = new Map(monthDays.map((dayPoint) => [dayPoint.day, dayPoint]))
-  const formattedMonthDays = Array.from({ length: daysInMonth }, (_, index) => {
-    const dayPoint = dayMap.get(index + 1) ?? { day: index + 1, generated: 0, consumed: 0, gridImport: 0 }
-    const selfUse = clampZero(dayPoint.consumed - dayPoint.gridImport)
-
-    return {
-      day: String(dayPoint.day),
-      generated: dayPoint.generated,
-      consumed: dayPoint.consumed,
-      selfUse,
-      gridImport: dayPoint.gridImport,
-      saved: +(selfUse * rate).toFixed(1),
-    }
-  })
+  const formattedMonthDays = formatMonthDays(monthDays, year, month)
 
   const billPaidMap = new Map(bills.map((bill) => [bill.month, bill.paid]))
   const months = rawMonths.map((monthPoint) => {
@@ -151,32 +133,12 @@ export async function getAll(date?: Date) {
 
   const monthLabel = `${MONTH_LONG_TH[month - 1]} ${year + 543}`
 
-  const hourlyMap = new Map(hourly.map((hourPoint) => [hourPoint.hour, hourPoint]))
-  const zeroHour = { hour: 0, pv: 0, load: 0, soc: 0, batteryPower: 0, gridPower: 0 }
-  const fullHourly = Array.from({ length: 24 }, (_, hour) => {
-    const hourPoint = hourlyMap.get(hour) ?? { ...zeroHour, hour }
-    return {
-      hour: `${String(hour).padStart(2, '0')}:00`,
-      pv: hourPoint.pv,
-      load: hourPoint.load,
-      net: +(hourPoint.pv - hourPoint.load).toFixed(2),
-      batt: hourPoint.batteryPower,
-      grid: hourPoint.gridPower,
-    }
-  })
-  const hourlySoc = Array.from({ length: 24 }, (_, hour) => {
-    const hourPoint = hourlyMap.get(hour)
-    return { hour: `${String(hour).padStart(2, '0')}:00`, soc: hourPoint?.soc ?? 0 }
-  })
-
   const full5Min = fiveMinRaw.map((sample) => ({
     minuteOfDay: sample.minuteOfDay,
-    time: `${String(Math.floor(sample.minuteOfDay / 60)).padStart(2, '0')}:${String(sample.minuteOfDay % 60).padStart(2, '0')}`,
     pv: sample.pv,
     pv1: sample.pv1,
     pv2: sample.pv2,
     load: sample.load,
-    net: +(sample.pv - sample.load).toFixed(2),
     batt: sample.batteryPower,
     grid: sample.gridPower,
     soc: sample.soc,
@@ -279,7 +241,9 @@ export async function getAll(date?: Date) {
   ]
 
   const totalSavedToDate = months.reduce((sum, monthPoint) => sum + monthPoint.saved, 0)
-  const monthlyAvgSaving = months.length > 0 ? totalSavedToDate / months.length : 0
+  // months[0] is the current (in-progress) month; average from last full month onward so a partial month doesn't skew the payback rate
+  const completedMonths = months.slice(1)
+  const monthlyAvgSaving = completedMonths.length > 0 ? completedMonths.reduce((sum, monthPoint) => sum + monthPoint.saved, 0) / completedMonths.length : 0
   const remaining = Math.max(0, SYSTEM.investmentTHB - totalSavedToDate)
   const monthsToPayback = monthlyAvgSaving > 0 ? remaining / monthlyAvgSaving : 0
   const payback = {
@@ -376,9 +340,7 @@ export async function getAll(date?: Date) {
   return {
     system: { ...SYSTEM, ratedPowerKw: live.powerRating || SYSTEM.ratedPowerKw },
     live,
-    battery,
     pvStrings,
-    systemHealth,
     freshness,
     alerts,
     today: { ...today, generationHours: hourly.filter((hourPoint) => hourPoint.pv > 0).length },
@@ -390,11 +352,8 @@ export async function getAll(date?: Date) {
     monthPicker,
     months,
     gridOverview,
-    hourly: fullHourly,
-    hourlySoc,
     fiveMin: full5Min,
     energyDistribution,
-    lifetime,
     payback,
     bills: billsEnhanced,
   }
@@ -404,25 +363,7 @@ export type SolarData = Awaited<ReturnType<typeof getAll>>
 
 export async function getMonthLoad(year: number, month: number) {
   const monthDays = await getMonthDays(year, month)
-
-  const daysInMonth = new Date(year, month, 0).getDate()
-  const dayMap = new Map(monthDays.map((dayPoint) => [dayPoint.day, dayPoint]))
-  const monthlyGridKwh = monthDays.reduce((sum, dayPoint) => sum + dayPoint.gridImport, 0)
-  const rate = marginalRate(monthlyGridKwh || 320)
-
-  const days = Array.from({ length: daysInMonth }, (_, index) => {
-    const dayPoint = dayMap.get(index + 1) ?? { day: index + 1, generated: 0, consumed: 0, gridImport: 0 }
-    const selfUse = clampZero(dayPoint.consumed - dayPoint.gridImport)
-
-    return {
-      day: String(dayPoint.day),
-      generated: dayPoint.generated,
-      consumed: dayPoint.consumed,
-      selfUse,
-      gridImport: dayPoint.gridImport,
-      saved: +(selfUse * rate).toFixed(1),
-    }
-  })
+  const days = formatMonthDays(monthDays, year, month)
 
   const raw = days.reduce(
     (acc, dayPoint) => ({

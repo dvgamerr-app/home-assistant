@@ -11,12 +11,10 @@ import PiggyBank from '@lucide/svelte/icons/piggy-bank'
 import Gauge from '@lucide/svelte/icons/gauge'
 import { getAll } from '@/lib/solar-data'
 import { thb, num } from '@/lib/electricity'
+import { getSocketUrl } from '@/lib/socket'
 
 const data = await getAll()
-const base = new URL(process.env.APP_BASE_URL ?? Astro.request.url)
-const wsProtocol = base.protocol === 'https:' ? 'wss:' : 'ws:'
-// ponytail: same-origin, reverse proxy routes /socket.io/ → socket server
-const socketUrl = `${wsProtocol}//${base.host}`
+const socketUrl = getSocketUrl(Astro.request.url)
 ---
 
 <Layout title="ภาพรวมพลังงานในบ้าน">

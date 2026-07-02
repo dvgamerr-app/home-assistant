@@ -148,29 +148,38 @@ const chartJson = JSON.stringify({
 
 <script>
   import { io } from 'socket.io-client'
+  import { svgPathFromPoints } from '@/lib/chart'
   import { SOCKET_CHANNELS } from '@/lib/socket'
 
   {
-    const wrapEl = document.querySelector('.solar-rate-chart-wrapper')
-    const svg = wrapEl?.querySelector('svg')
-    const tip = document.querySelector('.solar-rate-tip')
-    const xAxis = document.getElementById('solar-rate-x-axis')
-    const yAxis = document.getElementById('solar-rate-y-axis')
-    if (!wrapEl || !svg || !tip || !xAxis || !yAxis) throw new Error('solar-rate-chart: elements not found')
+    const wrapNullable = document.querySelector<HTMLElement>('.solar-rate-chart-wrapper')
+    const svgNullable = wrapNullable?.querySelector<SVGSVGElement>('svg')
+    const tipNullable = document.querySelector<HTMLElement>('.solar-rate-tip')
+    const xAxisNullable = document.getElementById('solar-rate-x-axis')
+    const yAxisNullable = document.getElementById('solar-rate-y-axis')
+    if (!wrapNullable || !svgNullable || !tipNullable || !xAxisNullable || !yAxisNullable) throw new Error('solar-rate-chart: elements not found')
+    const wrapEl = wrapNullable
+    const svg = svgNullable
+    const tip = tipNullable
+    const xAxis = xAxisNullable
+    const yAxis = yAxisNullable
+    const tipHourEl = tip.querySelector('.solar-rate-tip-hour')!
+    const tipPv1El = tip.querySelector('.solar-rate-tip-pv1')!
+    const tipPv2El = tip.querySelector('.solar-rate-tip-pv2')!
 
-    const J = JSON.parse(wrapEl.dataset.chart)
-    let pv1All = J.pv1
-    let pv2All = J.pv2
-    let times = J.times
-    const ratedPowerKw = J.ratedPowerKw
-    const isToday = J.isToday
-    const socketUrl = J.socketUrl
+    const J = JSON.parse(wrapEl.dataset.chart!)
+    let pv1All: number[] = J.pv1
+    let pv2All: number[] = J.pv2
+    let times: number[] = J.times
+    const ratedPowerKw: number = J.ratedPowerKw
+    const isToday: boolean = J.isToday
+    const socketUrl: string = J.socketUrl
 
-    const clamp01 = (value) => Math.max(0, Math.min(1, value))
-    const toPct = (kw) => (ratedPowerKw > 0 ? (kw / ratedPowerKw) * 100 : 0)
-    const fmtKw = (kw) => `${kw.toFixed(2)} kW`
-    const fmtPct = (pct) => `${pct.toFixed(0)}%`
-    const fmtTime = (minuteOfDay) => `${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')} น.`
+    const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
+    const toPct = (kw: number) => (ratedPowerKw > 0 ? (kw / ratedPowerKw) * 100 : 0)
+    const fmtKw = (kw: number) => `${kw.toFixed(2)} kW`
+    const fmtPct = (pct: number) => `${pct.toFixed(0)}%`
+    const fmtTime = (minuteOfDay: number) => `${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')} น.`
 
     function totalSeries() {
       return pv2All.map((value, index) => value + (pv1All[index] ?? 0))
@@ -181,7 +190,7 @@ const chartJson = JSON.stringify({
       return Math.max(100, Math.ceil(Math.max(peakPct, 1) / 25) * 25)
     }
 
-    function renderYAxis(maxPct) {
+    function renderYAxis(maxPct: number) {
       const ticks = Array.from({ length: 5 }, (_, index) => maxPct - (maxPct / 4) * index)
       const chartHeight = 220
       const topInset = 18
@@ -196,52 +205,18 @@ const chartJson = JSON.stringify({
         .join('')
     }
 
-    function buildPoints(values, xMin, yMin, xMax, yMax, maxPct) {
+    function buildPoints(values: number[], xMin: number, yMin: number, xMax: number, yMax: number, maxPct: number) {
       return values.map((value, index) => ({
         x: xMin + (times[index] / 1439) * (xMax - xMin),
         y: yMin + (1 - clamp01(value / maxPct)) * (yMax - yMin),
       }))
     }
 
-    function smoothPath(values, xMin, yMin, xMax, yMax, maxPct) {
-      if (values.length < 2) return ''
-      const tension = 0.9
-      const pts = buildPoints(values, xMin, yMin, xMax, yMax, maxPct)
-      const slopes = pts.slice(0, -1).map((point, index) => (pts[index + 1].y - point.y) / (pts[index + 1].x - point.x))
-      const tangents = pts.map((_, index) => {
-        if (index === 0) return slopes[0]
-        if (index === pts.length - 1) return slopes[slopes.length - 1]
-        const prev = slopes[index - 1]
-        const next = slopes[index]
-        if (prev === 0 || next === 0 || Math.sign(prev) !== Math.sign(next)) return 0
-        return (2 * prev * next) / (prev + next)
-      })
-      slopes.forEach((slope, index) => {
-        if (slope === 0) {
-          tangents[index] = 0
-          tangents[index + 1] = 0
-          return
-        }
-        const a = tangents[index] / slope
-        const b = tangents[index + 1] / slope
-        const hypot = Math.hypot(a, b)
-        if (hypot > 3) {
-          const scale = 3 / hypot
-          tangents[index] = scale * a * slope
-          tangents[index + 1] = scale * b * slope
-        }
-      })
-      let path = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`
-      for (let index = 1; index < pts.length; index++) {
-        const prev = pts[index - 1]
-        const next = pts[index]
-        const dx = (next.x - prev.x) / 3
-        path += ` C ${(prev.x + dx * tension).toFixed(1)},${(prev.y + tangents[index - 1] * dx * tension).toFixed(1)} ${(next.x - dx * tension).toFixed(1)},${(next.y - tangents[index] * dx * tension).toFixed(1)} ${next.x.toFixed(1)},${next.y.toFixed(1)}`
-      }
-      return path
+    function smoothPath(values: number[], xMin: number, yMin: number, xMax: number, yMax: number, maxPct: number) {
+      return svgPathFromPoints(buildPoints(values, xMin, yMin, xMax, yMax, maxPct))
     }
 
-    function stackAreaPath(topValues, bottomValues, xMin, yMin, xMax, yMax, maxPct) {
+    function stackAreaPath(topValues: number[], bottomValues: number[], xMin: number, yMin: number, xMax: number, yMax: number, maxPct: number) {
       if (topValues.length === 0) return ''
       const top = buildPoints(topValues, xMin, yMin, xMax, yMax, maxPct)
       const bottom = buildPoints(bottomValues, xMin, yMin, xMax, yMax, maxPct).reverse()
@@ -251,21 +226,19 @@ const chartJson = JSON.stringify({
     let curPx0 = 0
     let curPx1 = 0
     let curW = 0
-    let crosshair = null
+    let crosshair: SVGLineElement | null = null
 
     function syncSummary() {
       const latestMinute = times.at(-1)
       const latestPv1Kw = pv1All.at(-1) ?? 0
       const latestPv2Kw = pv2All.at(-1) ?? 0
-      const latestPv1Pct = toPct(latestPv1Kw)
-      const latestPv2Pct = toPct(latestPv2Kw)
 
       const pv1PctEl = document.getElementById('solar-rate-pv1-pct')
-      if (pv1PctEl) pv1PctEl.textContent = latestPv1Pct.toFixed(0)
+      if (pv1PctEl) pv1PctEl.textContent = toPct(latestPv1Kw).toFixed(0)
       const pv1KwEl = document.getElementById('solar-rate-pv1-kw')
       if (pv1KwEl) pv1KwEl.textContent = latestPv1Kw.toFixed(2)
       const pv2PctEl = document.getElementById('solar-rate-pv2-pct')
-      if (pv2PctEl) pv2PctEl.textContent = latestPv2Pct.toFixed(0)
+      if (pv2PctEl) pv2PctEl.textContent = toPct(latestPv2Kw).toFixed(0)
       const pv2KwEl = document.getElementById('solar-rate-pv2-kw')
       if (pv2KwEl) pv2KwEl.textContent = latestPv2Kw.toFixed(2)
       const latestTimeEl = document.getElementById('solar-rate-latest-time')
@@ -337,7 +310,7 @@ const chartJson = JSON.stringify({
       syncSummary()
     }
 
-    let resizeTimer
+    let resizeTimer: ReturnType<typeof setTimeout>
     const ro = new ResizeObserver(() => {
       clearTimeout(resizeTimer)
       resizeTimer = setTimeout(draw, 150)
@@ -368,9 +341,9 @@ const chartJson = JSON.stringify({
       crosshair.setAttribute('x2', cx)
       crosshair.setAttribute('visibility', 'visible')
 
-      tip.querySelector('.solar-rate-tip-hour').textContent = fmtTime(times[idx])
-      tip.querySelector('.solar-rate-tip-pv1').textContent = `${fmtPct(toPct(pv1All[idx] ?? 0))} • ${fmtKw(pv1All[idx] ?? 0)}`
-      tip.querySelector('.solar-rate-tip-pv2').textContent = `${fmtPct(toPct(pv2All[idx] ?? 0))} • ${fmtKw(pv2All[idx] ?? 0)}`
+      tipHourEl.textContent = fmtTime(times[idx])
+      tipPv1El.textContent = `${fmtPct(toPct(pv1All[idx] ?? 0))} • ${fmtKw(pv1All[idx] ?? 0)}`
+      tipPv2El.textContent = `${fmtPct(toPct(pv2All[idx] ?? 0))} • ${fmtKw(pv2All[idx] ?? 0)}`
       tip.classList.remove('hidden')
       tip.style.left = Math.min(event.clientX + 14, window.innerWidth - 204) + 'px'
       tip.style.top = Math.max(event.clientY - 96, 8) + 'px'
@@ -381,33 +354,25 @@ const chartJson = JSON.stringify({
       crosshair?.setAttribute('visibility', 'hidden')
     })
 
-    if (isToday) {
-      const socket = io(socketUrl, { transports: ['websocket'] })
+    const socket = isToday ? io(socketUrl, { transports: ['websocket'] }) : null
+    if (socket) {
       socket.on('connect', () => {
         socket.emit('subscribe', SOCKET_CHANNELS.solarFiveMin)
       })
-      socket.on(SOCKET_CHANNELS.solarFiveMin, (payload) => {
+      socket.on(SOCKET_CHANNELS.solarFiveMin, (payload: { pv1?: number[]; pv2?: number[]; times?: number[] }) => {
         pv1All = payload.pv1 ?? pv1All
         pv2All = payload.pv2 ?? pv2All
         times = payload.times ?? times
         draw()
       })
-      window.addEventListener(
-        'pagehide',
-        () => {
-          ro.disconnect()
-          socket.disconnect()
-        },
-        { once: true },
-      )
-    } else {
-      window.addEventListener(
-        'pagehide',
-        () => {
-          ro.disconnect()
-        },
-        { once: true },
-      )
     }
+    window.addEventListener(
+      'pagehide',
+      () => {
+        ro.disconnect()
+        socket?.disconnect()
+      },
+      { once: true },
+    )
   }
 </script>

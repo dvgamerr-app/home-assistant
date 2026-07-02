@@ -5,8 +5,9 @@ import svelte from '@astrojs/svelte'
 import node from '@astrojs/node'
 import { spawn } from 'child_process'
 
-/** @type {import('vite').Plugin} */
+/** @type {import('child_process').ChildProcess | null} */
 let socketProc = null
+/** @type {import('vite').Plugin} */
 const socketServer = {
   name: 'socket-server',
   configureServer() {

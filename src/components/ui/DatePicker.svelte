@@ -2,23 +2,19 @@
   import { untrack } from 'svelte'
   import ChevronLeft from '@lucide/svelte/icons/chevron-left'
   import ChevronRight from '@lucide/svelte/icons/chevron-right'
+  import { formatISODate, shiftISODate } from '@/lib/date'
+  import { MONTH_LONG_TH } from '@/lib/electricity'
 
   let { selected }: { selected: string } = $props()
 
-  const MONTH_TH = ['มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม']
   const DOW_TH = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา']
 
-  const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  const shift = (iso: string, days: number) => {
-    const [y, m, d] = iso.split('-').map(Number)
-    return toISO(new Date(y, m - 1, d + days))
-  }
-  const today = toISO(new Date())
-  const yesterday = shift(today, -1)
+  const today = formatISODate(new Date())
+  const yesterday = shiftISODate(today, -1)
 
   function displayDate(iso: string) {
     const [y, m, d] = iso.split('-').map(Number)
-    return `${d} ${MONTH_TH[m - 1]} ${y + 543}`
+    return `${d} ${MONTH_LONG_TH[m - 1]} ${y + 543}`
   }
 
   const [selY, selM] = untrack(() => selected.split('-').map(Number))
@@ -37,7 +33,7 @@
     })(),
   )
 
-  const viewLabel = $derived(`${MONTH_TH[viewMonth]} ${viewYear + 543}`)
+  const viewLabel = $derived(`${MONTH_LONG_TH[viewMonth]} ${viewYear + 543}`)
   const canNextMonth = $derived(`${viewYear}-${String(viewMonth + 2).padStart(2, '0')}` <= today.slice(0, 7))
 
   function navigate(iso: string) {
@@ -45,7 +41,7 @@
   }
 
   function offset(days: number) {
-    navigate(shift(selected, days))
+    navigate(shiftISODate(selected, days))
   }
 
   function prevMonth() {
