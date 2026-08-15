@@ -1,17 +1,18 @@
 ---
-type Props = { active: 'load' | 'solar' | 'bill' }
+type Props = { active: 'load' | 'solar' | 'bill' | 'water' }
 const { active } = Astro.props
 const tabs = [
   { id: 'load', label: 'การใช้ไฟในบ้าน', href: '/electricity/load' },
   { id: 'solar', label: 'ผลิตไฟ', href: '/electricity/solar' },
   { id: 'bill', label: 'การจ่ายค่าไฟ', href: '/electricity/bill' },
+  { id: 'water', label: 'การจ่ายค่าน้ำ', href: '/electricity/water' },
 ]
 ---
 
 <div class="mb-8 flex gap-4 overflow-x-auto border-b border-border/60 pb-1">
   {
     tabs.map((t) => (
-      <a href={t.href} class:list={['lbl', { active: t.id === active }]}>
+      <a href={t.href} aria-current={t.id === active ? ('page' as const) : undefined} class:list={['lbl', { active: t.id === active }]}>
         {t.label}
       </a>
     ))

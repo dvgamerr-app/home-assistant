@@ -1,0 +1,151 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import Nav from '@/components/Nav.astro'
+import ElectricityNav from '@/components/ElectricityNav.astro'
+import StatCard from '@/components/StatCard.astro'
+import Droplets from '@lucide/svelte/icons/droplets'
+import Receipt from '@lucide/svelte/icons/receipt'
+import Coins from '@lucide/svelte/icons/coins'
+import Gauge from '@lucide/svelte/icons/gauge'
+import { getWaterUsageData, type WaterUsageData } from '@/lib/solar-data'
+import { num, thb } from '@/lib/electricity'
+import { formatThaiDate } from '@/lib/date'
+
+const data = await getWaterUsageData()
+const { latest, usageChangeFromPrevious, amountChangeFromPrevious } = data
+
+const usageComparison =
+  usageChangeFromPrevious === null
+    ? ''
+    : usageChangeFromPrevious === 0
+      ? 'เท่ากับเดือนก่อน'
+      : `${usageChangeFromPrevious > 0 ? 'มากขึ้น' : 'น้อยลง'} ${num(Math.abs(usageChangeFromPrevious), 0)} ลบ.ม. จากเดือนก่อน`
+
+const amountComparison =
+  amountChangeFromPrevious === null
+    ? ''
+    : amountChangeFromPrevious === 0
+      ? 'เท่ากับเดือนก่อน'
+      : `${amountChangeFromPrevious > 0 ? 'มากขึ้น' : 'น้อยลง'} ${thb(Math.abs(amountChangeFromPrevious), 2)} จากเดือนก่อน`
+
+type WaterBill = WaterUsageData['months'][number]
+
+function paymentStatus(bill: WaterBill) {
+  if (bill.isPaid) {
+    return {
+      label: 'ชำระแล้ว',
+      tone: 'text-chart-1',
+      detail: bill.paidDate ? `ชำระ ${formatThaiDate(bill.paidDate)}` : '',
+    }
+  }
+
+  if (bill.paidAmount > 0 && bill.remainingAmount > 0) {
+    return {
+      label: 'ชำระบางส่วน',
+      tone: 'text-chart-2',
+      detail: `คงเหลือ ${thb(bill.remainingAmount, 2)}`,
+    }
+  }
+
+  return {
+    label: 'รอชำระ',
+    tone: 'text-chart-4',
+    detail: bill.dueDate ? `ครบกำหนด ${formatThaiDate(bill.dueDate)}` : '',
+  }
+}
+
+const latestStatus = latest ? paymentStatus(latest) : null
+---
+
+<Layout title="ค่าน้ำและการใช้น้ำ — บ้าน">
+  <Nav />
+  <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
+    <header class="space-y-3">
+      <p class="text-[11px] uppercase tracking-luxury text-muted-foreground">ระบบสาธารณูปโภค</p>
+      <h1 class="font-serif text-4xl font-light leading-tight text-foreground md:text-5xl">ค่าน้ำและการใช้น้ำ</h1>
+    </header>
+
+    <ElectricityNav active="water" />
+
+    <div class="space-y-6">
+      <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          label="การใช้น้ำเดือนล่าสุด"
+          value={latest ? `${num(latest.consumption, 0)} ลบ.ม.` : '—'}
+          sub={latest ? `${latest.label}${usageComparison ? ` · ${usageComparison}` : ''}` : 'ยังไม่มีข้อมูลการอ่านมิเตอร์'}
+          accent="blue"
+        >
+          <Droplets slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard
+          label="จ่ายค่าน้ำเดือนล่าสุด"
+          value={latest ? thb(latest.paidAmount, 2) : '—'}
+          sub={latest ? `${latestStatus?.label ?? ''}${amountComparison ? ` · ${amountComparison}` : ''}` : 'ยังไม่มีข้อมูลการชำระ'}
+          accent="terracotta"
+        >
+          <Receipt slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard label="ค่าใช้จ่ายต่อ ลบ.ม." value={latest ? thb(latest.unitPrice, 2) : '—'} sub="ยอดบิลรวม ÷ ปริมาณใช้น้ำ" accent="brass">
+          <Coins slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard label="ใช้น้ำเฉลี่ยต่อเดือน" value={data.months.length > 0 ? `${num(data.averageConsumption, 1)} ลบ.ม.` : '—'} sub={`ย้อนหลัง ${data.months.length} รอบบิล`} accent="sage">
+          <Gauge slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+      </div>
+
+      <section class="rounded-lg border border-border/70 bg-card">
+        <div class="border-b border-border/60 px-6 py-4">
+          <h2 class="font-serif text-lg font-light text-foreground">ประวัติค่าน้ำรายเดือน</h2>
+          <p class="mt-1 text-sm text-muted-foreground">ข้อมูลจากการประปานครหลวง · จ่ายสะสม {thb(data.totalPaid, 2)} ใน {data.months.length} รอบบิล</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-border/40 text-left text-[10px] uppercase tracking-luxury text-muted-foreground">
+                <th class="px-6 py-3">เดือน</th>
+                <th class="px-4 py-3 text-right">การใช้น้ำ</th>
+                <th class="px-4 py-3 text-right">เฉลี่ย/ลบ.ม.</th>
+                <th class="px-4 py-3 text-right">ยอดบิล</th>
+                <th class="px-4 py-3 text-right">จ่ายจริง</th>
+                <th class="px-6 py-3 text-right">สถานะ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                data.months.length > 0 ? (
+                  data.months.map((row) => {
+                    const status = paymentStatus(row)
+                    return (
+                      <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
+                        <td class="px-6 py-3 text-muted-foreground">
+                          <span class="block text-foreground">{row.label}</span>
+                          {row.readDate && <span class="mt-0.5 block text-xs">อ่านมิเตอร์ {formatThaiDate(row.readDate)}</span>}
+                        </td>
+                        <td class="px-4 py-3 text-right tabular-nums text-foreground">{num(row.consumption, 0)} ลบ.ม.</td>
+                        <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(row.unitPrice, 2)}</td>
+                        <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(row.billedAmount, 2)}</td>
+                        <td class="px-4 py-3 text-right tabular-nums text-foreground">{row.paidAmount > 0 ? thb(row.paidAmount, 2) : '—'}</td>
+                        <td class="px-6 py-3 text-right">
+                          <span class:list={['block text-xs', status.tone]}>{status.label}</span>
+                          {status.detail && <span class="mt-0.5 block whitespace-nowrap text-xs text-muted-foreground">{status.detail}</span>}
+                        </td>
+                      </tr>
+                    )
+                  })
+                ) : (
+                  <tr>
+                    <td colspan="6" class="px-6 py-10 text-center text-sm text-muted-foreground">
+                      ยังไม่มีข้อมูลการใช้น้ำ
+                    </td>
+                  </tr>
+                )
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <p class="text-pretty pb-4 text-center text-xs leading-relaxed text-muted-foreground">ยอดบิลรวมภาษีมูลค่าเพิ่มตามข้อมูล MWA · สถานะพิจารณาจากยอดคงเหลือและวันที่ชำระ</p>
+  </main>
+</Layout>

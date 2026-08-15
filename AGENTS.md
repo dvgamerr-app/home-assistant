@@ -28,6 +28,7 @@ ALLOWED_EMAILS        # comma-separated อีเมลที่อนุญา�
 SOCKET_PORT           # port socket.io server (default 3000)
 SOLAR_DEVICE_ID       # device_id ใน stash.solar_record
 MEA_HOUSE_CA          # เลข CA ของบ้านใน stash.mea_electric
+MWA_ACCOUNT_CODE      # account_code ใน stash.mwa_account (ถ้าไม่ตั้ง ใช้บัญชีแรก)
 GITHUB_CLIENT_ID/SECRET  # สำหรับ GitHub OAuth (optional)
 ```
 
@@ -49,15 +50,17 @@ bun run dev:socket      # รัน socket.io server แยก process (ใช�
 
 ```sql
 stash.solar_record   -- EAV: (device_id, attr, value, recorded_at)
-stash.mea_electric   -- บิลไฟ MEA: (month YYYYMM, kwh, paid, recorded_at)
+stash.mea_electric   -- บิลและสถานะชำระ MEA: (month YYYYMM, kwh, paid, payment_status, paid_at, due_date, outstanding_amount, payment_amount, payment_channel)
 stash.mea_meter      -- มิเตอร์: (month YYYYMM, reading, recorded_at)
+stash.mwa_account    -- บัญชีผู้ใช้น้ำ MWA: (account_code, branch, meter size, status)
+stash.mwa_water      -- รอบบิลน้ำ MWA: (period_year/month, consumption, current_read_date, amounts)
 ```
 
 pivot EAV: `DISTINCT ON (attr) ORDER BY attr, recorded_at DESC` ดึงค่าล่าสุดต่อ attribute
 
 ## โครงสร้าง
 
-- `src/pages/` — `index.astro` (ภาพรวม slim) · `electricity/` (`load` การใช้ไฟ / `solar` ผลิตไฟ / `bill` ค่าไฟ, สลับด้วย `ElectricityNav`; `index` redirect ไป `load`) · `login.astro` · `no-permission.astro` · `api/auth/[...all].ts`
+- `src/pages/` — `index.astro` (ภาพรวม slim) · `electricity/` (`load` การใช้ไฟ / `solar` ผลิตไฟ / `bill` ค่าไฟ / `water` การใช้น้ำ, สลับด้วย `ElectricityNav`; `index` redirect ไป `load`) · `login.astro` · `no-permission.astro` · `api/auth/[...all].ts`
 - `src/middleware.ts` — ตรวจ session + allowlist ทุก request ยกเว้น `/login`, `/no-permission`, `/api/auth`
 - `src/layouts/Layout.astro` — shell, โหลดฟอนต์ + script set theme กัน flash
 - `src/components/` — `.astro` static เป็นหลัก, Svelte islands: `LiveClock.svelte` · `ThemeToggle.svelte` · `LogoutButton.svelte` · `LoginForm.svelte` · `EnergyFlow.svelte` (socket.io) · `SolarStatusCards.svelte` (socket.io) · `ui/DatePicker.svelte`. กราฟอยู่ใน `components/charts/`

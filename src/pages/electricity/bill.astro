@@ -13,23 +13,93 @@ import CalendarRange from '@lucide/svelte/icons/calendar-range'
 import Target from '@lucide/svelte/icons/target'
 import { getAll } from '@/lib/solar-data'
 import { MONTH_SHORT_TH, num, thb } from '@/lib/electricity'
+import { formatThaiDate } from '@/lib/date'
 
 const data = await getAll()
 
 const billRows = data.bills.map((bill) => ({
-  month: MONTH_SHORT_TH[parseInt(bill.month.slice(4)) - 1] ?? bill.month,
+  month: `${MONTH_SHORT_TH[parseInt(bill.month.slice(4)) - 1] ?? bill.month} ${parseInt(bill.month.slice(0, 4)) + 543}`,
   kwh: bill.kwh,
-  paid: bill.paid,
+  billAmount: bill.paid,
   withoutSolar: bill.withoutSolar,
   saved: bill.savedTHB,
+  paymentStatus: bill.paymentStatus,
+  paidAt: bill.paidAt,
+  dueDate: bill.dueDate,
+  outstandingAmount: bill.outstandingAmount,
+  paymentAmount: bill.paymentAmount,
+  paymentChannel: bill.paymentChannel,
+  paymentKey: bill.receiptNo ?? (bill.paidAt && bill.paymentAmount !== null ? [bill.paidAt.toISOString(), bill.paymentAmount, bill.paymentChannel ?? ''].join('|') : null),
 }))
 
+type BillRow = (typeof billRows)[number]
+
+const paymentGroups = new Map<string, { count: number; primaryMonth: string }>()
+for (const bill of billRows) {
+  if (!bill.paymentKey) continue
+  const group = paymentGroups.get(bill.paymentKey)
+  if (group) group.count += 1
+  else paymentGroups.set(bill.paymentKey, { count: 1, primaryMonth: bill.month })
+}
+
+function paymentState(bill: BillRow) {
+  const status = bill.paymentStatus?.trim().toLowerCase() ?? ''
+
+  if (status === 'paid') {
+    const group = bill.paymentKey ? paymentGroups.get(bill.paymentKey) : undefined
+    const parts = [bill.paidAt ? `ชำระ ${formatThaiDate(bill.paidAt)}` : '', bill.paymentChannel ?? '', group && group.count > 1 ? `รวม ${group.count} บิล` : ''].filter(Boolean)
+    return { label: 'ชำระแล้ว', tone: 'text-chart-1', detail: parts.join(' · '), needsReview: false }
+  }
+
+  if (status === 'partial' || status === 'partially_paid' || ((bill.paymentAmount ?? 0) > 0 && (bill.outstandingAmount ?? 0) > 0)) {
+    return {
+      label: 'ชำระบางส่วน',
+      tone: 'text-chart-2',
+      detail: bill.outstandingAmount !== null ? `คงเหลือ ${thb(bill.outstandingAmount, 2)}` : '',
+      needsReview: true,
+    }
+  }
+
+  if (status === 'overdue' || status === 'late') {
+    return {
+      label: 'เกินกำหนด',
+      tone: 'text-chart-4',
+      detail: bill.outstandingAmount !== null ? `คงเหลือ ${thb(bill.outstandingAmount, 2)}` : '',
+      needsReview: true,
+    }
+  }
+
+  if (status === 'pending' || status === 'unpaid' || status === 'outstanding') {
+    return {
+      label: 'รอชำระ',
+      tone: 'text-chart-4',
+      detail: bill.dueDate ? `ครบกำหนด ${formatThaiDate(bill.dueDate)}` : '',
+      needsReview: true,
+    }
+  }
+
+  if (status) return { label: bill.paymentStatus ?? status, tone: 'text-muted-foreground', detail: 'สถานะใหม่ที่ยังไม่ได้กำหนดคำแปล', needsReview: true }
+  return { label: 'ยังไม่พบหลักฐานชำระ', tone: 'text-chart-2', detail: 'รอตรวจสอบกับประวัติการชำระ MEA', needsReview: true }
+}
+
 const totalSaved = billRows.reduce((sum: number, row: (typeof billRows)[0]) => sum + row.saved, 0)
+const billsNeedingPaymentReview = billRows.filter((bill) => paymentState(bill).needsReview)
+const paymentReviewSummary =
+  billRows.length === 0
+    ? { title: 'ยังไม่มีข้อมูลบิลให้ตรวจสอบ', detail: 'ระบบจะแสดงสถานะเมื่อได้รับข้อมูลบิลจาก MEA', ok: false }
+    : billsNeedingPaymentReview.length === 0
+      ? { title: 'พบหลักฐานชำระครบทุกบิล', detail: `ตรวจแล้ว ${billRows.length} รอบบิลจากข้อมูล MEA`, ok: true }
+      : {
+          title: `มี ${billsNeedingPaymentReview.length} บิลที่ต้องตรวจสอบ`,
+          detail: 'รวมบิลที่รอชำระและบิลที่ยังไม่พบหลักฐานชำระ โดยยังไม่ถือว่าเป็นหนี้ค้างจนกว่าจะมีข้อมูลยืนยันจาก MEA',
+          ok: false,
+        }
 const latestBill = billRows[0]
 const previousBill = billRows[1]
+const latestPayment = latestBill ? paymentState(latestBill) : null
 const latestVsPrevious = previousBill
   ? {
-      paid: latestBill ? latestBill.paid - previousBill.paid : 0,
+      billAmount: latestBill ? latestBill.billAmount - previousBill.billAmount : 0,
       saved: latestBill ? latestBill.saved - previousBill.saved : 0,
     }
   : null
@@ -47,7 +117,13 @@ const latestVsPrevious = previousBill
 
     <div class="space-y-6">
       <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard label="จ่ายค่าไฟเดือนล่าสุด" value={thb(latestBill?.paid ?? 0, 0)} sub={`ใช้ไฟ ${num(latestBill?.kwh ?? 0, 0)} หน่วย`} accent="terracotta">
+        <StatCard
+          label="ยอดค่าไฟเดือนล่าสุด"
+          value={latestBill ? thb(latestBill.billAmount, 2) : '—'}
+          sub={latestBill ? `ใช้ไฟ ${num(latestBill.kwh, 0)} หน่วย${latestPayment?.detail ? ` · ${latestPayment.detail}` : ''}` : 'ยังไม่มีข้อมูลบิล'}
+          accent="terracotta"
+          trend={latestPayment?.label}
+        >
           <Receipt slot="icon" size={18} strokeWidth={1.25} />
         </StatCard>
         <StatCard label="ถ้าไม่มีโซลาร์" value={thb(latestBill?.withoutSolar ?? 0, 0)} sub="ประมาณการตามอัตรา MEA" accent="blue">
@@ -65,6 +141,15 @@ const latestVsPrevious = previousBill
           <Gauge slot="icon" size={18} strokeWidth={1.25} />
         </StatCard>
       </div>
+
+      <section class="flex items-start gap-3 rounded-lg border border-border/70 bg-card px-5 py-4">
+        <span aria-hidden={true} class:list={['mt-1 h-2 w-2 shrink-0 rounded-full', paymentReviewSummary.ok ? 'bg-chart-1' : 'bg-chart-2']}></span>
+        <div>
+          <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">การตรวจสอบสถานะชำระ</p>
+          <p class:list={['mt-1 text-sm font-medium', paymentReviewSummary.ok ? 'text-chart-1' : 'text-foreground']}>{paymentReviewSummary.title}</p>
+          <p class="mt-1 text-xs leading-relaxed text-muted-foreground">{paymentReviewSummary.detail}</p>
+        </div>
+      </section>
 
       <section class="rounded-lg border border-border/70 bg-card p-6">
         <div class="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-5">
@@ -122,7 +207,7 @@ const latestVsPrevious = previousBill
           {
             latestVsPrevious && (
               <p class="mt-2 text-xs text-muted-foreground">
-                เดือนล่าสุดจ่าย {latestVsPrevious.paid >= 0 ? 'มากขึ้น' : 'น้อยลง'} {thb(Math.abs(latestVsPrevious.paid), 0)} จากเดือนก่อน
+                เดือนล่าสุดมียอดค่าไฟ {latestVsPrevious.billAmount >= 0 ? 'มากขึ้น' : 'น้อยลง'} {thb(Math.abs(latestVsPrevious.billAmount), 0)} จากเดือนก่อน
               </p>
             )
           }
@@ -133,22 +218,45 @@ const latestVsPrevious = previousBill
               <tr class="border-b border-border/40 text-left text-[10px] uppercase tracking-luxury text-muted-foreground">
                 <th class="px-6 py-3">เดือน</th>
                 <th class="px-4 py-3 text-right">หน่วย (kWh)</th>
-                <th class="px-4 py-3 text-right">จ่ายจริง</th>
+                <th class="px-4 py-3 text-right">ยอดค่าไฟ</th>
+                <th class="px-4 py-3 text-right">รายการชำระ</th>
+                <th class="px-4 py-3 text-right">สถานะ</th>
                 <th class="px-4 py-3 text-right">ถ้าไม่มีโซลาร์</th>
                 <th class="px-6 py-3 text-right">ประหยัด</th>
               </tr>
             </thead>
             <tbody>
               {
-                billRows.map((row) => (
-                  <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
-                    <td class="px-6 py-3 text-muted-foreground">{row.month}</td>
-                    <td class="px-4 py-3 text-right tabular-nums">{num(row.kwh, 0)}</td>
-                    <td class="px-4 py-3 text-right tabular-nums text-foreground">{thb(row.paid, 0)}</td>
-                    <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(row.withoutSolar, 0)}</td>
-                    <td class="px-6 py-3 text-right tabular-nums text-chart-1">{thb(row.saved, 0)}</td>
-                  </tr>
-                ))
+                billRows.map((row) => {
+                  const payment = paymentState(row)
+                  const paymentGroup = row.paymentKey ? paymentGroups.get(row.paymentKey) : undefined
+                  const isPrimaryPayment = !paymentGroup || paymentGroup.primaryMonth === row.month
+                  return (
+                    <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
+                      <td class="px-6 py-3 text-muted-foreground">{row.month}</td>
+                      <td class="px-4 py-3 text-right tabular-nums">{num(row.kwh, 0)}</td>
+                      <td class="px-4 py-3 text-right tabular-nums text-foreground">{thb(row.billAmount, 2)}</td>
+                      <td class="px-4 py-3 text-right tabular-nums text-foreground">
+                        {row.paymentAmount === null ? (
+                          '—'
+                        ) : isPrimaryPayment ? (
+                          <>
+                            <span class="block">{thb(row.paymentAmount, 2)}</span>
+                            {paymentGroup && paymentGroup.count > 1 && <span class="mt-0.5 block whitespace-nowrap text-xs text-muted-foreground">รวม {paymentGroup.count} บิล</span>}
+                          </>
+                        ) : (
+                          <span class="block whitespace-nowrap text-xs text-muted-foreground">รวมในรายการ {paymentGroup?.primaryMonth}</span>
+                        )}
+                      </td>
+                      <td class="px-4 py-3 text-right">
+                        <span class:list={['block whitespace-nowrap text-xs', payment.tone]}>{payment.label}</span>
+                        {payment.detail && <span class="mt-0.5 block whitespace-nowrap text-xs text-muted-foreground">{payment.detail}</span>}
+                      </td>
+                      <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(row.withoutSolar, 0)}</td>
+                      <td class="px-6 py-3 text-right tabular-nums text-chart-1">{thb(row.saved, 0)}</td>
+                    </tr>
+                  )
+                })
               }
             </tbody>
           </table>
@@ -156,6 +264,8 @@ const latestVsPrevious = previousBill
       </section>
     </div>
 
-    <p class="text-pretty pb-4 text-center text-xs leading-relaxed text-muted-foreground">ค่าประมาณอ้างอิงตามอัตราค่าไฟบ้านอยู่อาศัยประเภท 1.2 ของ MEA รวมค่า Ft และ VAT 7%</p>
+    <p class="text-pretty pb-4 text-center text-xs leading-relaxed text-muted-foreground">
+      ค่าประมาณอ้างอิงตามอัตราค่าไฟบ้านอยู่อาศัยประเภท 1.2 ของ MEA รวมค่า Ft และ VAT 7% · บิลที่ไม่พบใน payment history จะแสดง “ยังไม่พบหลักฐานชำระ” ไม่ใช่ “ค้างชำระ”
+    </p>
   </main>
 </Layout>

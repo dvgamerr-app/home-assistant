@@ -1,6 +1,6 @@
 import { formatBangkokDateTime, formatISODate, getBangkokISODate } from './date'
 import { calculateMonthlyBill, marginalRate, MONTH_LONG_TH, MONTH_SHORT_TH } from './electricity'
-import { getBatteryCharge, getBills, get5Min, getHourly, getLifetime, getLiveSnapshot, getMonthDays, getMonths, getPvPeak, getRecentDailyTotals, getToday, type DayPoint } from './db'
+import { getBatteryCharge, getBills, get5Min, getHourly, getLifetime, getLiveSnapshot, getMonthDays, getMonths, getPvPeak, getRecentDailyTotals, getToday, getWaterUsage, type DayPoint } from './db'
 
 export const SYSTEM = {
   name: 'บ้าน 75/63',
@@ -397,3 +397,31 @@ export async function getMonthLoad(year: number, month: number) {
 }
 
 export type MonthLoad = Awaited<ReturnType<typeof getMonthLoad>>
+
+/** ข้อมูลหน้าใช้น้ำ แยกจาก getAll() เพื่อไม่ให้หน้าพลังงานต้อง query ตารางน้ำโดยไม่จำเป็น */
+export async function getWaterUsageData(nMonths = 24) {
+  const months = (await getWaterUsage(nMonths)).map((row) => ({
+    ...row,
+    label: `${MONTH_SHORT_TH[row.month - 1]} ${row.year + 543}`,
+    unitPrice: row.consumption > 0 ? row.billedAmount / row.consumption : 0,
+  }))
+  const latest = months[0]
+  const previous = months[1]
+
+  return {
+    months,
+    latest,
+    usageChangeFromPrevious: latest && previous ? latest.consumption - previous.consumption : null,
+    amountChangeFromPrevious: latest && previous ? latest.paidAmount - previous.paidAmount : null,
+    averageConsumption: average(
+      months.map((row) => row.consumption),
+      1,
+    ),
+    totalPaid: round(
+      months.reduce((sum, row) => sum + row.paidAmount, 0),
+      2,
+    ),
+  }
+}
+
+export type WaterUsageData = Awaited<ReturnType<typeof getWaterUsageData>>

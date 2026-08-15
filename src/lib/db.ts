@@ -5,6 +5,7 @@ const sql = postgres(process.env.DATABASE_URL!, { ssl: false, max: 5 })
 
 const DEVICE = process.env.SOLAR_DEVICE_ID!
 const HOUSE_CA = process.env.MEA_HOUSE_CA!
+const WATER_ACCOUNT = process.env.MWA_ACCOUNT_CODE ?? ''
 const TZ = 'Asia/Bangkok'
 const CO2_KG_PER_KWH = 0.4999 // Thailand grid emission factor
 
@@ -75,16 +76,45 @@ export type LifetimeData = {
 
 export type Bill = {
   month: string // YYYYMM
+  billNo: string | null
+  billDate: Date | null
   kwh: number
   paid: number
   unitUsedSolar: number
   amountUsedSolar: number
   income: number
+  billNoNormalized: string | null
+  paymentBillNo: string | null
+  paymentStatus: string | null
+  paidAt: Date | null
+  dueDate: Date | null
+  outstandingAmount: number | null
+  paymentAmount: number | null
+  receiptNo: string | null
+  paymentChannel: string | null
+  paymentChannelSap: string | null
+  paymentSyncedAt: Date | null
+}
+
+export type WaterUsage = {
+  year: number
+  month: number
+  consumption: number
+  billedAmount: number
+  vatAmount: number
+  paidAmount: number
+  remainingAmount: number
+  billDate: Date | null
+  dueDate: Date | null
+  readDate: Date | null
+  paidDate: Date | null
+  isPaid: boolean
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const n = (v: unknown) => Number(v ?? 0)
+const nullableN = (v: unknown) => (v === null || v === undefined ? null : Number(v))
 const toDayString = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
 // ── Queries ───────────────────────────────────────────────────────────────────
@@ -401,14 +431,46 @@ export async function getBills(nMonths = 12): Promise<Bill[]> {
   const rows = await sql<
     {
       month: string
+      bill_no: string | null
+      bill_date: Date | null
       kwh: string
       paid: string
       unit_used_solar: string
       amount_used_solar: string
       income: string
+      bill_no_normalized: string | null
+      payment_bill_no: string | null
+      payment_status: string | null
+      paid_at: Date | null
+      due_date: Date | null
+      outstanding_amount: string | null
+      payment_amount: string | null
+      receipt_no: string | null
+      payment_channel: string | null
+      payment_channel_sap: string | null
+      payment_synced_at: Date | null
     }[]
   >`
-    SELECT month, kwh, paid, unit_used_solar, amount_used_solar, income
+    SELECT
+      month,
+      bill_no,
+      bill_date,
+      kwh,
+      paid,
+      unit_used_solar,
+      amount_used_solar,
+      income,
+      bill_no_normalized,
+      payment_bill_no,
+      payment_status,
+      paid_at,
+      due_date,
+      outstanding_amount,
+      payment_amount,
+      receipt_no,
+      payment_channel,
+      payment_channel_sap,
+      payment_synced_at
     FROM stash.mea_electric
     WHERE ca = ${HOUSE_CA}
     ORDER BY month DESC
@@ -416,10 +478,85 @@ export async function getBills(nMonths = 12): Promise<Bill[]> {
   `
   return rows.map((r) => ({
     month: r.month,
+    billNo: r.bill_no,
+    billDate: r.bill_date,
     kwh: n(r.kwh),
     paid: n(r.paid),
     unitUsedSolar: n(r.unit_used_solar),
     amountUsedSolar: n(r.amount_used_solar),
     income: n(r.income),
+    billNoNormalized: r.bill_no_normalized,
+    paymentBillNo: r.payment_bill_no,
+    paymentStatus: r.payment_status,
+    paidAt: r.paid_at,
+    dueDate: r.due_date,
+    outstandingAmount: nullableN(r.outstanding_amount),
+    paymentAmount: nullableN(r.payment_amount),
+    receiptNo: r.receipt_no,
+    paymentChannel: r.payment_channel,
+    paymentChannelSap: r.payment_channel_sap,
+    paymentSyncedAt: r.payment_synced_at,
   }))
+}
+
+/** ปริมาณใช้น้ำจากรอบอ่านมิเตอร์ MWA ล่าสุด โดยตัดรายการค่าธรรมเนียมที่ไม่มีวันอ่านมิเตอร์ออก */
+export async function getWaterUsage(nMonths = 12): Promise<WaterUsage[]> {
+  const rows = await sql<
+    {
+      period_year: number
+      period_month: number
+      consumption: string
+      gross_amount: string
+      vat_amount: string
+      paid_amount: string
+      balance_gross_amount: string
+      bill_date: Date | null
+      bill_due_date: Date | null
+      current_read_date: Date | null
+      paid_date: Date | null
+    }[]
+  >`
+    SELECT DISTINCT ON (period_year, period_month)
+      period_year,
+      period_month,
+      consumption,
+      gross_amount,
+      vat_amount,
+      paid_amount,
+      balance_gross_amount,
+      bill_date,
+      bill_due_date,
+      current_read_date,
+      paid_date
+    FROM stash.mwa_water
+    WHERE account_code = COALESCE(
+      NULLIF(${WATER_ACCOUNT}, ''),
+      (SELECT account_code FROM stash.mwa_account ORDER BY account_code LIMIT 1)
+    )
+      AND current_read_date IS NOT NULL
+      AND period_year IS NOT NULL
+      AND period_month BETWEEN 1 AND 12
+    ORDER BY period_year DESC, period_month DESC, current_read_date DESC, created_at DESC
+    LIMIT ${nMonths}
+  `
+
+  return rows.map((row) => {
+    const paidAmount = n(row.paid_amount)
+    const remainingAmount = n(row.balance_gross_amount)
+
+    return {
+      year: Number(row.period_year),
+      month: Number(row.period_month),
+      consumption: n(row.consumption),
+      billedAmount: n(row.gross_amount),
+      vatAmount: n(row.vat_amount),
+      paidAmount,
+      remainingAmount,
+      billDate: row.bill_date,
+      dueDate: row.bill_due_date,
+      readDate: row.current_read_date,
+      paidDate: row.paid_date,
+      isPaid: Boolean(row.paid_date) && paidAmount > 0 && remainingAmount <= 0,
+    }
+  })
 }
