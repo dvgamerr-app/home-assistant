@@ -6,6 +6,7 @@
   let password = $state('')
   let error = $state(initialError)
   let loading = $state(false)
+  let canLinkPasswordWithGitHub = $state(false)
 
   function toThaiError(message, currentMode) {
     if (!message) {
@@ -25,12 +26,14 @@
   function switchMode(nextMode) {
     mode = nextMode
     error = ''
+    canLinkPasswordWithGitHub = false
   }
 
   async function submitEmail(e) {
     e.preventDefault()
     loading = true
     error = ''
+    canLinkPasswordWithGitHub = false
     const signup = mode === 'signup'
     try {
       const res = await fetch(signup ? '/api/auth/sign-up/email' : '/api/auth/sign-in/email', {
@@ -42,6 +45,9 @@
         window.location.href = '/'
       } else {
         const data = await res.json().catch(() => ({}))
+        const code = String(data.code ?? '').toUpperCase()
+        const message = String(data.message ?? '').toLowerCase()
+        canLinkPasswordWithGitHub = signup && githubEnabled && (code === 'USER_ALREADY_EXISTS' || code === 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL' || message.includes('user already exists'))
         error = toThaiError(data.message, mode)
       }
     } catch {
@@ -51,14 +57,14 @@
     }
   }
 
-  async function signInGitHub() {
+  async function signInGitHub(callbackURL = '/') {
     loading = true
     error = ''
     try {
       const res = await fetch('/api/auth/sign-in/social', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider: 'github', callbackURL: '/' }),
+        body: JSON.stringify({ provider: 'github', callbackURL }),
       })
       const data = await res.json().catch(() => ({}))
       if (data.url) {
@@ -94,6 +100,21 @@
 <form onsubmit={submitEmail} class="space-y-5">
   {#if error}
     <p class="rounded-md border border-destructive/50 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</p>
+  {/if}
+
+  {#if canLinkPasswordWithGitHub}
+    <div class="space-y-2 rounded-md border border-border/70 bg-background/60 p-4">
+      <p class="text-sm text-foreground">หากบัญชีนี้สร้างด้วย GitHub ให้ยืนยันตัวตนก่อน แล้วจึงเพิ่มรหัสผ่านให้บัญชีเดิม</p>
+      <button
+        type="button"
+        onclick={() => signInGitHub('/account/set-password')}
+        disabled={loading}
+        class="w-full rounded-md border border-accent/60 bg-accent/10 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent/20 disabled:opacity-50"
+      >
+        ยืนยันด้วย GitHub และเพิ่มรหัสผ่าน
+      </button>
+      <p class="text-xs text-muted-foreground">เพื่อความปลอดภัย ระบบจะให้กรอกรหัสผ่านใหม่อีกครั้งหลังยืนยัน GitHub</p>
+    </div>
   {/if}
 
   {#if mode === 'signup'}
@@ -159,7 +180,7 @@
 
   <button
     type="button"
-    onclick={signInGitHub}
+    onclick={() => signInGitHub()}
     disabled={loading}
     class="flex w-full items-center justify-center gap-3 rounded-md border border-border/70 px-4 py-2.5 text-sm text-foreground transition-colors hover:bg-card disabled:opacity-50"
   >
