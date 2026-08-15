@@ -1,11 +1,13 @@
 import { betterAuth } from 'better-auth'
 import { kyselyAdapter } from '@better-auth/kysely-adapter'
+import { twoFactor } from 'better-auth/plugins'
 import { getAuthDb } from '../db/auth-db'
 
 const githubId = process.env.GITHUB_CLIENT_ID
 const githubSecret = process.env.GITHUB_CLIENT_SECRET
 
 export const auth = betterAuth({
+  appName: 'OurKK',
   database: kyselyAdapter(getAuthDb(), { type: 'postgres' }),
   secret: process.env.BETTER_AUTH_SECRET!,
   baseURL: process.env.APP_BASE_URL ?? 'http://localhost:4321',
@@ -14,6 +16,7 @@ export const auth = betterAuth({
     errorURL: new URL('/login', process.env.APP_BASE_URL ?? 'http://localhost:4321').toString(),
   },
   emailAndPassword: { enabled: true },
+  plugins: [twoFactor({ issuer: 'OurKK' })],
   ...(githubId && githubSecret
     ? {
         socialProviders: {

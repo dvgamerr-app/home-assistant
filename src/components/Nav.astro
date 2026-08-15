@@ -18,7 +18,7 @@ const NAV = [
   { label: 'ห้องต่าง ๆ', href: '#' },
   { label: 'โหมดบ้าน', href: '#' },
   { label: 'พลังงาน', href: '/electricity' },
-  { label: 'ความปลอดภัย', href: '#' },
+  { label: 'ตั้งค่า', href: '/settings' },
 ]
 const isActive = (href: string) => (href === '/' ? path === '/' : href !== '#' && path.startsWith(href))
 const btn = 'button' as const
@@ -60,9 +60,17 @@ const btn = 'button' as const
       <Bell size={16} strokeWidth={1.25} />
       <span class="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent"></span>
     </button>
-    <button type={btn} aria-label="ตั้งค่า" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+    <a
+      href="/settings"
+      aria-label="ตั้งค่าบัญชี"
+      aria-current={path.startsWith('/settings') ? ('page' as const) : undefined}
+      class:list={[
+        'flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-secondary hover:text-foreground',
+        path.startsWith('/settings') ? 'bg-secondary text-foreground' : 'text-muted-foreground',
+      ]}
+    >
       <Settings size={16} strokeWidth={1.25} />
-    </button>
+    </a>
     <ThemeToggle client:load />
 
     <div class="ml-3 hidden items-center gap-3 border-l border-border/60 pl-4 md:flex">

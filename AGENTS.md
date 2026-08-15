@@ -9,6 +9,7 @@ Home-assistant dashboard — รวบรวมข้อมูลในบ้า
 - **Tailwind v4** — config แบบ CSS-first (`@theme` ใน `src/styles/global.css`), ผ่าน `@tailwindcss/vite` ไม่ใช่ integration เก่า
 - **@lucide/svelte** — ไอคอน, import ราย icon (`@lucide/svelte/icons/<name>`)
 - **better-auth v1.6** — auth in-project, email+password + GitHub OAuth. config: `src/lib/auth.ts`. API route: `src/pages/api/auth/[...all].ts`
+- **Better Auth 2FA** — TOTP + recovery codes ผ่าน `twoFactor` plugin; enrollment อยู่หน้า `/settings`, challenge อยู่ `/two-factor`; schema เพิ่มใน migration `002_two_factor.ts`
 - **Kysely v0.29** — migration runner สำหรับ auth DB (`src/db/auth-db.ts`, migrations ใน `src/db/migrations/`). รัน: `bun run migration:run`
 - **pg v8** — Postgres dialect ให้ Kysely (auth tables เท่านั้น)
 - **postgres.js v3** — query ข้อมูล solar/MEA จาก collector DB (`src/lib/db.ts`)
@@ -60,7 +61,7 @@ pivot EAV: `DISTINCT ON (attr) ORDER BY attr, recorded_at DESC` ดึงค่�
 
 ## โครงสร้าง
 
-- `src/pages/` — `index.astro` (ภาพรวม slim) · `electricity/` (`load` การใช้ไฟ / `solar` ผลิตไฟ / `bill` ค่าไฟ / `water` การใช้น้ำ, สลับด้วย `ElectricityNav`; `index` redirect ไป `load`) · `login.astro` · `no-permission.astro` · `api/auth/[...all].ts`
+- `src/pages/` — `index.astro` (ภาพรวม slim) · `electricity/` (`load` การใช้ไฟ / `solar` ผลิตไฟ / `bill` ค่าไฟ / `water` การใช้น้ำ, สลับด้วย `ElectricityNav`; `index` redirect ไป `load`) · `settings.astro` · `two-factor.astro` · `login.astro` · `no-permission.astro` · `api/auth/[...all].ts`
 - `src/middleware.ts` — ตรวจ session + allowlist ทุก request ยกเว้น `/login`, `/no-permission`, `/api/auth`
 - `src/layouts/Layout.astro` — shell, โหลดฟอนต์ + script set theme กัน flash
 - `src/components/` — `.astro` static เป็นหลัก, Svelte islands: `LiveClock.svelte` · `ThemeToggle.svelte` · `LogoutButton.svelte` · `LoginForm.svelte` · `EnergyFlow.svelte` (socket.io) · `SolarStatusCards.svelte` (socket.io) · `ui/DatePicker.svelte`. กราฟอยู่ใน `components/charts/`

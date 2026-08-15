@@ -1,0 +1,27 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import TwoFactorForm from '@/components/TwoFactorForm.svelte'
+import { auth } from '@/lib/auth'
+
+const session = await auth.api.getSession({ headers: Astro.request.headers })
+if (session) return Astro.redirect('/')
+---
+
+<Layout title="ยืนยันสองขั้นตอน — บ้าน" description="ยืนยันรหัสความปลอดภัยเพื่อเข้าสู่ระบบ OurKK">
+  <main class="flex min-h-screen items-center justify-center px-6 py-12">
+    <div class="w-full max-w-sm space-y-8">
+      <a href="/" class="mx-auto flex w-fit items-center gap-3">
+        <span aria-hidden={true} class="flex h-9 w-9 items-center justify-center rounded-full border border-foreground/80">
+          <span class="font-serif text-sm leading-none tracking-tight text-foreground">KK</span>
+        </span>
+        <span class="font-serif text-xl tracking-wide text-foreground">OurKK</span>
+      </a>
+
+      <div class="rounded-xl border border-border/70 bg-card p-8">
+        <TwoFactorForm client:load />
+      </div>
+
+      <p class="text-center text-xs leading-relaxed text-muted-foreground">อุปกรณ์นี้จะถูกจดจำเป็นเวลา 30 วันหลังยืนยันสำเร็จ</p>
+    </div>
+  </main>
+</Layout>

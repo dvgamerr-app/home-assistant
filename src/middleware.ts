@@ -1,7 +1,7 @@
 import { defineMiddleware } from 'astro:middleware'
 import { auth } from '@/lib/auth'
 
-const PUBLIC = ['/login', '/no-permission', '/api/auth']
+const PUBLIC = ['/login', '/two-factor', '/no-permission', '/api/auth']
 
 export const onRequest = defineMiddleware(async ({ request, redirect }, next) => {
   const { pathname } = new URL(request.url)
