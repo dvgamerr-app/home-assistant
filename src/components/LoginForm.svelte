@@ -4,7 +4,7 @@
   let name = $state('')
   let email = $state('')
   let password = $state('')
-  let error = $state(initialError)
+  let error = $state((() => initialError)())
   let loading = $state(false)
   let canLinkPasswordWithGitHub = $state(false)
 
