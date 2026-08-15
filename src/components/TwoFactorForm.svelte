@@ -25,10 +25,21 @@
 
   async function verify(event) {
     event.preventDefault()
-    loading = true
     error = ''
+    const normalizedCode = mode === 'totp' ? code.replace(/[^0-9]/g, '') : code.trim()
+
+    if (mode === 'totp' && !/^[0-9]{6}$/.test(normalizedCode)) {
+      error = 'กรุณากรอกรหัสตัวเลข 6 หลักจากแอป Authenticator'
+      return
+    }
+    if (mode === 'backup' && !normalizedCode) {
+      error = 'กรุณากรอก Recovery code'
+      return
+    }
+
+    loading = true
     const endpoint = mode === 'totp' ? '/api/auth/two-factor/verify-totp' : '/api/auth/two-factor/verify-backup-code'
-    const body = mode === 'totp' ? { code: code.replace(/\s/g, ''), trustDevice: true } : { code: code.trim(), disableSession: false, trustDevice: true }
+    const body = mode === 'totp' ? { code: normalizedCode, trustDevice: true } : { code: normalizedCode, disableSession: false, trustDevice: true }
 
     try {
       const response = await fetch(endpoint, {
@@ -67,7 +78,7 @@
     </p>
   </div>
 
-  <form onsubmit={verify} class="space-y-5">
+  <form onsubmit={verify} novalidate class="space-y-5">
     {#if error}
       <p class="rounded-md border border-destructive/50 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error}</p>
     {/if}
@@ -81,10 +92,8 @@
         bind:value={code}
         type="text"
         required
-        minlength={mode === 'totp' ? 6 : undefined}
         maxlength={mode === 'totp' ? 6 : undefined}
         inputmode={mode === 'totp' ? 'numeric' : 'text'}
-        pattern={mode === 'totp' ? '[0-9]{6}' : undefined}
         autocomplete="one-time-code"
         placeholder={mode === 'totp' ? '000000' : 'xxxx-xxxxxx'}
         class:list={[

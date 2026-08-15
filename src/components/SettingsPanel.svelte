@@ -108,9 +108,16 @@
   async function verifyTwoFactor(event) {
     event.preventDefault()
     securityError = ''
+    const normalizedCode = totpCode.replace(/[^0-9]/g, '')
+
+    if (!/^[0-9]{6}$/.test(normalizedCode)) {
+      securityError = 'กรุณากรอกรหัสตัวเลข 6 หลักจากแอป Authenticator'
+      return
+    }
+
     securityLoading = true
     try {
-      await request('/two-factor/verify-totp', { code: totpCode.replace(/\s/g, ''), trustDevice: true })
+      await request('/two-factor/verify-totp', { code: normalizedCode, trustDevice: true })
       twoFactorEnabled = true
       totpCode = ''
       securityStep = 'backup'
@@ -313,7 +320,7 @@
           </div>
         </form>
       {:else if securityStep === 'verify'}
-        <form onsubmit={verifyTwoFactor} class="space-y-5">
+        <form onsubmit={verifyTwoFactor} novalidate class="space-y-5">
           <div class="grid items-center gap-5 sm:grid-cols-[auto_1fr]">
             <div class="mx-auto rounded-lg border border-border/70 bg-white p-2">
               {#if qrDataURL}
@@ -341,10 +348,8 @@
               bind:value={totpCode}
               type="text"
               required
-              minlength="6"
               maxlength="6"
               inputmode="numeric"
-              pattern="[0-9]{6}"
               autocomplete="one-time-code"
               placeholder="000000"
               class="w-full rounded-md border border-border/70 bg-background px-4 py-3 font-mono text-lg tracking-[0.35em] text-foreground outline-none focus:border-accent"
