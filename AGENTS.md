@@ -31,6 +31,13 @@ SOLAR_DEVICE_ID       # device_id ใน stash.solar_record
 MEA_HOUSE_CA          # เลข CA ของบ้านใน stash.mea_electric
 MWA_ACCOUNT_CODE      # account_code ใน stash.mwa_account (ถ้าไม่ตั้ง ใช้บัญชีแรก)
 GITHUB_CLIENT_ID/SECRET  # สำหรับ GitHub OAuth (optional)
+LINE_NOTICE_URL       # endpoint กลางสำหรับส่ง alert เข้า LINE
+LINE_NOTICE_API_KEY   # API key ของ LINE Manager (เก็บใน secret/env เท่านั้น)
+ENERGY_LIB_AVATAR_URL # avatar หลัก: https://home.ourkk.com/lib.png
+ENERGY_ALERT_BATTERY_RESERVE_PCT # ค่า reserve สำหรับ alert หลัง 09:00 (default 15)
+ENERGY_ALERT_BATTERY_EVENING_MAX_PCT # หลัง 18:00 แจ้งเมื่อ SOC ยังไม่ต่ำกว่าค่านี้ (default 95)
+ENERGY_ALERT_SOLAR_BASELINE_MONTH  # เดือนฐาน MPPT รูปแบบ YYYY-MM (default = ก.ค. ล่าสุด)
+ENERGY_ALERT_SOLAR_MIN_RATIO       # สัดส่วนขั้นต่ำเทียบฐาน (default 0.2)
 ```
 
 ## คำสั่ง
@@ -65,9 +72,9 @@ pivot EAV: `DISTINCT ON (attr) ORDER BY attr, recorded_at DESC` ดึงค่�
 - `src/middleware.ts` — ตรวจ session + allowlist ทุก request ยกเว้น `/login`, `/no-permission`, `/api/auth`
 - `src/layouts/Layout.astro` — shell, โหลดฟอนต์ + script set theme กัน flash
 - `src/components/` — `.astro` static เป็นหลัก, Svelte islands: `LiveClock.svelte` · `ThemeToggle.svelte` · `LogoutButton.svelte` · `LoginForm.svelte` · `EnergyFlow.svelte` (socket.io) · `SolarStatusCards.svelte` (socket.io) · `ui/DatePicker.svelte`. กราฟอยู่ใน `components/charts/`
-- `src/lib/` — `solar-data.ts` (async `getAll()`/`getMonthLoad()` ดึงข้อมูลจาก db), `db.ts` (postgres.js queries), `solar-fivemin.ts` (payload กราฟ 5 นาที ใช้ร่วมกับ socket server), `auth.ts` (better-auth config), `electricity.ts` (MEA bill formula + `thb()`/`num()` + ชื่อเดือนไทย), `chart.ts` (`svgPathFromPoints`/`svgLine`/`svgArea`/`svgStackedBars`), `date.ts` (วันที่ Bangkok), `socket.ts` (channel + `getSocketUrl`), `logger.ts` (pino)
+- `src/lib/` — `solar-data.ts` (async `getAll()`/`getMonthLoad()` ดึงข้อมูลจาก db), `db.ts` (postgres.js queries), `solar-fivemin.ts` (payload กราฟ 5 นาที ใช้ร่วมกับ socket server), `energy-alerts.ts` (เฉพาะ Energy Lib: device/battery/solar), `utility-bill-alerts.ts` (เฉพาะบิลค่าไฟ/ค่าน้ำ), `auth.ts` (better-auth config), `electricity.ts` (MEA bill formula + `thb()`/`num()` + ชื่อเดือนไทย), `chart.ts` (`svgPathFromPoints`/`svgLine`/`svgArea`/`svgStackedBars`), `date.ts` (วันที่ Bangkok), `socket.ts` (channel + `getSocketUrl`), `logger.ts` (pino)
 - `src/db/` — `auth-db.ts` (Kysely instance) · `migrate.ts` · `migrations/`
-- `server/socket.mjs` — socket.io server, poll ทุก 60s แล้ว broadcast ตาม channel ที่ client subscribe (`live`, `solar:fivemin`)
+- `server/socket.mjs` — socket.io server, poll ทุก 60s แล้ว broadcast ตาม channel ที่ client subscribe (`live`, `solar:fivemin`) พร้อมรัน Energy Lib worker และ utility bill worker แยกกัน
 - `src/styles/global.css` — design tokens (oklch, light/dark), font, tracking-luxury, `.legend-dot`
 - `docs/design-system.html` — design-system reference เปิดในเบราว์เซอร์ได้เลย, token sync กับ global.css
 

@@ -97,6 +97,7 @@ export type Bill = {
 }
 
 export type WaterUsage = {
+  billNumber: string
   year: number
   month: number
   consumption: number
@@ -108,7 +109,18 @@ export type WaterUsage = {
   dueDate: Date | null
   readDate: Date | null
   paidDate: Date | null
+  createdAt: Date
   isPaid: boolean
+}
+
+export type PvMorningEnergy = {
+  pv1Kwh: number
+  pv2Kwh: number
+}
+
+export type PvMorningBaseline = PvMorningEnergy & {
+  days: number
+  month: string
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -128,9 +140,9 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
     ORDER BY attr, recorded_at DESC
   `
   const m = Object.fromEntries(rows.map((r) => [r.attr, n(r.value)]))
-  const lastUpdate = rows[0]?.recorded_at ?? new Date()
+  const lastUpdate = rows.reduce<Date | null>((latest, row) => (!latest || row.recorded_at > latest ? row.recorded_at : latest), null)
   // online = ข้อมูลล่าสุดไม่เกิน 15 นาที
-  const isOnline = Date.now() - new Date(lastUpdate).getTime() < 15 * 60 * 1000
+  const isOnline = lastUpdate !== null && Date.now() - lastUpdate.getTime() < 15 * 60 * 1000
 
   return {
     pvPowerKw: m.generationPower ?? 0,
@@ -149,7 +161,7 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
     powerRating: m.powerRating ?? 0,
     offGridPowerKw: m.offGridPortTotalPower ?? 0,
     isOnline,
-    lastUpdate: new Date(lastUpdate).toISOString(),
+    lastUpdate: (lastUpdate ?? new Date(0)).toISOString(),
   }
 }
 
@@ -499,10 +511,82 @@ export async function getBills(nMonths = 12): Promise<Bill[]> {
   }))
 }
 
+/** พลังงานแยก MPPT ช่วง 06:00–09:00 ของวันที่กำหนด (ข้อมูลเข้าประมาณทุก 5 นาที) */
+export async function getPvMorningEnergy(day: string): Promise<PvMorningEnergy> {
+  const [row] = await sql<{ pv1_kwh: string; pv2_kwh: string }[]>`
+    SELECT
+      COALESCE(SUM(CASE WHEN attr = 'pv1Power' THEN GREATEST(value, 0) ELSE 0 END) * (5.0 / 60.0), 0) AS pv1_kwh,
+      COALESCE(SUM(CASE WHEN attr = 'pv2Power' THEN GREATEST(value, 0) ELSE 0 END) * (5.0 / 60.0), 0) AS pv2_kwh
+    FROM stash.solar_record
+    WHERE device_id = ${DEVICE}
+      AND attr IN ('pv1Power', 'pv2Power')
+      AND recorded_at >= (${day + ' 06:00 ' + TZ})::timestamptz
+      AND recorded_at < (${day + ' 09:00 ' + TZ})::timestamptz
+  `
+
+  return { pv1Kwh: n(row?.pv1_kwh), pv2Kwh: n(row?.pv2_kwh) }
+}
+
+/** ค่าเฉลี่ยพลังงานรายวันแยก MPPT ช่วง 06:00–09:00 รวมวันที่ไม่มีข้อมูลเป็น 0 */
+export async function getPvMorningBaseline(month: string): Promise<PvMorningBaseline> {
+  const monthStart = `${month}-01`
+  const [row] = await sql<{ pv1_kwh: string; pv2_kwh: string; days: string }[]>`
+    WITH days AS (
+      SELECT generate_series(
+        ${monthStart}::date,
+        (${monthStart}::date + interval '1 month - 1 day')::date,
+        interval '1 day'
+      )::date AS day
+    ), daily AS (
+      SELECT
+        (recorded_at AT TIME ZONE ${TZ})::date AS day,
+        attr,
+        SUM(GREATEST(value, 0)) * (5.0 / 60.0) AS kwh
+      FROM stash.solar_record
+      WHERE device_id = ${DEVICE}
+        AND attr IN ('pv1Power', 'pv2Power')
+        AND recorded_at >= (${monthStart + ' 00:00 ' + TZ})::timestamptz
+        AND recorded_at < ((${monthStart}::date + interval '1 month')::date::text || ' 00:00 ' || ${TZ})::timestamptz
+        AND (recorded_at AT TIME ZONE ${TZ})::time >= time '06:00'
+        AND (recorded_at AT TIME ZONE ${TZ})::time < time '09:00'
+      GROUP BY 1, 2
+    )
+    SELECT
+      AVG(COALESCE(pv1.kwh, 0)) AS pv1_kwh,
+      AVG(COALESCE(pv2.kwh, 0)) AS pv2_kwh,
+      COUNT(*) AS days
+    FROM days
+    LEFT JOIN daily pv1 ON pv1.day = days.day AND pv1.attr = 'pv1Power'
+    LEFT JOIN daily pv2 ON pv2.day = days.day AND pv2.attr = 'pv2Power'
+  `
+
+  return {
+    month,
+    days: n(row?.days),
+    pv1Kwh: n(row?.pv1_kwh),
+    pv2Kwh: n(row?.pv2_kwh),
+  }
+}
+
+/** SOC สูงสุดของแบตเตอรี่ในช่วง 06:00–09:00 ใช้ตรวจว่าพ้นค่า reserve แล้วหรือยัง */
+export async function getBatteryMorningSocPeak(day: string): Promise<number | null> {
+  const [row] = await sql<{ peak_soc: string | null }[]>`
+    SELECT MAX(value) AS peak_soc
+    FROM stash.solar_record
+    WHERE device_id = ${DEVICE}
+      AND attr = 'batterySOC'
+      AND recorded_at >= (${day + ' 06:00 ' + TZ})::timestamptz
+      AND recorded_at < (${day + ' 09:00 ' + TZ})::timestamptz
+  `
+
+  return row?.peak_soc === null || row?.peak_soc === undefined ? null : n(row.peak_soc)
+}
+
 /** ปริมาณใช้น้ำจากรอบอ่านมิเตอร์ MWA ล่าสุด โดยตัดรายการค่าธรรมเนียมที่ไม่มีวันอ่านมิเตอร์ออก */
 export async function getWaterUsage(nMonths = 12): Promise<WaterUsage[]> {
   const rows = await sql<
     {
+      bill_number: string
       period_year: number
       period_month: number
       consumption: string
@@ -514,9 +598,11 @@ export async function getWaterUsage(nMonths = 12): Promise<WaterUsage[]> {
       bill_due_date: Date | null
       current_read_date: Date | null
       paid_date: Date | null
+      created_at: Date
     }[]
   >`
     SELECT DISTINCT ON (period_year, period_month)
+      bill_number,
       period_year,
       period_month,
       consumption,
@@ -527,7 +613,8 @@ export async function getWaterUsage(nMonths = 12): Promise<WaterUsage[]> {
       bill_date,
       bill_due_date,
       current_read_date,
-      paid_date
+      paid_date,
+      created_at
     FROM stash.mwa_water
     WHERE account_code = COALESCE(
       NULLIF(${WATER_ACCOUNT}, ''),
@@ -545,6 +632,7 @@ export async function getWaterUsage(nMonths = 12): Promise<WaterUsage[]> {
     const remainingAmount = n(row.balance_gross_amount)
 
     return {
+      billNumber: row.bill_number,
       year: Number(row.period_year),
       month: Number(row.period_month),
       consumption: n(row.consumption),
@@ -556,6 +644,7 @@ export async function getWaterUsage(nMonths = 12): Promise<WaterUsage[]> {
       dueDate: row.bill_due_date,
       readDate: row.current_read_date,
       paidDate: row.paid_date,
+      createdAt: row.created_at,
       isPaid: Boolean(row.paid_date) && paidAmount > 0 && remainingAmount <= 0,
     }
   })

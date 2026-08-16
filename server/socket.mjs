@@ -4,6 +4,8 @@ import { logger } from '../src/lib/logger.ts'
 import { getLiveSnapshot } from '../src/lib/db.ts'
 import { getTodayFiveMinChartPayload } from '../src/lib/solar-fivemin.ts'
 import { SOCKET_CHANNELS, isSocketChannel, normalizeSocketChannels } from '../src/lib/socket.ts'
+import { runEnergyAlerts } from '../src/lib/energy-alerts.ts'
+import { runUtilityBillAlerts } from '../src/lib/utility-bill-alerts.ts'
 
 const PORT = parseInt(process.env.SOCKET_PORT ?? '3000')
 const POLL_MS = 60_000
@@ -74,7 +76,11 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => logger.info(`client: ${socket.id}, disconnected`))
 })
 
-await broadcast()
-setInterval(broadcast, POLL_MS)
+async function tick() {
+  await Promise.all([broadcast(), runEnergyAlerts(), runUtilityBillAlerts()])
+}
+
+await tick()
+setInterval(() => void tick(), POLL_MS)
 
 httpServer.listen(PORT, () => logger.info(`socket.io server port:${PORT} started`))
