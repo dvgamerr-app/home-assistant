@@ -9,12 +9,36 @@ import Sun from '@lucide/svelte/icons/sun'
 import Plug from '@lucide/svelte/icons/plug'
 import PiggyBank from '@lucide/svelte/icons/piggy-bank'
 import Gauge from '@lucide/svelte/icons/gauge'
-import { getAll } from '@/lib/solar-data'
-import { thb, num } from '@/lib/electricity'
+import Receipt from '@lucide/svelte/icons/receipt'
+import Droplets from '@lucide/svelte/icons/droplets'
+import { getAll, getWaterUsageData } from '@/lib/solar-data'
+import { MONTH_SHORT_TH, thb, num } from '@/lib/electricity'
 import { getSocketUrl } from '@/lib/socket'
 
-const data = await getAll()
+const [data, waterData] = await Promise.all([getAll(), getWaterUsageData(1)])
 const socketUrl = getSocketUrl(Astro.request.url)
+
+const latestElectricityBill = data.bills[0]
+const latestWaterBill = waterData.latest
+
+function electricityPaymentLabel() {
+  if (!latestElectricityBill) return undefined
+
+  const status = latestElectricityBill.paymentStatus?.trim().toLowerCase() ?? ''
+  if (status === 'paid') return 'ชำระแล้ว'
+  if (status === 'partial' || status === 'partially_paid' || ((latestElectricityBill.paymentAmount ?? 0) > 0 && (latestElectricityBill.outstandingAmount ?? 0) > 0)) return 'ชำระบางส่วน'
+  if (status === 'overdue' || status === 'late') return 'เกินกำหนด'
+  if (status === 'pending' || status === 'unpaid' || status === 'outstanding') return 'รอชำระ'
+  return 'ยังไม่พบหลักฐานชำระ'
+}
+
+function electricityMonthLabel(month: string) {
+  const monthName = MONTH_SHORT_TH[parseInt(month.slice(4)) - 1] ?? month
+  return `${monthName} ${parseInt(month.slice(0, 4)) + 543}`
+}
+
+const electricityPayment = electricityPaymentLabel()
+const waterPayment = !latestWaterBill ? undefined : latestWaterBill.isPaid ? 'ชำระแล้ว' : latestWaterBill.paidAmount > 0 && latestWaterBill.remainingAmount > 0 ? 'ชำระบางส่วน' : 'รอชำระ'
 ---
 
 <Layout title="ภาพรวมพลังงานในบ้าน">
@@ -51,6 +75,33 @@ const socketUrl = getSocketUrl(Astro.request.url)
         <EnergyFlow live={data.live} socketUrl={socketUrl} client:load />
       </div>
     </div>
+
+    <section class="space-y-4">
+      <div>
+        <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">บิลล่าสุด</p>
+        <h2 class="mt-1 font-serif text-xl font-light text-foreground">ค่าน้ำและค่าไฟของบ้าน</h2>
+      </div>
+      <div class="grid gap-4 md:grid-cols-2">
+        <StatCard
+          label="ค่าไฟเดือนล่าสุด"
+          value={latestElectricityBill ? thb(latestElectricityBill.paid, 2) : '—'}
+          sub={latestElectricityBill ? `${electricityMonthLabel(latestElectricityBill.month)} · ใช้ไฟ ${num(latestElectricityBill.kwh, 0)} หน่วย` : 'ยังไม่มีข้อมูลบิลค่าไฟ'}
+          trend={electricityPayment}
+          accent="terracotta"
+        >
+          <Receipt slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard
+          label="ค่าน้ำเดือนล่าสุด"
+          value={latestWaterBill ? thb(latestWaterBill.billedAmount, 2) : '—'}
+          sub={latestWaterBill ? `${latestWaterBill.label} · ใช้น้ำ ${num(latestWaterBill.consumption, 0)} ลบ.ม.` : 'ยังไม่มีข้อมูลบิลค่าน้ำ'}
+          trend={waterPayment}
+          accent="blue"
+        >
+          <Droplets slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+      </div>
+    </section>
 
     <p class="text-pretty pb-4 text-center text-xs leading-relaxed text-muted-foreground">
       ค่าไฟคำนวณตามอัตราค่าไฟฟ้าบ้านอยู่อาศัย ประเภท 1.2 แบบขั้นบันไดของการไฟฟ้านครหลวง (MEA) รวมค่า Ft และภาษีมูลค่าเพิ่ม 7%

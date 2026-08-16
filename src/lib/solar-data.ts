@@ -324,7 +324,7 @@ export async function getAll(date?: Date) {
       ? [
           {
             tone: 'warn' as const,
-            title: 'แบตเตอรี่สำรองเหลือน้อย',
+            title: 'พลังงานในแบตเตอรี่เหลือน้อย',
             detail: `เหลือ ${round(live.batterySoc, 0)}% (${round(storedKwh, 1)} kWh)`,
           },
         ]

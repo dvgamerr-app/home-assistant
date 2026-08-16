@@ -24,7 +24,7 @@
   const battStatus = $derived(live.batteryPowerKw < -0.05 ? 'charging' : live.batteryPowerKw > 0.05 ? 'discharging' : 'idle')
   const battStatusLabel = $derived(({ charging: 'กำลังชาร์จ', discharging: 'กำลังจ่ายไฟ', idle: 'พร้อมใช้งาน' } as const)[battStatus])
   const storedKwh = $derived((system.batteryCapacityKwh * live.batterySoc) / 100)
-  const backupHours = $derived(live.loadPowerKw > 0 ? storedKwh / live.loadPowerKw : 0)
+  const remainingUsageHours = $derived(live.loadPowerKw > 0 ? storedKwh / live.loadPowerKw : 0)
 
   // System health derived
   const ratedKw = $derived(live.powerRating || system.ratedPowerKw)
@@ -49,6 +49,11 @@
   function pvLive(i: number) {
     return i === 0 ? live.pv1 : live.pv2
   }
+
+  function hourMinute(value: number) {
+    const totalMinutes = Math.max(0, Math.round(value * 60))
+    return `${Math.floor(totalMinutes / 60)} ชม. ${totalMinutes % 60} น.`
+  }
 </script>
 
 <div class="grid gap-6 lg:grid-cols-3">
@@ -61,7 +66,7 @@
         {:else}
           <BatteryFull size={18} strokeWidth={1.25} />
         {/if}
-        <h2 class="font-serif text-lg font-light text-foreground">แบตเตอรี่ &amp; ไฟสำรอง</h2>
+        <h2 class="font-serif text-lg font-light text-foreground">แบตเตอรี่ &amp; พลังงานสะสม</h2>
       </div>
       <span class="rounded-full border border-border/70 px-3 py-1 text-[10px] uppercase tracking-luxury text-muted-foreground">{battStatusLabel}</span>
     </div>
@@ -81,12 +86,10 @@
       <div class="rounded-md border border-border/60 p-3">
         <div class="mb-2 flex items-center gap-1.5 text-muted-foreground">
           <Clock size={14} strokeWidth={1.25} />
-          <span class="text-[10px] uppercase tracking-wider">สำรองได้อีก</span>
+          <span class="text-[10px] uppercase tracking-wider">ใช้ต่อได้อีก</span>
         </div>
-        <p class="font-mono text-lg font-medium leading-none text-foreground">
-          {num(backupHours, 1)}<span class="ml-1 text-sm font-normal">ชม.</span>
-        </p>
-        <p class="mt-1.5 text-[11px] text-muted-foreground">ถ้าไฟดับ</p>
+        <p class="font-mono text-lg font-medium leading-none text-foreground">{hourMinute(remainingUsageHours)}</p>
+        <p class="mt-1.5 text-[11px] text-muted-foreground">หลังโซลาร์หยุดผลิต</p>
       </div>
       <div class="rounded-md border border-border/60 p-3">
         <div class="mb-2 flex items-center gap-1.5 text-muted-foreground">

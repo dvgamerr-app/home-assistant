@@ -83,17 +83,6 @@ function paymentState(bill: BillRow) {
 }
 
 const totalSaved = billRows.reduce((sum: number, row: (typeof billRows)[0]) => sum + row.saved, 0)
-const billsNeedingPaymentReview = billRows.filter((bill) => paymentState(bill).needsReview)
-const paymentReviewSummary =
-  billRows.length === 0
-    ? { title: 'ยังไม่มีข้อมูลบิลให้ตรวจสอบ', detail: 'ระบบจะแสดงสถานะเมื่อได้รับข้อมูลบิลจาก MEA', ok: false }
-    : billsNeedingPaymentReview.length === 0
-      ? { title: 'พบหลักฐานชำระครบทุกบิล', detail: `ตรวจแล้ว ${billRows.length} รอบบิลจากข้อมูล MEA`, ok: true }
-      : {
-          title: `มี ${billsNeedingPaymentReview.length} บิลที่ต้องตรวจสอบ`,
-          detail: 'รวมบิลที่รอชำระและบิลที่ยังไม่พบหลักฐานชำระ โดยยังไม่ถือว่าเป็นหนี้ค้างจนกว่าจะมีข้อมูลยืนยันจาก MEA',
-          ok: false,
-        }
 const latestBill = billRows[0]
 const previousBill = billRows[1]
 const latestPayment = latestBill ? paymentState(latestBill) : null
@@ -141,15 +130,6 @@ const latestVsPrevious = previousBill
           <Gauge slot="icon" size={18} strokeWidth={1.25} />
         </StatCard>
       </div>
-
-      <section class="flex items-start gap-3 rounded-lg border border-border/70 bg-card px-5 py-4">
-        <span aria-hidden={true} class:list={['mt-1 h-2 w-2 shrink-0 rounded-full', paymentReviewSummary.ok ? 'bg-chart-1' : 'bg-chart-2']}></span>
-        <div>
-          <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">การตรวจสอบสถานะชำระ</p>
-          <p class:list={['mt-1 text-sm font-medium', paymentReviewSummary.ok ? 'text-chart-1' : 'text-foreground']}>{paymentReviewSummary.title}</p>
-          <p class="mt-1 text-xs leading-relaxed text-muted-foreground">{paymentReviewSummary.detail}</p>
-        </div>
-      </section>
 
       <section class="rounded-lg border border-border/70 bg-card p-6">
         <div class="mb-6 flex flex-wrap items-start justify-between gap-4 border-b border-border/60 pb-5">
