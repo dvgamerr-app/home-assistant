@@ -14,4 +14,4 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production --ignore-scripts
 ENV HOST=0.0.0.0 PORT=4321
 EXPOSE 4321
-CMD ["sh", "-c", "bun server/socket.mjs & bun ./dist/server/entry.mjs"]
+CMD ["sh", "-c", "bun run migration:run && (bun server/socket.mjs & exec bun ./dist/server/entry.mjs)"]

@@ -107,6 +107,8 @@ jobs:
             -e BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }} \
             -e GITHUB_CLIENT_ID=${{ secrets.HA_GITHUB_CLIENT_ID }} \
             -e GITHUB_CLIENT_SECRET=${{ secrets.HA_GITHUB_CLIENT_SECRET }} \
+            -e LINE_NOTICE_URL=${{ secrets.LINE_NOTICE_URL }} \
+            -e LINE_NOTICE_API_KEY=${{ secrets.LINE_NOTICE_API_KEY }} \
             -e TZ=Asia/Bangkok \
             -e APP_BASE_URL=${{ vars.APP_BASE_URL }} \
             -e SOLAR_DEVICE_ID=${{ vars.SOLAR_DEVICE_ID }} \
