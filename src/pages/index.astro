@@ -11,11 +11,11 @@ import PiggyBank from '@lucide/svelte/icons/piggy-bank'
 import Gauge from '@lucide/svelte/icons/gauge'
 import Receipt from '@lucide/svelte/icons/receipt'
 import Droplets from '@lucide/svelte/icons/droplets'
-import { getAll, getWaterUsageData } from '@/lib/solar-data'
+import { getOverviewData, getWaterUsageData } from '@/lib/solar-data'
 import { MONTH_SHORT_TH, thb, num } from '@/lib/electricity'
 import { getSocketUrl } from '@/lib/socket'
 
-const [data, waterData] = await Promise.all([getAll(), getWaterUsageData(1)])
+const [data, waterData] = await Promise.all([getOverviewData(), getWaterUsageData(1)])
 const socketUrl = getSocketUrl(Astro.request.url)
 
 const latestElectricityBill = data.bills[0]

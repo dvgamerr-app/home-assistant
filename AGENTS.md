@@ -27,6 +27,12 @@ BETTER_AUTH_SECRET    # random secret สำหรับ better-auth
 APP_BASE_URL          # base URL ของเว็บ (ใช้ทั้ง better-auth + socket URL ตอน production)
 ALLOWED_EMAILS        # comma-separated อีเมลที่อนุญาต (ถ้าไม่ตั้ง = ไม่กรอง)
 SOCKET_PORT           # port socket.io server (default 3000)
+SOCKET_POLL_MS        # ตรวจ source timestamp สำหรับ socket (default 60000; emit เมื่อข้อมูลเปลี่ยน)
+ENERGY_ALERT_POLL_MS  # รอบตรวจ Energy Lib alert (default 300000 ตาม cadence ข้อมูล ~5 นาที)
+UTILITY_ALERT_POLL_MS # รอบตรวจบิลค่าไฟ/น้ำ (default 3600000)
+MEA_BILL_DAY          # วันที่ค่าไฟเข้าในแต่ละเดือน (default 12)
+MWA_BILL_DAY          # วันที่ค่าน้ำเข้าในแต่ละเดือน (default 22)
+UTILITY_ALERT_GRACE_DAYS # จำนวนวันเผื่อ collector ส่งช้า (default 1)
 SOLAR_DEVICE_ID       # device_id ใน stash.solar_record
 MEA_HOUSE_CA          # เลข CA ของบ้านใน stash.mea_electric
 MWA_ACCOUNT_CODE      # account_code ใน stash.mwa_account (ถ้าไม่ตั้ง ใช้บัญชีแรก)

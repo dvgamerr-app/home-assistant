@@ -1,5 +1,22 @@
 import { describe, expect, test } from 'bun:test'
+import { getScheduledUtilityBillTypes, type UtilityBillSchedule } from './utility-bill-alerts'
 import { buildUtilityBillFlexMessage, buildUtilityBillNoticeRequest } from './utility-line-notice'
+
+const schedule: UtilityBillSchedule = { electricityDay: 12, waterDay: 22, graceDays: 1 }
+
+describe('Utility bill alert schedule', () => {
+  test('checks MEA on Bangkok dates 12-13 only', () => {
+    expect(getScheduledUtilityBillTypes(new Date('2026-08-11T17:00:00Z'), schedule)).toEqual(['electricity'])
+    expect(getScheduledUtilityBillTypes(new Date('2026-08-13T16:59:59Z'), schedule)).toEqual(['electricity'])
+    expect(getScheduledUtilityBillTypes(new Date('2026-08-13T17:00:00Z'), schedule)).toEqual([])
+  })
+
+  test('checks MWA on Bangkok dates 22-23 only', () => {
+    expect(getScheduledUtilityBillTypes(new Date('2026-08-21T17:00:00Z'), schedule)).toEqual(['water'])
+    expect(getScheduledUtilityBillTypes(new Date('2026-08-23T16:59:59Z'), schedule)).toEqual(['water'])
+    expect(getScheduledUtilityBillTypes(new Date('2026-08-23T17:00:00Z'), schedule)).toEqual([])
+  })
+})
 
 describe('Utility bill Flex Message', () => {
   test('builds independent MEA and MWA bill cards', () => {

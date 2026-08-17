@@ -12,7 +12,7 @@ import ProductionCurve from '@/components/charts/ProductionCurve.astro'
 import SolarProductionRateCurve from '@/components/charts/SolarProductionRateCurve.astro'
 import SelfSufficiencyChart from '@/components/charts/SelfSufficiencyChart.astro'
 import { getBangkokISODate, isISODate, parseISODate } from '@/lib/date'
-import { getAll } from '@/lib/solar-data'
+import { getSolarPageData } from '@/lib/solar-data'
 import { getSocketUrl } from '@/lib/socket'
 
 const dateParam = Astro.url.searchParams.get('date')
@@ -20,7 +20,7 @@ const todayISO = getBangkokISODate()
 const selectedISO = isISODate(dateParam) ? dateParam : todayISO
 const selectedDate = parseISODate(selectedISO)
 const isToday = selectedISO === todayISO
-const data = await getAll(selectedDate)
+const data = await getSolarPageData(selectedDate)
 
 const socketUrl = getSocketUrl(Astro.request.url)
 ---

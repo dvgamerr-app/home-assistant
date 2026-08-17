@@ -129,15 +129,57 @@ const n = (v: unknown) => Number(v ?? 0)
 const nullableN = (v: unknown) => (v === null || v === undefined ? null : Number(v))
 const toDayString = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
+function shiftDayString(day: string, days: number) {
+  const date = new Date(`${day}T00:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+function monthBounds(year: number, month: number) {
+  const start = `${year}-${String(month).padStart(2, '0')}-01`
+  const nextYear = month === 12 ? year + 1 : year
+  const nextMonth = month === 12 ? 1 : month + 1
+  const end = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
+  return { start, end }
+}
+
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 /** ค่า snapshot ล่าสุดต่อ attr ทุกตัว → pivot เป็น object เดียว */
 export async function getLiveSnapshot(): Promise<LiveSnapshot> {
   const rows = await sql<{ attr: string; value: string; recorded_at: Date }[]>`
-    SELECT DISTINCT ON (attr) attr, value, recorded_at
-    FROM stash.solar_record
-    WHERE device_id = ${DEVICE}
-    ORDER BY attr, recorded_at DESC
+    WITH attrs(attr) AS (
+      VALUES
+        ('generationPower'),
+        ('totalLoadPower'),
+        ('batteryPower'),
+        ('batterySOC'),
+        ('batterySOH'),
+        ('aPhaseFeederPower'),
+        ('batteryVoltage'),
+        ('batteryCurrent'),
+        ('cyclePeriod'),
+        ('pv1Power'),
+        ('pv1Voltage'),
+        ('pv1Current'),
+        ('pv2Power'),
+        ('pv2Voltage'),
+        ('pv2Current'),
+        ('gridVoltage'),
+        ('totalGenerationTime'),
+        ('powerRating'),
+        ('offGridPortTotalPower')
+    )
+    SELECT attrs.attr, latest.value, latest.recorded_at
+    FROM attrs
+    CROSS JOIN LATERAL (
+      SELECT value, recorded_at
+      FROM stash.solar_record
+      WHERE device_id = ${DEVICE}
+        AND attr = attrs.attr
+      ORDER BY recorded_at DESC
+      LIMIT 1
+    ) latest
   `
   const m = Object.fromEntries(rows.map((r) => [r.attr, n(r.value)]))
   const lastUpdate = rows.reduce<Date | null>((latest, row) => (!latest || row.recorded_at > latest ? row.recorded_at : latest), null)
@@ -169,32 +211,29 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
 export async function getToday(date?: Date): Promise<TodayData> {
   const d = date ?? new Date()
   const dayStr = toDayString(d)
+  const nextDayStr = shiftDayString(dayStr, 1)
 
-  const rows = await sql<{ attr: string; value: string }[]>`
-    SELECT attr,
-           MAX(value::numeric) as value
+  const [row] = await sql<{ generated: string; consumed: string; grid_import: string }[]>`
+    SELECT
+      GREATEST(
+        COALESCE(MAX(value) FILTER (WHERE attr = 'totalPowerGeneration'), 0) -
+        COALESCE(MIN(value) FILTER (WHERE attr = 'totalPowerGeneration'), 0),
+        0
+      ) AS generated,
+      COALESCE(MAX(value) FILTER (WHERE attr = 'loadDayElectricityConsumption'), 0) AS consumed,
+      COALESCE(MAX(value) FILTER (WHERE attr = 'dayPurchaseElectricityConsumption'), 0) AS grid_import
     FROM stash.solar_record
     WHERE device_id = ${DEVICE}
       AND attr IN ('loadDayElectricityConsumption', 'dayPurchaseElectricityConsumption',
                    'totalPowerGeneration')
-      AND (recorded_at AT TIME ZONE ${TZ})::date = ${dayStr}::date
-    GROUP BY attr
+      AND recorded_at >= (${dayStr} || ' 00:00 ' || ${TZ})::timestamptz
+      AND recorded_at < (${nextDayStr} || ' 00:00 ' || ${TZ})::timestamptz
   `
-  const cur = Object.fromEntries(rows.map((r) => [r.attr, n(r.value)]))
-
-  // generated = delta totalPowerGeneration (max - min of day)
-  const [startRow] = await sql<{ value: string }[]>`
-    SELECT value FROM stash.solar_record
-    WHERE device_id = ${DEVICE} AND attr = 'totalPowerGeneration'
-      AND (recorded_at AT TIME ZONE ${TZ})::date = ${dayStr}::date
-    ORDER BY recorded_at ASC LIMIT 1
-  `
-  const generated = Math.max(0, (cur.totalPowerGeneration ?? 0) - n(startRow?.value))
 
   return {
-    generated,
-    consumed: cur.loadDayElectricityConsumption ?? 0,
-    gridImport: cur.dayPurchaseElectricityConsumption ?? 0,
+    generated: n(row?.generated),
+    consumed: n(row?.consumed),
+    gridImport: n(row?.grid_import),
   }
 }
 
@@ -213,6 +252,7 @@ export type MinutePoint = {
 export async function get5Min(date?: Date): Promise<MinutePoint[]> {
   const d = date ?? new Date()
   const dayStart = toDayString(d)
+  const dayEnd = shiftDayString(dayStart, 1)
 
   const rows = await sql<{ minute_of_day: string; pv: string; pv1: string; pv2: string; load: string; soc: string; battery_power: string; grid_power: string }[]>`
     SELECT
@@ -227,7 +267,8 @@ export async function get5Min(date?: Date): Promise<MinutePoint[]> {
     FROM stash.solar_record
     WHERE device_id = ${DEVICE}
       AND attr IN ('generationPower', 'pv1Power', 'pv2Power', 'totalLoadPower', 'batterySOC', 'batteryPower', 'aPhaseFeederPower')
-      AND (recorded_at AT TIME ZONE ${TZ})::date = ${dayStart}::date
+      AND recorded_at >= (${dayStart} || ' 00:00 ' || ${TZ})::timestamptz
+      AND recorded_at < (${dayEnd} || ' 00:00 ' || ${TZ})::timestamptz
     GROUP BY minute_of_day
     ORDER BY minute_of_day
   `
@@ -247,6 +288,7 @@ export async function get5Min(date?: Date): Promise<MinutePoint[]> {
 export async function getHourly(date?: Date): Promise<HourlyPoint[]> {
   const d = date ?? new Date()
   const dayStart = toDayString(d)
+  const dayEnd = shiftDayString(dayStart, 1)
 
   const rows = await sql<{ hour: string; pv: string; load: string; soc: string; battery_power: string; grid_power: string }[]>`
     SELECT
@@ -259,7 +301,8 @@ export async function getHourly(date?: Date): Promise<HourlyPoint[]> {
     FROM stash.solar_record
     WHERE device_id = ${DEVICE}
       AND attr IN ('generationPower', 'totalLoadPower', 'batterySOC', 'batteryPower', 'aPhaseFeederPower')
-      AND (recorded_at AT TIME ZONE ${TZ})::date = ${dayStart}::date
+      AND recorded_at >= (${dayStart} || ' 00:00 ' || ${TZ})::timestamptz
+      AND recorded_at < (${dayEnd} || ' 00:00 ' || ${TZ})::timestamptz
     GROUP BY hour
     ORDER BY hour
   `
@@ -287,20 +330,21 @@ export async function getPvPeak(): Promise<{ pv1: number; pv2: number }> {
 
 /** รายวันของเดือน year/month (1-based) */
 export async function getMonthDays(year: number, month: number): Promise<DayPoint[]> {
-  const monthStr = `${year}-${String(month).padStart(2, '0')}`
+  const { start, end } = monthBounds(year, month)
 
   const rows = await sql<{ day: string; generated: string; consumed: string; grid_import: string }[]>`
     WITH daily AS (
       SELECT
         (recorded_at AT TIME ZONE ${TZ})::date as day,
         attr,
-        MIN(value::numeric) as v_min,
-        MAX(value::numeric) as v_max
+        MIN(value) as v_min,
+        MAX(value) as v_max
       FROM stash.solar_record
       WHERE device_id = ${DEVICE}
         AND attr IN ('totalPowerGeneration', 'loadDayElectricityConsumption',
                      'dayPurchaseElectricityConsumption')
-        AND to_char(recorded_at AT TIME ZONE ${TZ}, 'YYYY-MM') = ${monthStr}
+        AND recorded_at >= (${start} || ' 00:00 ' || ${TZ})::timestamptz
+        AND recorded_at < (${end} || ' 00:00 ' || ${TZ})::timestamptz
       GROUP BY day, attr
     )
     SELECT
@@ -326,19 +370,21 @@ export async function getRecentDailyTotals(endDate: Date, days = 8): Promise<Dai
   const start = new Date(end.getFullYear(), end.getMonth(), end.getDate() - (days - 1))
   const startStr = toDayString(start)
   const endStr = toDayString(end)
+  const endExclusiveStr = shiftDayString(endStr, 1)
 
   const rows = await sql<{ day: string; generated: string; consumed: string; grid_import: string }[]>`
     WITH daily AS (
       SELECT
         (recorded_at AT TIME ZONE ${TZ})::date as day,
         attr,
-        MIN(value::numeric) as v_min,
-        MAX(value::numeric) as v_max
+        MIN(value) as v_min,
+        MAX(value) as v_max
       FROM stash.solar_record
       WHERE device_id = ${DEVICE}
         AND attr IN ('totalPowerGeneration', 'loadDayElectricityConsumption',
                      'dayPurchaseElectricityConsumption')
-        AND (recorded_at AT TIME ZONE ${TZ})::date BETWEEN ${startStr}::date AND ${endStr}::date
+        AND recorded_at >= (${startStr} || ' 00:00 ' || ${TZ})::timestamptz
+        AND recorded_at < (${endExclusiveStr} || ' 00:00 ' || ${TZ})::timestamptz
       GROUP BY day, attr
     )
     SELECT
@@ -520,8 +566,8 @@ export async function getPvMorningEnergy(day: string): Promise<PvMorningEnergy> 
     FROM stash.solar_record
     WHERE device_id = ${DEVICE}
       AND attr IN ('pv1Power', 'pv2Power')
-      AND recorded_at >= (${day + ' 06:00 ' + TZ})::timestamptz
-      AND recorded_at < (${day + ' 09:00 ' + TZ})::timestamptz
+      AND recorded_at >= (${day} || ' 06:00 ' || ${TZ})::timestamptz
+      AND recorded_at < (${day} || ' 09:00 ' || ${TZ})::timestamptz
   `
 
   return { pv1Kwh: n(row?.pv1_kwh), pv2Kwh: n(row?.pv2_kwh) }
@@ -545,8 +591,8 @@ export async function getPvMorningBaseline(month: string): Promise<PvMorningBase
       FROM stash.solar_record
       WHERE device_id = ${DEVICE}
         AND attr IN ('pv1Power', 'pv2Power')
-        AND recorded_at >= (${monthStart + ' 00:00 ' + TZ})::timestamptz
-        AND recorded_at < ((${monthStart}::date + interval '1 month')::date::text || ' 00:00 ' || ${TZ})::timestamptz
+        AND recorded_at >= (${monthStart} || ' 00:00 ' || ${TZ})::timestamptz
+        AND recorded_at < ((${monthStart}::text::date + interval '1 month')::date::text || ' 00:00 ' || ${TZ})::timestamptz
         AND (recorded_at AT TIME ZONE ${TZ})::time >= time '06:00'
         AND (recorded_at AT TIME ZONE ${TZ})::time < time '09:00'
       GROUP BY 1, 2
@@ -575,8 +621,8 @@ export async function getBatteryMorningSocPeak(day: string): Promise<number | nu
     FROM stash.solar_record
     WHERE device_id = ${DEVICE}
       AND attr = 'batterySOC'
-      AND recorded_at >= (${day + ' 06:00 ' + TZ})::timestamptz
-      AND recorded_at < (${day + ' 09:00 ' + TZ})::timestamptz
+      AND recorded_at >= (${day} || ' 06:00 ' || ${TZ})::timestamptz
+      AND recorded_at < (${day} || ' 09:00 ' || ${TZ})::timestamptz
   `
 
   return row?.peak_soc === null || row?.peak_soc === undefined ? null : n(row.peak_soc)

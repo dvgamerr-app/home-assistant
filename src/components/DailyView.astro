@@ -8,7 +8,7 @@ import ChartCard from './ui/ChartCard.astro'
 import LegendRow from './ui/LegendRow.astro'
 import { svgStackedBars } from '@/lib/chart'
 import { num, thb } from '@/lib/electricity'
-import type { MonthLoad } from '@/lib/solar-data'
+import type { MonthLoad, MonthLoadSummary } from '@/lib/solar-data'
 
 interface Props {
   today: { generated: number; consumed: number; gridImport: number; generationHours: number }
@@ -17,8 +17,8 @@ interface Props {
   monthLabel: string
   isCurrentMonth?: boolean
   selMonthTotals?: MonthLoad['totals']
-  lastMonth: MonthLoad
-  twoMonthsAgo: MonthLoad
+  lastMonth: MonthLoadSummary
+  twoMonthsAgo: MonthLoadSummary
   availableMonths?: Array<{ value: string; label: string }>
   selectedMonth?: string
 }

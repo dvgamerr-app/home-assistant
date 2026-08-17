@@ -1,6 +1,23 @@
 import { formatBangkokDateTime, formatISODate, getBangkokISODate } from './date'
+import { cacheData } from './data-cache'
 import { calculateMonthlyBill, marginalRate, MONTH_LONG_TH, MONTH_SHORT_TH } from './electricity'
-import { getBatteryCharge, getBills, get5Min, getHourly, getLifetime, getLiveSnapshot, getMonthDays, getMonths, getPvPeak, getRecentDailyTotals, getToday, getWaterUsage, type DayPoint } from './db'
+import {
+  getBatteryCharge,
+  getBills,
+  get5Min,
+  getHourly,
+  getLifetime,
+  getLiveSnapshot,
+  getMonthDays,
+  getMonths,
+  getPvPeak,
+  getRecentDailyTotals,
+  getToday,
+  getWaterUsage,
+  type DayPoint,
+  type LiveSnapshot,
+  type MonthPoint,
+} from './db'
 
 export const SYSTEM = {
   name: 'บ้าน 75/63',
@@ -15,6 +32,36 @@ const thMonth = (yyyymm: string) => MONTH_SHORT_TH[parseInt(yyyymm.slice(4)) - 1
 const round = (value: number, digits = 1) => Number(value.toFixed(digits))
 const clampZero = (value: number) => Math.max(0, value)
 const pct = (part: number, total: number, digits = 0) => (total > 0 ? round((part / total) * 100, digits) : 0)
+
+const EMPTY_LIVE: LiveSnapshot = {
+  pvPowerKw: 0,
+  loadPowerKw: 0,
+  batteryPowerKw: 0,
+  batterySoc: 0,
+  batterySoh: 100,
+  gridPowerKw: 0,
+  batteryVoltage: 0,
+  batteryCurrent: 0,
+  cyclePeriod: 0,
+  pv1: { power: 0, voltage: 0, current: 0 },
+  pv2: { power: 0, voltage: 0, current: 0 },
+  gridVoltage: 0,
+  totalGenerationTime: 0,
+  powerRating: 0,
+  offGridPowerKw: 0,
+  isOnline: false,
+  lastUpdate: new Date(0).toISOString(),
+}
+
+export type SolarDataScope = 'all' | 'overview' | 'load' | 'load-history' | 'solar' | 'bill'
+
+const CACHE = {
+  live: 5_000,
+  currentDay: 30_000,
+  currentAggregate: 60_000,
+  historical: 6 * 60 * 60_000,
+  slowMoving: 5 * 60_000,
+} as const
 
 function changeFrom(current: number, previous: number) {
   const diff = current - previous
@@ -65,7 +112,31 @@ function formatMonthDays(monthDays: DayPoint[], year: number, month: number) {
   })
 }
 
-export async function getAll(date?: Date) {
+function summarizeMonth(monthPoint: MonthPoint, selfUseOverride?: number) {
+  const year = parseInt(monthPoint.month.slice(0, 4))
+  const month = parseInt(monthPoint.month.slice(5))
+  const selfUse = selfUseOverride ?? clampZero(monthPoint.consumed - monthPoint.gridImport)
+  const billActual = calculateMonthlyBill(monthPoint.gridImport)
+  const billNoSolar = calculateMonthlyBill(monthPoint.consumed)
+
+  return {
+    key: monthPoint.month,
+    label: `${MONTH_LONG_TH[month - 1]} ${year + 543}`,
+    labelShort: `${MONTH_SHORT_TH[month - 1]} ${String(year + 543).slice(-2)}`,
+    totals: {
+      generated: monthPoint.generated,
+      consumed: monthPoint.consumed,
+      gridImport: monthPoint.gridImport,
+      selfUse,
+      savedTHB: Math.max(0, billNoSolar.total - billActual.total),
+      gridCostTHB: billActual.total,
+      wouldHaveCostTHB: billNoSolar.total,
+      selfSufficiency: monthPoint.consumed > 0 ? (selfUse / monthPoint.consumed) * 100 : 0,
+    },
+  }
+}
+
+export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
   const selectedDate = date ?? new Date()
   const year = selectedDate.getFullYear()
   const month = selectedDate.getMonth() + 1
@@ -73,19 +144,41 @@ export async function getAll(date?: Date) {
   const todayISO = getBangkokISODate()
   const isToday = selectedISO === todayISO
 
-  const [live, today, monthDays, rawMonths, hourly, fiveMinRaw, lifetime, bills, histBatteryCharge, pvPeak, recentDailyRows] = await Promise.all([
-    getLiveSnapshot(),
-    getToday(selectedDate),
-    getMonthDays(year, month),
-    getMonths(12),
-    getHourly(selectedDate),
-    get5Min(selectedDate),
-    getLifetime(),
-    getBills(36),
-    getBatteryCharge(12),
-    getPvPeak(),
-    getRecentDailyTotals(selectedDate, 8),
+  const needsLive = scope === 'all' || scope === 'overview' || scope === 'solar'
+  const needsToday = scope === 'all' || scope === 'overview' || scope === 'load' || scope === 'solar'
+  const needsMonthDays = scope === 'all' || scope === 'overview' || scope === 'load'
+  const needsHourly = scope === 'all' || scope === 'overview' || scope === 'load'
+  const needsFiveMin = scope === 'all' || scope === 'solar'
+  const needsSolarHistory = scope === 'all' || scope === 'solar'
+  const needsBills = scope === 'all' || scope === 'overview' || scope === 'bill'
+  const selectedMonth = selectedISO.slice(0, 7)
+  const currentMonth = todayISO.slice(0, 7)
+  const dayTtl = isToday ? CACHE.currentDay : CACHE.historical
+  const monthTtl = selectedMonth === currentMonth ? CACHE.currentAggregate : CACHE.historical
+
+  const [liveResult, todayResult, monthDaysResult, rawMonths, hourlyResult, fiveMinResult, lifetimeResult, billsResult, histBatteryChargeResult, pvPeakResult, recentDailyResult] = await Promise.all([
+    needsLive ? cacheData('solar:live', CACHE.live, getLiveSnapshot) : Promise.resolve(null),
+    needsToday ? cacheData(`solar:today:${selectedISO}`, dayTtl, () => getToday(selectedDate)) : Promise.resolve(null),
+    needsMonthDays ? cacheData(`solar:month-days:${selectedMonth}`, monthTtl, () => getMonthDays(year, month)) : Promise.resolve(null),
+    cacheData('solar:months:12', CACHE.currentAggregate, () => getMonths(12)),
+    needsHourly ? cacheData(`solar:hourly:${selectedISO}`, dayTtl, () => getHourly(selectedDate)) : Promise.resolve(null),
+    needsFiveMin ? cacheData(`solar:five-min:${selectedISO}`, dayTtl, () => get5Min(selectedDate)) : Promise.resolve(null),
+    needsSolarHistory ? cacheData('solar:lifetime', CACHE.slowMoving, getLifetime) : Promise.resolve(null),
+    needsBills ? cacheData('utility:bills:36', CACHE.slowMoving, () => getBills(36)) : Promise.resolve(null),
+    needsSolarHistory ? cacheData('solar:battery-charge:12', CACHE.slowMoving, () => getBatteryCharge(12)) : Promise.resolve(null),
+    needsSolarHistory ? cacheData('solar:pv-peak', CACHE.slowMoving, getPvPeak) : Promise.resolve(null),
+    needsSolarHistory ? cacheData(`solar:recent-daily:${selectedISO}:8`, dayTtl, () => getRecentDailyTotals(selectedDate, 8)) : Promise.resolve(null),
   ])
+  const live = liveResult ?? EMPTY_LIVE
+  const today = todayResult ?? { generated: 0, consumed: 0, gridImport: 0 }
+  const monthDays = monthDaysResult ?? []
+  const hourly = hourlyResult ?? []
+  const fiveMinRaw = fiveMinResult ?? []
+  const lifetime = lifetimeResult ?? { generated: 0, gridImport: 0, generationTime: 0, co2ReductionKg: 0 }
+  const bills = billsResult ?? []
+  const histBatteryCharge = histBatteryChargeResult ?? 0
+  const pvPeak = pvPeakResult ?? { pv1: 0, pv2: 0 }
+  const recentDailyRows = recentDailyResult ?? []
 
   const storedKwh = (SYSTEM.batteryCapacityKwh * live.batterySoc) / 100
 
@@ -109,6 +202,7 @@ export async function getAll(date?: Date) {
   const formattedMonthDays = formatMonthDays(monthDays, year, month)
 
   const billPaidMap = new Map(bills.map((bill) => [bill.month, bill.paid]))
+  const monthSummaries = rawMonths.map(summarizeMonth)
   const months = rawMonths.map((monthPoint) => {
     const selfUse = clampZero(monthPoint.consumed - monthPoint.gridImport)
     const billWithoutSolar = calculateMonthlyBill(monthPoint.consumed).total
@@ -350,6 +444,7 @@ export async function getAll(date?: Date) {
     monthDays: formattedMonthDays,
     monthLabel,
     monthPicker,
+    monthSummaries,
     months,
     gridOverview,
     fiveMin: full5Min,
@@ -361,8 +456,16 @@ export async function getAll(date?: Date) {
 
 export type SolarData = Awaited<ReturnType<typeof getAll>>
 
+export const getOverviewData = () => getAll(undefined, 'overview')
+export const getLoadPageData = (includeCurrentDay = true) => getAll(undefined, includeCurrentDay ? 'load' : 'load-history')
+export const getSolarPageData = (date?: Date) => getAll(date, 'solar')
+export const getBillPageData = () => getAll(undefined, 'bill')
+
 export async function getMonthLoad(year: number, month: number) {
-  const monthDays = await getMonthDays(year, month)
+  const monthKey = `${year}-${String(month).padStart(2, '0')}`
+  const currentMonth = getBangkokISODate().slice(0, 7)
+  const ttl = monthKey === currentMonth ? CACHE.currentAggregate : CACHE.historical
+  const monthDays = await cacheData(`solar:month-days:${monthKey}`, ttl, () => getMonthDays(year, month))
   const days = formatMonthDays(monthDays, year, month)
 
   const raw = days.reduce(
@@ -379,28 +482,29 @@ export async function getMonthLoad(year: number, month: number) {
       selfUse: 0,
     },
   )
-  const billActual = calculateMonthlyBill(raw.gridImport)
-  const billNoSolar = calculateMonthlyBill(raw.consumed)
+  const summary = summarizeMonth(
+    {
+      month: monthKey,
+      generated: raw.generated,
+      consumed: raw.consumed,
+      gridImport: raw.gridImport,
+    },
+    raw.selfUse,
+  )
 
   return {
     days,
-    label: `${MONTH_LONG_TH[month - 1]} ${year + 543}`,
-    labelShort: `${MONTH_SHORT_TH[month - 1]} ${String(year + 543).slice(-2)}`,
-    totals: {
-      ...raw,
-      savedTHB: Math.max(0, billNoSolar.total - billActual.total),
-      gridCostTHB: billActual.total,
-      wouldHaveCostTHB: billNoSolar.total,
-      selfSufficiency: raw.consumed > 0 ? (raw.selfUse / raw.consumed) * 100 : 0,
-    },
+    ...summary,
   }
 }
 
 export type MonthLoad = Awaited<ReturnType<typeof getMonthLoad>>
+export type MonthLoadSummary = Omit<MonthLoad, 'days'>
 
 /** ข้อมูลหน้าใช้น้ำ แยกจาก getAll() เพื่อไม่ให้หน้าพลังงานต้อง query ตารางน้ำโดยไม่จำเป็น */
 export async function getWaterUsageData(nMonths = 24) {
-  const months = (await getWaterUsage(nMonths)).map((row) => ({
+  const source = await cacheData(`utility:water:${nMonths}`, CACHE.slowMoving, () => getWaterUsage(nMonths))
+  const months = source.map((row) => ({
     ...row,
     label: `${MONTH_SHORT_TH[row.month - 1]} ${row.year + 543}`,
     unitPrice: row.consumption > 0 ? row.billedAmount / row.consumption : 0,

@@ -3,7 +3,7 @@ import Layout from '@/layouts/Layout.astro'
 import Nav from '@/components/Nav.astro'
 import ElectricityNav from '@/components/ElectricityNav.astro'
 import DailyView from '@/components/DailyView.astro'
-import { getAll, getMonthLoad } from '@/lib/solar-data'
+import { getLoadPageData, getMonthLoad } from '@/lib/solar-data'
 
 const now = new Date()
 const curYear = now.getFullYear()
@@ -23,11 +23,12 @@ const selectedMonthStr = `${selYear}${String(selMonth).padStart(2, '0')}`
 const lastFullDate = new Date(curYear, curMonth - 2, 1)
 const twoMonthsAgoDate = new Date(curYear, curMonth - 3, 1)
 
-const [data, selMonthData, lastMonthData, twoMonthsAgoData] = await Promise.all([
-  getAll(),
-  isCurrentMonth ? Promise.resolve(null) : getMonthLoad(selYear, selMonth),
-  getMonthLoad(lastFullDate.getFullYear(), lastFullDate.getMonth() + 1),
-  getMonthLoad(twoMonthsAgoDate.getFullYear(), twoMonthsAgoDate.getMonth() + 1),
+const [data, selMonthData] = await Promise.all([getLoadPageData(isCurrentMonth), isCurrentMonth ? Promise.resolve(null) : getMonthLoad(selYear, selMonth)])
+
+const monthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+const [lastMonthData, twoMonthsAgoData] = await Promise.all([
+  data.monthSummaries.find((entry) => entry.key === monthKey(lastFullDate)) ?? getMonthLoad(lastFullDate.getFullYear(), lastFullDate.getMonth() + 1),
+  data.monthSummaries.find((entry) => entry.key === monthKey(twoMonthsAgoDate)) ?? getMonthLoad(twoMonthsAgoDate.getFullYear(), twoMonthsAgoDate.getMonth() + 1),
 ])
 
 // เดือนที่มีข้อมูลจริงใน DB (จาก getMonths(12) ใน getAll)

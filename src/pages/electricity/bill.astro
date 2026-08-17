@@ -11,11 +11,11 @@ import Coins from '@lucide/svelte/icons/coins'
 import Landmark from '@lucide/svelte/icons/landmark'
 import CalendarRange from '@lucide/svelte/icons/calendar-range'
 import Target from '@lucide/svelte/icons/target'
-import { getAll } from '@/lib/solar-data'
+import { getBillPageData } from '@/lib/solar-data'
 import { MONTH_SHORT_TH, num, thb } from '@/lib/electricity'
 import { formatThaiDate } from '@/lib/date'
 
-const data = await getAll()
+const data = await getBillPageData()
 
 const billRows = data.bills.map((bill) => ({
   month: `${MONTH_SHORT_TH[parseInt(bill.month.slice(4)) - 1] ?? bill.month} ${parseInt(bill.month.slice(0, 4)) + 543}`,
