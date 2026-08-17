@@ -114,6 +114,9 @@ jobs:
             -e SOLAR_DEVICE_ID=${{ vars.SOLAR_DEVICE_ID }} \
             -e MEA_HOUSE_CA=${{ vars.MEA_HOUSE_CA }} \
             -e MWA_ACCOUNT_CODE=${{ vars.MWA_ACCOUNT_CODE }} \
+            -e MEA_BILL_DAY=${{ vars.MEA_BILL_DAY }} \
+            -e MWA_BILL_DAY=${{ vars.MWA_BILL_DAY }} \
+            -e UTILITY_ALERT_GRACE_DAYS=${{ vars.UTILITY_ALERT_GRACE_DAYS }} \
             -e ALLOWED_EMAILS=${{ vars.ALLOWED_EMAILS }} \
             -p ${{ vars.PORT }}:4321 \
             -p ${{ vars.SOCKET_PORT }}:3000 \
