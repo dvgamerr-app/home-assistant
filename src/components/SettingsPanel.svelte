@@ -378,7 +378,7 @@
           </div>
 
           <div class="grid grid-cols-2 gap-2 rounded-md border border-border/70 bg-background p-4 font-mono text-xs text-foreground">
-            {#each backupCodes as backupCode}
+            {#each backupCodes as backupCode (backupCode)}
               <code class="rounded border border-border/50 bg-card px-2 py-1.5 text-center">{backupCode}</code>
             {/each}
           </div>
