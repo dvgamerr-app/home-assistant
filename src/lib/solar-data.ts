@@ -1,4 +1,4 @@
-import { formatBangkokDateTime, formatISODate, getBangkokISODate } from './date'
+import { formatISODate, getBangkokISODate } from './date'
 import { cacheData } from './data-cache'
 import { calculateMonthlyBill, marginalRate, MONTH_LONG_TH, MONTH_SHORT_TH } from './electricity'
 import {
@@ -148,8 +148,9 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
   const needsToday = scope === 'all' || scope === 'overview' || scope === 'load' || scope === 'solar'
   const needsMonthDays = scope === 'all' || scope === 'overview' || scope === 'load'
   const needsHourly = scope === 'all' || scope === 'overview' || scope === 'load'
-  const needsFiveMin = scope === 'all' || scope === 'solar'
+  const needsFiveMin = scope === 'all' || scope === 'load' || scope === 'solar'
   const needsSolarHistory = scope === 'all' || scope === 'solar'
+  const needsDayComparison = scope === 'all' || scope === 'load' || scope === 'solar'
   const needsBills = scope === 'all' || scope === 'overview' || scope === 'bill'
   const selectedMonth = selectedISO.slice(0, 7)
   const currentMonth = todayISO.slice(0, 7)
@@ -167,7 +168,7 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
     needsBills ? cacheData('utility:bills:36', CACHE.slowMoving, () => getBills(36)) : Promise.resolve(null),
     needsSolarHistory ? cacheData('solar:battery-charge:12', CACHE.slowMoving, () => getBatteryCharge(12)) : Promise.resolve(null),
     needsSolarHistory ? cacheData('solar:pv-peak', CACHE.slowMoving, getPvPeak) : Promise.resolve(null),
-    needsSolarHistory ? cacheData(`solar:recent-daily:${selectedISO}:8`, dayTtl, () => getRecentDailyTotals(selectedDate, 8)) : Promise.resolve(null),
+    needsDayComparison ? cacheData(`solar:recent-daily:${selectedISO}:8`, dayTtl, () => getRecentDailyTotals(selectedDate, 8)) : Promise.resolve(null),
   ])
   const live = liveResult ?? EMPTY_LIVE
   const today = todayResult ?? { generated: 0, consumed: 0, gridImport: 0 }
@@ -179,8 +180,6 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
   const histBatteryCharge = histBatteryChargeResult ?? 0
   const pvPeak = pvPeakResult ?? { pv1: 0, pv2: 0 }
   const recentDailyRows = recentDailyResult ?? []
-
-  const storedKwh = (SYSTEM.batteryCapacityKwh * live.batterySoc) / 100
 
   const pvStrings = [
     { name: 'แผง MPPT 1', power: live.pv1.power, voltage: live.pv1.voltage, current: live.pv1.current, installed: true, peakKw: pvPeak.pv1 },
@@ -366,65 +365,6 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
     solarSurplusPct: latestMonth?.solarSurplusPct ?? 0,
   }
 
-  const ageMinutes = Math.max(0, Math.round((Date.now() - new Date(live.lastUpdate).getTime()) / 60000))
-  const freshness = {
-    isOnline: live.isOnline,
-    lastUpdate: live.lastUpdate,
-    lastUpdateLabel: formatBangkokDateTime(live.lastUpdate),
-    ageMinutes,
-    isToday,
-  }
-
-  const alerts: Array<{ tone: 'ok' | 'info' | 'warn' | 'danger'; title: string; detail: string }> = [
-    live.isOnline
-      ? {
-          tone: 'ok',
-          title: 'ข้อมูลสดพร้อมใช้งาน',
-          detail: ageMinutes <= 1 ? 'อัปเดตเมื่อสักครู่' : `อัปเดตล่าสุดเมื่อ ${ageMinutes} นาทีก่อน`,
-        }
-      : {
-          tone: 'danger',
-          title: 'อุปกรณ์ยังไม่ส่งข้อมูลสด',
-          detail: `ล่าสุด ${formatBangkokDateTime(live.lastUpdate)}`,
-        },
-    ...(!isToday
-      ? [
-          {
-            tone: 'info' as const,
-            title: 'กำลังดูข้อมูลย้อนหลัง',
-            detail: `วันที่ ${selectedISO}`,
-          },
-        ]
-      : []),
-    ...(live.gridVoltage < 210
-      ? [
-          {
-            tone: 'warn' as const,
-            title: 'แรงดันไฟต่ำกว่าปกติ',
-            detail: `ตอนนี้ ${round(live.gridVoltage, 0)} V`,
-          },
-        ]
-      : []),
-    ...(live.gridVoltage > 245
-      ? [
-          {
-            tone: 'warn' as const,
-            title: 'แรงดันไฟสูงกว่าปกติ',
-            detail: `ตอนนี้ ${round(live.gridVoltage, 0)} V`,
-          },
-        ]
-      : []),
-    ...(live.batterySoc <= 20
-      ? [
-          {
-            tone: 'warn' as const,
-            title: 'พลังงานในแบตเตอรี่เหลือน้อย',
-            detail: `เหลือ ${round(live.batterySoc, 0)}% (${round(storedKwh, 1)} kWh)`,
-          },
-        ]
-      : []),
-  ]
-
   const monthPicker = rawMonths.map((monthPoint) => {
     const y = parseInt(monthPoint.month.slice(0, 4))
     const mo = parseInt(monthPoint.month.slice(5))
@@ -435,8 +375,6 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
     system: { ...SYSTEM, ratedPowerKw: live.powerRating || SYSTEM.ratedPowerKw },
     live,
     pvStrings,
-    freshness,
-    alerts,
     today: { ...today, generationHours: hourly.filter((hourPoint) => hourPoint.pv > 0).length },
     day,
     dayFlow,

@@ -1,15 +1,15 @@
 ---
 interface Props {
-  items: { label: string; color: string }[]
+  items: { label: string; color: string; mobileHidden?: boolean }[]
   class?: string
 }
 const { items, class: cls } = Astro.props
 ---
 
-<div class:list={['flex flex-wrap gap-x-6 gap-y-2 text-xs text-muted-foreground', cls]}>
+<div class:list={['flex flex-wrap gap-x-4 gap-y-2 text-[11px] text-muted-foreground sm:gap-x-6 sm:text-xs', cls]}>
   {
     items.map((item) => (
-      <span class="flex items-center gap-2">
+      <span class:list={['items-center gap-2', item.mobileHidden ? 'hidden sm:flex' : 'flex']}>
         <span class="legend-dot" style={`background:${item.color}`} />
         {item.label}
       </span>

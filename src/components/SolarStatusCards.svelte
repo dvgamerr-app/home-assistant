@@ -50,9 +50,8 @@
     return i === 0 ? live.pv1 : live.pv2
   }
 
-  function hourMinute(value: number) {
-    const totalMinutes = Math.max(0, Math.round(value * 60))
-    return `${Math.floor(totalMinutes / 60)} ชม. ${totalMinutes % 60} น.`
+  function approximateHours(value: number) {
+    return `~${Math.max(0, Math.round(value))} ชม.`
   }
 </script>
 
@@ -88,7 +87,7 @@
           <Clock size={14} strokeWidth={1.25} />
           <span class="text-[10px] uppercase tracking-wider">ใช้ต่อได้อีก</span>
         </div>
-        <p class="font-mono text-lg font-medium leading-none text-foreground">{hourMinute(remainingUsageHours)}</p>
+        <p class="font-mono text-lg font-medium leading-none text-foreground">{approximateHours(remainingUsageHours)}</p>
         <p class="mt-1.5 text-[11px] text-muted-foreground">หลังโซลาร์หยุดผลิต</p>
       </div>
       <div class="rounded-md border border-border/60 p-3">

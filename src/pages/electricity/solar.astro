@@ -2,15 +2,12 @@
 import Layout from '@/layouts/Layout.astro'
 import Nav from '@/components/Nav.astro'
 import ElectricityNav from '@/components/ElectricityNav.astro'
-import SolarAlertStrip from '@/components/SolarAlertStrip.astro'
-import SolarDaySummary from '@/components/SolarDaySummary.astro'
 import SolarStatusCards from '@/components/SolarStatusCards.svelte'
 import BatteryBehaviorChart from '@/components/charts/BatteryBehaviorChart.astro'
 import EnergyDistributionChart from '@/components/charts/EnergyDistributionChart.astro'
 import GridDependencyChart from '@/components/charts/GridDependencyChart.astro'
 import ProductionCurve from '@/components/charts/ProductionCurve.astro'
 import SolarProductionRateCurve from '@/components/charts/SolarProductionRateCurve.astro'
-import SelfSufficiencyChart from '@/components/charts/SelfSufficiencyChart.astro'
 import { getBangkokISODate, isISODate, parseISODate } from '@/lib/date'
 import { getSolarPageData } from '@/lib/solar-data'
 import { getSocketUrl } from '@/lib/socket'
@@ -35,21 +32,14 @@ const socketUrl = getSocketUrl(Astro.request.url)
 
     <ElectricityNav active="solar" />
 
-    <div class="space-y-6">
-      <SolarAlertStrip freshness={data.freshness} alerts={data.alerts} />
-      <SolarDaySummary dayFlow={data.dayFlow} dayComparison={data.dayComparison} />
-
+    <div class="grid gap-6">
       <ProductionCurve fiveMin={data.fiveMin} date={selectedISO} isToday={isToday} socketUrl={socketUrl} />
 
       <SolarStatusCards live={data.live} pvStrings={data.pvStrings} system={data.system} socketUrl={socketUrl} client:load />
 
-      <div class="pt-2 md:pt-4">
-        <SolarProductionRateCurve fiveMin={data.fiveMin} isToday={isToday} ratedPowerKw={data.system.ratedPowerKw} socketUrl={socketUrl} />
-      </div>
-
       <div class="grid gap-6 lg:grid-cols-2">
         <BatteryBehaviorChart fiveMin={data.fiveMin} dayFlow={data.dayFlow} />
-        <SelfSufficiencyChart months={data.months} />
+        <SolarProductionRateCurve fiveMin={data.fiveMin} isToday={isToday} pv1MaxKw={data.pvStrings[0]?.peakKw ?? 0} pv2MaxKw={data.pvStrings[1]?.peakKw ?? 0} socketUrl={socketUrl} />
       </div>
 
       <div class="grid gap-6 lg:grid-cols-2">

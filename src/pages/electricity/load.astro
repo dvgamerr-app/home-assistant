@@ -3,6 +3,7 @@ import Layout from '@/layouts/Layout.astro'
 import Nav from '@/components/Nav.astro'
 import ElectricityNav from '@/components/ElectricityNav.astro'
 import DailyView from '@/components/DailyView.astro'
+import SolarDaySummary from '@/components/SolarDaySummary.astro'
 import { getLoadPageData, getMonthLoad } from '@/lib/solar-data'
 
 const now = new Date()
@@ -23,7 +24,7 @@ const selectedMonthStr = `${selYear}${String(selMonth).padStart(2, '0')}`
 const lastFullDate = new Date(curYear, curMonth - 2, 1)
 const twoMonthsAgoDate = new Date(curYear, curMonth - 3, 1)
 
-const [data, selMonthData] = await Promise.all([getLoadPageData(isCurrentMonth), isCurrentMonth ? Promise.resolve(null) : getMonthLoad(selYear, selMonth)])
+const [data, selMonthData] = await Promise.all([getLoadPageData(true), isCurrentMonth ? Promise.resolve(null) : getMonthLoad(selYear, selMonth)])
 
 const monthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
 const [lastMonthData, twoMonthsAgoData] = await Promise.all([
@@ -47,6 +48,8 @@ const monthLabel = isCurrentMonth ? data.monthLabel : selMonthData!.label
     </header>
 
     <ElectricityNav active="load" />
+
+    <SolarDaySummary dayFlow={data.dayFlow} dayComparison={data.dayComparison} />
 
     <DailyView
       today={data.today}
