@@ -45,6 +45,33 @@ const waterPayment = !latestWaterBill ? undefined : latestWaterBill.isPaid ? '�
   <Nav />
   <Hero live={data.live} system={data.system} />
   <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
+    <section class="space-y-4">
+      <div>
+        <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">บิลล่าสุด</p>
+        <h2 class="mt-1 font-serif text-xl font-light text-foreground">ค่าน้ำและค่าไฟของบ้าน</h2>
+      </div>
+      <div class="grid gap-4 md:grid-cols-2">
+        <StatCard
+          label="ค่าไฟเดือนล่าสุด"
+          value={latestElectricityBill ? thb(latestElectricityBill.paid, 2) : '—'}
+          sub={latestElectricityBill ? `${electricityMonthLabel(latestElectricityBill.month)} · ใช้ไฟ ${num(latestElectricityBill.kwh, 0)} หน่วย` : 'ยังไม่มีข้อมูลบิลค่าไฟ'}
+          trend={electricityPayment}
+          accent="terracotta"
+        >
+          <Receipt slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard
+          label="ค่าน้ำเดือนล่าสุด"
+          value={latestWaterBill ? thb(latestWaterBill.billedAmount, 2) : '—'}
+          sub={latestWaterBill ? `${latestWaterBill.label} · ใช้น้ำ ${num(latestWaterBill.consumption, 0)} ลบ.ม.` : 'ยังไม่มีข้อมูลบิลค่าน้ำ'}
+          trend={waterPayment}
+          accent="blue"
+        >
+          <Droplets slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+      </div>
+    </section>
+
     <div class="grid items-stretch gap-4 lg:grid-cols-3">
       <div class="flex flex-col gap-4 lg:col-span-2">
         <section class="space-y-4">
@@ -75,33 +102,6 @@ const waterPayment = !latestWaterBill ? undefined : latestWaterBill.isPaid ? '�
         <EnergyFlow live={data.live} socketUrl={socketUrl} client:load />
       </div>
     </div>
-
-    <section class="space-y-4">
-      <div>
-        <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">บิลล่าสุด</p>
-        <h2 class="mt-1 font-serif text-xl font-light text-foreground">ค่าน้ำและค่าไฟของบ้าน</h2>
-      </div>
-      <div class="grid gap-4 md:grid-cols-2">
-        <StatCard
-          label="ค่าไฟเดือนล่าสุด"
-          value={latestElectricityBill ? thb(latestElectricityBill.paid, 2) : '—'}
-          sub={latestElectricityBill ? `${electricityMonthLabel(latestElectricityBill.month)} · ใช้ไฟ ${num(latestElectricityBill.kwh, 0)} หน่วย` : 'ยังไม่มีข้อมูลบิลค่าไฟ'}
-          trend={electricityPayment}
-          accent="terracotta"
-        >
-          <Receipt slot="icon" size={18} strokeWidth={1.25} />
-        </StatCard>
-        <StatCard
-          label="ค่าน้ำเดือนล่าสุด"
-          value={latestWaterBill ? thb(latestWaterBill.billedAmount, 2) : '—'}
-          sub={latestWaterBill ? `${latestWaterBill.label} · ใช้น้ำ ${num(latestWaterBill.consumption, 0)} ลบ.ม.` : 'ยังไม่มีข้อมูลบิลค่าน้ำ'}
-          trend={waterPayment}
-          accent="blue"
-        >
-          <Droplets slot="icon" size={18} strokeWidth={1.25} />
-        </StatCard>
-      </div>
-    </section>
 
     <p class="text-pretty pb-4 text-center text-xs leading-relaxed text-muted-foreground">
       ค่าไฟคำนวณตามอัตราค่าไฟฟ้าบ้านอยู่อาศัย ประเภท 1.2 แบบขั้นบันไดของการไฟฟ้านครหลวง (MEA) รวมค่า Ft และภาษีมูลค่าเพิ่ม 7%
