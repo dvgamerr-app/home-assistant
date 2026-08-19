@@ -12,6 +12,9 @@ if (!session) return Astro.redirect('/login')
 const accounts = await auth.api.listUserAccounts({ headers: Astro.request.headers })
 const hasPassword = accounts.some((account) => account.providerId === 'credential')
 const hasGitHub = accounts.some((account) => account.providerId === 'github')
+const githubEnabled = !!process.env.GITHUB_CLIENT_ID
+const githubStatus = Astro.url.searchParams.get('github')
+const githubError = Astro.url.searchParams.get('error')
 const twoFactorEnabled = session.user.twoFactorEnabled ?? false
 const displayName = session.user.name?.trim() || session.user.email.split('@')[0]
 const parts = displayName.split(/\s+/).filter(Boolean)
@@ -71,6 +74,16 @@ const initials = (parts.length > 1 ? parts[0][0] + parts[1][0] : displayName.sli
       </div>
     </section>
 
-    <SettingsPanel client:load initialName={displayName} email={session.user.email} initialTwoFactorEnabled={twoFactorEnabled} hasPassword={hasPassword} />
+    <SettingsPanel
+      client:load
+      initialName={displayName}
+      email={session.user.email}
+      initialTwoFactorEnabled={twoFactorEnabled}
+      hasPassword={hasPassword}
+      {hasGitHub}
+      {githubEnabled}
+      initialGitHubMessage={githubStatus === 'linked' && hasGitHub ? 'เชื่อมบัญชี GitHub เรียบร้อยแล้ว' : ''}
+      initialGitHubError={githubStatus === 'error' || githubError ? 'เชื่อมบัญชี GitHub ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' : ''}
+    />
   </main>
 </Layout>

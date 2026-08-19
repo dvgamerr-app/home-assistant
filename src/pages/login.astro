@@ -16,6 +16,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_code: 'รหัสยืนยันจากผู้ให้บริการไม่ถูกต้องหรือหมดอายุแล้ว กรุณาเริ่มต้นเข้าสู่ระบบใหม่อีกครั้ง',
   unable_to_get_user_info: 'ไม่สามารถดึงข้อมูลบัญชีจากผู้ให้บริการได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง',
   no_callback_url: 'ไม่พบปลายทางสำหรับกลับเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง',
+  account_not_linked: 'อีเมลนี้มีบัญชีอยู่แล้ว กรุณาเข้าสู่ระบบด้วยอีเมลและรหัสผ่านก่อน แล้วเชื่อม GitHub ที่หน้า Settings',
 }
 
 const initialError = (errorCode && ERROR_MESSAGES[errorCode]) || errorDescription || (errorCode ? 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ กรุณาลองใหม่อีกครั้ง' : '')

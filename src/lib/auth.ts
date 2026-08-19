@@ -15,12 +15,15 @@ export const auth = betterAuth({
   onAPIError: {
     errorURL: new URL('/login', process.env.APP_BASE_URL ?? 'http://localhost:4321').toString(),
   },
-  emailAndPassword: { enabled: true },
+  emailAndPassword: {
+    enabled: true,
+    disableSignUp: true,
+  },
   plugins: [twoFactor({ issuer: 'OurKK' })],
   ...(githubId && githubSecret
     ? {
         socialProviders: {
-          github: { clientId: githubId, clientSecret: githubSecret },
+          github: { clientId: githubId, clientSecret: githubSecret, disableSignUp: true },
         },
         account: {
           accountLinking: { enabled: true, trustedProviders: ['github'] as const },
