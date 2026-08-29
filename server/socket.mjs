@@ -9,7 +9,7 @@ import { getBangkokISODate } from '../src/lib/date.ts'
 import { getTodayFiveMinChartPayload } from '../src/lib/solar-fivemin.ts'
 import { SOCKET_CHANNELS, isSocketChannel, normalizeSocketChannels } from '../src/lib/socket.ts'
 import { runEnergyAlerts } from '../src/lib/energy-alerts.ts'
-import { getScheduledUtilityBillTypes, runUtilityBillAlerts } from '../src/lib/utility-bill-alerts.ts'
+import { runUtilityBillAlerts } from '../src/lib/utility-bill-alerts.ts'
 
 const PORT = parseInt(process.env.SOCKET_PORT ?? '3000')
 const { socketMs: SOCKET_POLL_MS, energyAlertMs: ENERGY_ALERT_POLL_MS, utilityAlertMs: UTILITY_ALERT_POLL_MS } = config.poll
@@ -139,19 +139,16 @@ httpServer.on('error', (err) => {
 })
 httpServer.listen(PORT, () => logger.info(`socket.io server port:${PORT} started`))
 
-const runScheduledUtilityBillAlerts = () => {
-  const types = getScheduledUtilityBillTypes()
-  if (types.length > 0) return runUtilityBillAlerts(types)
-}
-
 void broadcast()
 void runEnergyAlerts()
-// Startup check catches bills collected while this process was offline.
+// เช็คบิลตอน start ด้วย เผื่อบิลเข้ามาระหว่าง process นี้ออฟไลน์
+// (เดิม startup ใช้ path ที่ไม่กรองวัน แต่ interval กรอง → บิลที่มาไม่ตรงวัน
+//  จะถูกแจ้งตอน container restart ไม่ใช่ตอนบิลเข้า)
 void runUtilityBillAlerts()
 const timers = [
   setInterval(() => void broadcast(), SOCKET_POLL_MS),
   setInterval(() => void runEnergyAlerts(), ENERGY_ALERT_POLL_MS),
-  setInterval(() => void runScheduledUtilityBillAlerts(), UTILITY_ALERT_POLL_MS),
+  setInterval(() => void runUtilityBillAlerts(), UTILITY_ALERT_POLL_MS),
 ]
 
 process.on('unhandledRejection', (err) => logger.error({ err }, 'unhandled rejection'))

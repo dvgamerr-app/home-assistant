@@ -39,13 +39,23 @@ describe('sendLineMessages', () => {
     expect(JSON.parse(String(captured[0]!.init.body))).toEqual({ messages: [{ type: 'flex', altText: 'ทดสอบ' }] })
   })
 
-  test('403 is permanent — throws immediately without retrying', async () => {
-    stubFetch([{ status: 403, body: '{"errorCode":403}' }])
+  // ของจริง 28/08/2026: บิลน้ำโดน 403 ตอน 20:07 แล้ว key ตัวเดิมส่งผ่านตอน 21:36
+  // → 403 ของ endpoint นี้คือ "ปลายทางไม่พร้อม" ไม่ใช่ "key ผิด"
+  test('403 คือปลายทางไม่พร้อม — retry แล้วผ่าน', async () => {
+    stubFetch([{ status: 403, body: '{"errorCode":403}' }, { status: 200 }])
+
+    await sendLineMessages([{}], noDelay)
+
+    expect(captured).toHaveLength(2)
+  })
+
+  test('400 เป็นความผิดของ payload เราเอง — เลิกทันที ไม่ retry', async () => {
+    stubFetch([{ status: 400, body: 'bad request' }])
 
     const error = await sendLineMessages([{}], noDelay).catch((err: unknown) => err)
 
     expect(error).toBeInstanceOf(LineNoticeError)
-    expect((error as LineNoticeError).status).toBe(403)
+    expect((error as LineNoticeError).status).toBe(400)
     expect((error as LineNoticeError).retryable).toBe(false)
     expect(captured).toHaveLength(1)
   })

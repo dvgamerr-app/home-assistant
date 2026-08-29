@@ -1,20 +1,22 @@
 import { describe, expect, test } from 'bun:test'
-import { getScheduledUtilityBillTypes, type UtilityBillSchedule } from './utility-bill-alerts'
+import { shouldNotifyBill } from './utility-bill-alerts'
 import { buildUtilityBillFlexMessage } from './utility-line-notice'
 
-const schedule: UtilityBillSchedule = { electricityDay: 12, waterDay: 22, graceDays: 1 }
-
-describe('Utility bill alert schedule', () => {
-  test('checks MEA on Bangkok dates 12-13 only', () => {
-    expect(getScheduledUtilityBillTypes(new Date('2026-08-11T17:00:00Z'), schedule)).toEqual(['electricity'])
-    expect(getScheduledUtilityBillTypes(new Date('2026-08-13T16:59:59Z'), schedule)).toEqual(['electricity'])
-    expect(getScheduledUtilityBillTypes(new Date('2026-08-13T17:00:00Z'), schedule)).toEqual([])
+describe('Utility bill dedupe', () => {
+  test('แจ้งเมื่อเลขบิลเปลี่ยน ไม่ว่าจะเป็นวันที่เท่าไร', () => {
+    expect(shouldNotifyBill({ lastValue: '657137' }, '657138')).toBe('notify')
   })
 
-  test('checks MWA on Bangkok dates 22-23 only', () => {
-    expect(getScheduledUtilityBillTypes(new Date('2026-08-21T17:00:00Z'), schedule)).toEqual(['water'])
-    expect(getScheduledUtilityBillTypes(new Date('2026-08-23T16:59:59Z'), schedule)).toEqual(['water'])
-    expect(getScheduledUtilityBillTypes(new Date('2026-08-23T17:00:00Z'), schedule)).toEqual([])
+  test('เลขบิลเดิม = ไม่แจ้งซ้ำ (เรียกกี่รอบก็ปลอดภัย)', () => {
+    expect(shouldNotifyBill({ lastValue: '657138' }, '657138')).toBe('none')
+  })
+
+  test('ครั้งแรกสุดแค่จดไว้ ไม่แจ้ง กันสแปมตอนตั้งระบบใหม่', () => {
+    expect(shouldNotifyBill(null, '657138')).toBe('record-only')
+  })
+
+  test('lastValue ว่างแต่มีบิลอยู่ = ถือว่าบิลใหม่', () => {
+    expect(shouldNotifyBill({ lastValue: null }, '657138')).toBe('notify')
   })
 })
 

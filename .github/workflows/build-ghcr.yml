@@ -132,9 +132,6 @@ jobs:
           SOLAR_DEVICE_ID: ${{ vars.SOLAR_DEVICE_ID }}
           MEA_HOUSE_CA: ${{ vars.MEA_HOUSE_CA }}
           MWA_ACCOUNT_CODE: ${{ vars.MWA_ACCOUNT_CODE }}
-          MEA_BILL_DAY: ${{ vars.MEA_BILL_DAY }}
-          MWA_BILL_DAY: ${{ vars.MWA_BILL_DAY }}
-          UTILITY_ALERT_GRACE_DAYS: ${{ vars.UTILITY_ALERT_GRACE_DAYS }}
           ALLOWED_EMAILS: ${{ vars.ALLOWED_EMAILS }}
           APP_PORT: ${{ vars.PORT }}
           SOCKET_PORT: ${{ vars.SOCKET_PORT }}
@@ -155,9 +152,6 @@ jobs:
             -e SOLAR_DEVICE_ID="$SOLAR_DEVICE_ID" \
             -e MEA_HOUSE_CA="$MEA_HOUSE_CA" \
             -e MWA_ACCOUNT_CODE="$MWA_ACCOUNT_CODE" \
-            -e MEA_BILL_DAY="$MEA_BILL_DAY" \
-            -e MWA_BILL_DAY="$MWA_BILL_DAY" \
-            -e UTILITY_ALERT_GRACE_DAYS="$UTILITY_ALERT_GRACE_DAYS" \
             -e ALLOWED_EMAILS="$ALLOWED_EMAILS" \
             -p "$APP_PORT":4321 \
             -p "$SOCKET_PORT":3000 \

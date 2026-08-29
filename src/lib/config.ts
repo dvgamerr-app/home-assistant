@@ -1,5 +1,5 @@
 // อ่าน ENV ที่เดียว ตอน import — ก่อนหน้านี้แต่ละไฟล์มี helper แปลงตัวเลขของตัวเอง
-// (numberEnv / integerEnv / intervalEnv) ที่ clamp ไม่เหมือนกัน และ LINE config
+// (numberEnv / integerEnv / intervalEnv) ที่ clamp ไม่เหมือนกัน และ LINE config เดิม
 // ถูกเช็คซ้ำ 3 ที่ ทำให้ค่า default จริงกับที่เขียนใน AGENTS.md เพี้ยนกันได้ง่าย
 
 /** อ่านค่าตัวเลขจาก env แล้ว clamp ให้อยู่ในช่วง — ค่าที่ parse ไม่ได้จะใช้ fallback */
@@ -8,14 +8,6 @@ function numberEnv(name: string, fallback: number, min: number, max: number) {
   if (raw === undefined || raw.trim() === '') return fallback
   const value = Number(raw)
   return Number.isFinite(value) ? Math.min(Math.max(value, min), max) : fallback
-}
-
-/** เหมือน numberEnv แต่ตัดเศษทิ้ง — ใช้กับวันที่/จำนวนวัน */
-function integerEnv(name: string, fallback: number, min: number, max: number) {
-  const raw = process.env[name]
-  if (raw === undefined || raw.trim() === '') return fallback
-  const value = Number(raw)
-  return Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value), min), max) : fallback
 }
 
 const trimmedEnv = (name: string) => process.env[name]?.trim() ?? ''
@@ -36,11 +28,6 @@ export const config = {
     minSolarRatio: numberEnv('ENERGY_ALERT_SOLAR_MIN_RATIO', 0.2, 0, 1),
     /** ว่าง = ใช้ ก.ค. ล่าสุดเป็นฐาน (ดู getDefaultSolarBaselineMonth) */
     baselineMonth: trimmedEnv('ENERGY_ALERT_SOLAR_BASELINE_MONTH'),
-  },
-  utilityBill: {
-    electricityDay: integerEnv('MEA_BILL_DAY', 12, 1, 28),
-    waterDay: integerEnv('MWA_BILL_DAY', 22, 1, 28),
-    graceDays: integerEnv('UTILITY_ALERT_GRACE_DAYS', 1, 0, 7),
   },
   solar: {
     deviceId: trimmedEnv('SOLAR_DEVICE_ID'),

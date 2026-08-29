@@ -1,27 +1,25 @@
 import { createAlertWorker, runAlertChecks } from './alert-worker'
-import { config } from './config'
-import { formatThaiDate, getBangkokISODate } from './date'
+import { formatThaiDate } from './date'
 import { getBills, getWaterUsage } from './db'
 import { getAlertState, setAlertState } from './alert-state'
 import { MONTH_LONG_TH, num } from './electricity'
 import { sendUtilityBillNotice } from './utility-line-notice'
 
 export type UtilityBillType = 'electricity' | 'water'
-export type UtilityBillSchedule = {
-  electricityDay: number
-  waterDay: number
-  graceDays: number
-}
 
-export function getUtilityBillSchedule(): UtilityBillSchedule {
-  return config.utilityBill
-}
-
-export function getScheduledUtilityBillTypes(now = new Date(), schedule = getUtilityBillSchedule()): UtilityBillType[] {
-  const day = Number(getBangkokISODate(now).slice(8, 10))
-  const withinWindow = (dueDay: number) => day >= dueDay && day <= dueDay + schedule.graceDays
-
-  return [...(withinWindow(schedule.electricityDay) ? (['electricity'] as const) : []), ...(withinWindow(schedule.waterDay) ? (['water'] as const) : [])]
+/**
+ * ตัดสินว่าควรแจ้งบิลใบนี้หรือยัง โดยดูจาก "เลขบิล" ไม่ใช่วันที่
+ *
+ * collector ดึงบิล MEA/MWA ใหม่ทุกวัน 09:00 (cron `0 9 * * *`) ดังนั้นบิลใบใหม่
+ * โผล่วันไหนก็ได้ ตรรกะเดิมที่กรองตาม MEA_BILL_DAY/MWA_BILL_DAY จึงพลาดบิล
+ * ที่มาไม่ตรงวัน แล้วไปโผล่ตอน container restart แทน
+ *
+ * การเทียบด้วยเลขบิลทำให้เรียกซ้ำกี่รอบก็ปลอดภัย — ส่งแค่ตอนเลขบิลเปลี่ยนจริง
+ */
+export function shouldNotifyBill(state: { lastValue: string | null } | null, identity: string) {
+  // ครั้งแรกสุด: จดไว้เฉยๆ ไม่แจ้ง กันสแปมตอนตั้งระบบใหม่
+  if (!state) return 'record-only' as const
+  return state.lastValue === identity ? ('none' as const) : ('notify' as const)
 }
 
 const oneDecimal = (value: number) => num(value, 1)
@@ -43,12 +41,12 @@ async function checkElectricityBill() {
 
   const identity = bill.billNoNormalized ?? bill.billNo ?? bill.month
   const alertKey = 'electricity-bill'
-  const state = await getAlertState(alertKey)
-  if (!state) {
+  const decision = shouldNotifyBill(await getAlertState(alertKey), identity)
+  if (decision === 'none') return
+  if (decision === 'record-only') {
     await setAlertState({ alertKey, status: 'seen', lastValue: identity })
     return
   }
-  if (state.lastValue === identity) return
 
   await sendUtilityBillNotice({
     utility: 'electricity',
@@ -67,12 +65,12 @@ async function checkWaterBill() {
 
   const identity = bill.billNumber || `${bill.year}-${bill.month}`
   const alertKey = 'water-bill'
-  const state = await getAlertState(alertKey)
-  if (!state) {
+  const decision = shouldNotifyBill(await getAlertState(alertKey), identity)
+  if (decision === 'none') return
+  if (decision === 'record-only') {
     await setAlertState({ alertKey, status: 'seen', lastValue: identity })
     return
   }
-  if (state.lastValue === identity) return
 
   await sendUtilityBillNotice({
     utility: 'water',
@@ -85,14 +83,18 @@ async function checkWaterBill() {
   await setAlertState({ alertKey, status: 'seen', lastValue: identity, notified: true })
 }
 
-export const runUtilityBillAlerts = createAlertWorker<[UtilityBillType[]?]>({
+/**
+ * เช็คบิลทั้งสองทุกรอบ ไม่กรองตามวันที่ — dedupe ด้วยเลขบิลใน shouldNotifyBill()
+ * ทำให้ปลอดภัยที่จะเรียกบ่อย และบิลจะถูกแจ้งภายใน 1 รอบ poll หลัง collector ดึงมา
+ */
+export const runUtilityBillAlerts = createAlertWorker({
   name: 'utility-bill-alerts',
   requiresLineNotice: true,
-  run: async (types = ['electricity', 'water']) => {
-    // เดิมใช้ Promise.all — ถ้าค่าไฟ reject ด้วย ค่าน้ำจะถูกทิ้งเงียบๆ ไม่มี log
+  run: async () => {
+    // runAlertChecks ไม่ใช่ Promise.all — ถ้าค่าไฟ reject ค่าน้ำต้องยังได้เช็คและมี log
     await runAlertChecks('utility-bill-alerts', [
-      ...(types.includes('electricity') ? [{ name: 'electricity-bill', run: checkElectricityBill }] : []),
-      ...(types.includes('water') ? [{ name: 'water-bill', run: checkWaterBill }] : []),
+      { name: 'electricity-bill', run: checkElectricityBill },
+      { name: 'water-bill', run: checkWaterBill },
     ])
   },
 })

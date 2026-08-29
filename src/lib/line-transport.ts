@@ -12,9 +12,18 @@ export class LineNoticeError extends Error {
     this.name = 'LineNoticeError'
   }
 
-  /** 429/5xx = ปัญหาชั่วคราว ลองใหม่ได้; 4xx อื่น (เช่น 403 key ผิด) ลองใหม่ก็ไม่หาย */
+  /**
+   * ลองใหม่ได้: 429 (ถูก throttle), 5xx (ปลายทางพัง) และ **403**
+   *
+   * 403 ดูเหมือน "key ผิด" แต่จากของจริง 28/08/2026: บิลน้ำโดน 403 ตอน 20:07
+   * แล้ว key ตัวเดิมส่งผ่านตอน 21:36 → LINE notice endpoint ตอบ 403 ตอนที่
+   * ปลายทาง (LINE Manager) ไม่พร้อมด้วย ไม่ใช่แค่ตอน key ผิด จึงต้อง retry
+   * ถ้า key ผิดจริงก็แค่เสียเวลา ~5 วิ ต่อการส่ง แต่ได้กลับมาไวขึ้นมากเวลาปลายทางสะดุด
+   *
+   * ไม่ลองใหม่: 400/401/404/422 ฯลฯ ที่เป็นความผิดของ payload เราเอง
+   */
   get retryable() {
-    return this.status === 429 || this.status >= 500
+    return this.status === 429 || this.status === 403 || this.status >= 500
   }
 }
 
