@@ -2,7 +2,11 @@
 import { num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
 
-const { dayFlow, dayComparison, isToday = false } = Astro.props as Pick<SolarData, 'dayFlow' | 'dayComparison'> & { isToday?: boolean }
+interface Props extends Pick<SolarData, 'dayFlow' | 'dayComparison'> {
+  isToday?: boolean
+}
+
+const { dayFlow, dayComparison, isToday = false } = Astro.props
 
 const dateLabel = new Intl.DateTimeFormat('th-TH', {
   dateStyle: 'long',

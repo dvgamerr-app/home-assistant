@@ -1,8 +1,9 @@
 ---
 import ChartCard from '@/components/ui/ChartCard.astro'
+import ChartYAxis from '@/components/ui/ChartYAxis.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
 import type { BatteryConnectionState } from '@/lib/battery'
-import { svgPathFromPoints } from '@/lib/chart'
+import { clamp01, svgAreaFromPoints, svgPathFromPoints } from '@/lib/chart'
 import { num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
 
@@ -13,17 +14,14 @@ type BatteryPoint = {
   gridImport: number
 }
 
-const {
-  fiveMin: points,
-  dayFlow,
-  currentBatteryConnection = null,
-} = Astro.props as Pick<SolarData, 'fiveMin' | 'dayFlow'> & {
+interface Props extends Pick<SolarData, 'fiveMin' | 'dayFlow'> {
   currentBatteryConnection?: BatteryConnectionState | null
 }
+
+const { fiveMin: points, dayFlow, currentBatteryConnection = null } = Astro.props
 const batteryReadingReliable = currentBatteryConnection === null || currentBatteryConnection === 'connected'
 const batteryReadingMessage = currentBatteryConnection === 'disconnected' ? 'แบตเตอรี่ไม่ได้เชื่อมต่อ ค่า SOC ที่อินเวอร์เตอร์รายงานอาจเป็นค่าค้าง' : 'ข้อมูลสถานะแบตเตอรี่ไม่เป็นปัจจุบัน'
 
-const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
 const fmtMinute = (minuteOfDay: number) => `${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')}`
 
 const rawBatteryPoints: BatteryPoint[] = points.map((point) => ({
@@ -73,7 +71,7 @@ const socLinePoints = chartPoints.map((point) => ({
   y: yForNormalized(point.soc / 100),
 }))
 const socPath = svgPathFromPoints(socLinePoints)
-const socArea = `${socPath} L ${socLinePoints.at(-1)?.x.toFixed(1)},${py1} L ${socLinePoints[0]?.x.toFixed(1)},${py1} Z`
+const socArea = svgAreaFromPoints(socLinePoints, py1)
 
 const battAbsMax = Math.max(...windowPoints.map((point) => Math.abs(point.batt)), ...windowPoints.map((point) => point.gridImport), 0.5)
 const scaleMin = -battAbsMax
@@ -95,6 +93,7 @@ const zeroY = yForNormalized(normPower(0))
 const powerTicks = [battAbsMax, battAbsMax * 0.5, 0, -battAbsMax * 0.5, -battAbsMax]
 const powerTickLabels = powerTicks.map((tick) => (tick < 0 ? '−' : '') + num(Math.abs(tick), 1))
 const powerGridYs = powerTicks.map((tick) => yForNormalized(normPower(tick)))
+const powerAxisTicks = powerGridYs.map((tickY, index) => ({ label: powerTickLabels[index]!, topPct: (tickY / VH) * 100, emphasis: powerTicks[index] === 0 }))
 
 const chargeMinutes = windowPoints.reduce((total, point, index, source) => {
   const next = source[index + 1]
@@ -105,6 +104,7 @@ const activeWindowLabel = `${fmtMinute(startMinute)}–${fmtMinute(endMinute)}`
 const maxGridImportKw = Math.max(...windowPoints.map((point) => point.gridImport), 0)
 const socTicks = [100, 50, 0]
 const socGridYs = socTicks.map((tick) => yForNormalized(tick / 100))
+const socAxisTicks = socGridYs.map((tickY, index) => ({ label: `${socTicks[index]}%`, topPct: (tickY / VH) * 100 }))
 const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
 ---
 
@@ -142,15 +142,7 @@ const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
         <span class="hidden sm:inline">100% / 50% / 0%</span>
       </div>
       <div class="flex items-start gap-1">
-        <div class="relative hidden h-44 shrink-0 overflow-visible sm:block" style="width:1.75rem">
-          {
-            socGridYs.map((tickY, index) => (
-              <span class="absolute right-0 text-right text-[9px] leading-none text-muted-foreground" style={`top:${((tickY / VH) * 100).toFixed(2)}%;transform:translateY(-50%)`}>
-                {socTicks[index]}%
-              </span>
-            ))
-          }
-        </div>
+        <ChartYAxis ticks={socAxisTicks} class="hidden h-44 sm:block" />
         <div class="min-w-0 flex-1">
           <div class="h-40 w-full sm:h-44">
             <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
@@ -183,18 +175,7 @@ const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
         <span>+ จ่ายออก / − ชาร์จ</span>
       </div>
       <div class="flex items-start gap-1">
-        <div class="relative h-44 shrink-0 overflow-visible" style="width:1.75rem">
-          {
-            powerGridYs.map((tickY, index) => (
-              <span
-                class:list={['absolute right-0 text-right text-[9px] leading-none', powerTicks[index] === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
-                style={`top:${((tickY / VH) * 100).toFixed(2)}%;transform:translateY(-50%)`}
-              >
-                {powerTickLabels[index]}
-              </span>
-            ))
-          }
-        </div>
+        <ChartYAxis ticks={powerAxisTicks} class="h-44" />
         <div class="min-w-0 flex-1">
           <div class="h-44 w-full">
             <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">

@@ -1,5 +1,5 @@
 import { num } from './electricity'
-import { get5Min } from './db'
+import { get5Min, type MinutePoint } from './db'
 
 export type FiveMinChartPoint = {
   minuteOfDay: number
@@ -22,22 +22,30 @@ export type FiveMinChartPayload = {
   peakPv: number
   peakLoad: number
   peakBattDis: number
-  scaleMin: number
-  scaleMax: number
-  hasNeg: boolean
-  tickNorms: number[]
   gridPct: number[]
   yLabels: string[]
 }
 
+/** เปลี่ยนชื่อ field จาก `MinutePoint` (ชื่อตาม DB) เป็นชื่อสั้นที่กราฟใช้ */
+export function toFiveMinChartPoint(sample: MinutePoint): FiveMinChartPoint {
+  return {
+    minuteOfDay: sample.minuteOfDay,
+    pv: sample.pv,
+    pv1: sample.pv1,
+    pv2: sample.pv2,
+    load: sample.load,
+    batt: sample.batteryPower,
+    grid: sample.gridPower,
+  }
+}
+
+export const toFiveMinChartPoints = (samples: MinutePoint[]) => samples.map(toFiveMinChartPoint)
+
 function computeScale(active: FiveMinChartPoint[]) {
   if (active.length === 0) {
     return {
-      scaleMin: 0,
-      scaleMax: 1,
-      hasNeg: false,
-      tickNorms: [1, 0.5, 0],
       yLabels: ['1', '0.5', '0'],
+      // 3 ticks บน viewBox 220 (inset 18/28) — ค่าเดียวกับที่ loop ข้างล่างจะได้
       gridPct: [8.18, 51.36, 94.55],
     }
   }
@@ -59,11 +67,10 @@ function computeScale(active: FiveMinChartPoint[]) {
   const [VH, MT, MB] = [220, 18, 28]
   const ph = VH - MT - MB
   const yTicks = [...Array.from({ length: numPos }, (_, i) => (numPos - i) * step), 0, ...(hasNeg ? Array.from({ length: numNeg }, (_, i) => -(i + 1) * step) : [])]
-  const tickNorms = yTicks.map((v) => norm(v))
   const gridPct = yTicks.map((v) => +(((MT + (1 - norm(v)) * ph) / VH) * 100).toFixed(2))
   const yLabels = yTicks.map((v) => (v < 0 ? '−' : '') + num(Math.abs(v), 1))
 
-  return { scaleMin, scaleMax, hasNeg, tickNorms, gridPct, yLabels }
+  return { gridPct, yLabels }
 }
 
 export function buildFiveMinChartPayload(points: FiveMinChartPoint[], currentMinute = 1439): FiveMinChartPayload {
@@ -86,15 +93,6 @@ export function buildFiveMinChartPayload(points: FiveMinChartPoint[], currentMin
 }
 
 export async function getTodayFiveMinChartPayload(now = new Date()) {
-  const points = (await get5Min(now)).map((sample) => ({
-    minuteOfDay: sample.minuteOfDay,
-    pv: sample.pv,
-    pv1: sample.pv1,
-    pv2: sample.pv2,
-    load: sample.load,
-    batt: sample.batteryPower,
-    grid: sample.gridPower,
-  }))
-
+  const points = toFiveMinChartPoints(await get5Min(now))
   return buildFiveMinChartPayload(points, now.getHours() * 60 + now.getMinutes())
 }

@@ -4,19 +4,17 @@ import type { SolarData } from '@/lib/solar-data'
 import ChartCard from '@/components/ui/ChartCard.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
 import { buildFiveMinChartPayload } from '@/lib/solar-fivemin'
+import type { SolarRateChartConfig } from '@/lib/solar-rate-chart'
 
-const {
-  fiveMin: POINTS,
-  isToday,
-  pv1MaxKw,
-  pv2MaxKw,
-  socketUrl,
-} = Astro.props as Pick<SolarData, 'fiveMin'> & {
+// interface Props ให้ astro check ตรวจ call site ได้ — `Astro.props as ...` ทำให้ prop ที่ลืมส่งเงียบ
+interface Props extends Pick<SolarData, 'fiveMin'> {
   isToday: boolean
   pv1MaxKw: number
   pv2MaxKw: number
   socketUrl: string
 }
+
+const { fiveMin: POINTS, isToday, pv1MaxKw, pv2MaxKw, socketUrl } = Astro.props
 
 const [VH, MT, MB] = [220, 18, 28]
 
@@ -58,7 +56,8 @@ function buildYAxis(scaleTop: number) {
 
 const { yLabels, gridPct } = buildYAxis(scaleTopForPeak(peakPct))
 
-const chartJson = JSON.stringify({
+// สัญญาระหว่าง frontmatter กับ <script> — ประกาศครั้งเดียวแล้วใช้ทั้งสองฝั่ง
+const chartConfig: SolarRateChartConfig = {
   pv1: initialChart.pv1,
   pv2: initialChart.pv2,
   times: initialChart.times,
@@ -66,7 +65,8 @@ const chartJson = JSON.stringify({
   pv2MaxKw: safePv2MaxKw,
   isToday,
   socketUrl,
-})
+}
+const chartJson = JSON.stringify(chartConfig)
 ---
 
 <ChartCard eyebrow="ขีดความสามารถ" title="กำลังผลิตเทียบค่าสูงสุด" subtitle="แต่ละชุดคำนวณเปอร์เซ็นต์จากค่าสูงสุดของตัวเองตลอดทั้งวัน" class="overflow-hidden">
@@ -155,6 +155,8 @@ const chartJson = JSON.stringify({
   import { io } from 'socket.io-client'
   import { svgPathFromPoints } from '@/lib/chart'
   import { SOCKET_CHANNELS } from '@/lib/socket'
+  import type { FiveMinChartPayload } from '@/lib/solar-fivemin'
+  import type { SolarRateChartConfig } from '@/lib/solar-rate-chart'
 
   {
     const wrapNullable = document.querySelector<HTMLElement>('.solar-rate-chart-wrapper')
@@ -172,16 +174,15 @@ const chartJson = JSON.stringify({
     const tipPv1El = tip.querySelector('.solar-rate-tip-pv1')!
     const tipPv2El = tip.querySelector('.solar-rate-tip-pv2')!
 
-    const J = JSON.parse(wrapEl.dataset.chart!)
-    let pv1All: number[] = J.pv1
-    let pv2All: number[] = J.pv2
-    let times: number[] = J.times
-    const pv1MaxKw: number = J.pv1MaxKw
-    const pv2MaxKw: number = J.pv2MaxKw
-    const isToday: boolean = J.isToday
-    const socketUrl: string = J.socketUrl
+    const chartConfig = JSON.parse(wrapEl.dataset.chart!) as SolarRateChartConfig
+    let pv1All = chartConfig.pv1
+    let pv2All = chartConfig.pv2
+    let times = chartConfig.times
+    const { pv1MaxKw, pv2MaxKw, isToday, socketUrl } = chartConfig
 
     const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
+    /** ระยะขอบของพื้นที่วาด — ต้องเป็นค่าเดียวกันทั้ง draw() และ renderYAxis() */
+    const INSET = { left: 4, top: 18, right: 8, bottom: 28 } as const
     const toPct = (kw: number, maxKw: number) => (maxKw > 0 ? (kw / maxKw) * 100 : 0)
     const fmtKw = (kw: number) => `${kw.toFixed(2)} kW`
     const fmtPct = (pct: number) => `${pct.toFixed(0)}%`
@@ -192,15 +193,16 @@ const chartJson = JSON.stringify({
       return Math.max(100, Math.ceil(Math.max(peakPct, 1) / 25) * 25)
     }
 
-    function renderYAxis(maxPct: number) {
+    /**
+     * ตำแหน่งป้ายต้องคิดจากความสูงจริงที่วัดได้ (h-48/sm:h-56/md:h-60 = 192/224/240px)
+     * เดิม hardcode 220 ซึ่งไม่เคยตรงกับความสูงจริงเลย ป้ายจึงเลื่อนจากเส้น gridline
+     */
+    function renderYAxis(maxPct: number, chartHeight: number) {
       const ticks = Array.from({ length: 5 }, (_, index) => maxPct - (maxPct / 4) * index)
-      const chartHeight = 220
-      const topInset = 18
-      const bottomInset = 28
-      const plotHeight = chartHeight - topInset - bottomInset
+      const plotHeight = chartHeight - INSET.top - INSET.bottom
       yAxis.innerHTML = ticks
         .map((value, index) => {
-          const top = (((topInset + (1 - value / maxPct) * plotHeight) / chartHeight) * 100).toFixed(2)
+          const top = (((INSET.top + (1 - value / maxPct) * plotHeight) / chartHeight) * 100).toFixed(2)
           const cls = index === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground'
           return `<span class="absolute right-0 text-right text-[9px] leading-none ${cls}" style="top:${top}%;transform:translateY(-50%)">${value.toFixed(0)}%</span>`
         })
@@ -248,7 +250,7 @@ const chartJson = JSON.stringify({
       const w = wrapEl.clientWidth
       const h = wrapEl.clientHeight
       curW = w
-      const [ML, MT, MR, MB] = [4, 18, 8, 28]
+      const [ML, MT, MR, MB] = [INSET.left, INSET.top, INSET.right, INSET.bottom]
       const px0 = ML
       const py0 = MT
       const px1 = w - MR
@@ -262,7 +264,7 @@ const chartJson = JSON.stringify({
       const mppt1Pct = pv1All.map((value) => Math.max(0, toPct(value, pv1MaxKw)))
       const mppt2Pct = pv2All.map((value) => Math.max(0, toPct(value, pv2MaxKw)))
       const maxPct = scaleTop()
-      renderYAxis(maxPct)
+      renderYAxis(maxPct, h)
 
       const mppt1Line = smoothPath(mppt1Pct, px0, py0, px1, py1, maxPct)
       const mppt2Line = smoothPath(mppt2Pct, px0, py0, px1, py1, maxPct)
@@ -365,7 +367,7 @@ const chartJson = JSON.stringify({
       socket.on('connect', () => {
         socket.emit('subscribe', SOCKET_CHANNELS.solarFiveMin)
       })
-      socket.on(SOCKET_CHANNELS.solarFiveMin, (payload: { pv1?: number[]; pv2?: number[]; times?: number[] }) => {
+      socket.on(SOCKET_CHANNELS.solarFiveMin, (payload: Partial<FiveMinChartPayload>) => {
         pv1All = payload.pv1 ?? pv1All
         pv2All = payload.pv2 ?? pv2All
         times = payload.times ?? times

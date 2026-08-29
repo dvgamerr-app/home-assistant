@@ -1,0 +1,36 @@
+---
+// แกน Y ของกราฟ — ป้ายลอยทับ container ที่สูงเท่า SVG
+// ตำแหน่งต้องคำนวณจาก gridline จริงเสมอ (ห้าม hardcode %) ไม่งั้นป้ายจะเลื่อนจากเส้น
+export interface YAxisTick {
+  label: string
+  /** ตำแหน่งจากขอบบน คิดเป็น % ของความสูง viewBox */
+  topPct: number
+  /** เน้นป้ายนี้ (ปกติคือ tick สูงสุด หรือเส้นศูนย์) */
+  emphasis?: boolean
+}
+
+interface Props {
+  ticks: YAxisTick[]
+  /** ความกว้างคอลัมน์ป้าย */
+  width?: string
+  /** class ของ container — ใส่ความสูง/การซ่อนตาม breakpoint ให้ตรงกับ SVG */
+  class?: string
+  /** ใส่เมื่อ client script ต้อง re-render แกนนี้ */
+  id?: string
+}
+
+const { ticks, width = '1.75rem', class: className, id } = Astro.props
+---
+
+<div id={id} class:list={['relative shrink-0 overflow-visible', className]} style={`width:${width}`}>
+  {
+    ticks.map((tick) => (
+      <span
+        class:list={['absolute right-0 text-right text-[9px] leading-none', tick.emphasis ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
+        style={`top:${tick.topPct.toFixed(2)}%;transform:translateY(-50%)`}
+      >
+        {tick.label}
+      </span>
+    ))
+  }
+</div>

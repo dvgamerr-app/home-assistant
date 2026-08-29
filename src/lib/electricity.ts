@@ -64,18 +64,39 @@ export function marginalRate(monthlyUnits: number) {
   return (tier.rate + FT_RATE) * (1 + VAT_RATE)
 }
 
+// `Intl.NumberFormat` แพงพอที่จะไม่ควรสร้างใหม่ทุกครั้ง — หน้าหนึ่งเรียก thb()/num() หลายร้อยครั้ง
+const formatters = new Map<string, Intl.NumberFormat>()
+
+function formatter(kind: 'thb' | 'num', digits: number) {
+  const key = `${kind}:${digits}`
+  let cached = formatters.get(key)
+  if (!cached) {
+    cached = new Intl.NumberFormat('th-TH', {
+      ...(kind === 'thb' ? { style: 'currency' as const, currency: 'THB' } : {}),
+      minimumFractionDigits: digits,
+      maximumFractionDigits: digits,
+    })
+    formatters.set(key, cached)
+  }
+  return cached
+}
+
 export function thb(value: number, digits = 0) {
-  return new Intl.NumberFormat('th-TH', {
-    style: 'currency',
-    currency: 'THB',
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  }).format(value)
+  return formatter('thb', digits).format(value)
 }
 
 export function num(value: number, digits = 1) {
-  return new Intl.NumberFormat('th-TH', {
-    minimumFractionDigits: digits,
-    maximumFractionDigits: digits,
-  }).format(value)
+  return formatter('num', digits).format(value)
+}
+
+/**
+ * แปลงเดือนบิลรูปแบบ `YYYYMM` (ตาม `stash.mea_electric.month`) เป็น "ส.ค. 2568"
+ * คืนค่าดิบถ้า parse ไม่ได้ เพื่อไม่ให้หน้าเว็บแสดง NaN
+ */
+export function formatBillMonth(month: string) {
+  const year = Number.parseInt(month.slice(0, 4), 10)
+  const monthIndex = Number.parseInt(month.slice(4, 6), 10) - 1
+  const monthName = MONTH_SHORT_TH[monthIndex]
+  if (!monthName || !Number.isFinite(year)) return month
+  return `${monthName} ${year + 543}`
 }

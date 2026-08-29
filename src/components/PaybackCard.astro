@@ -5,7 +5,9 @@ import Coins from '@lucide/svelte/icons/coins'
 import { thb, num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
 
-const { system, payback } = Astro.props as Pick<SolarData, 'system' | 'payback'>
+type Props = Pick<SolarData, 'system' | 'payback'>
+
+const { system, payback } = Astro.props
 const years = Math.floor(payback.yearsToPayback)
 const months = Math.round((payback.yearsToPayback - years) * 12)
 const pct = Math.min(100, payback.progressPct)

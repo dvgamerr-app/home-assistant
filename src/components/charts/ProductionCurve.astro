@@ -8,7 +8,13 @@ import { buildFiveMinChartPayload } from '@/lib/solar-fivemin'
 import { getBangkokISODate } from '@/lib/date'
 import { SYSTEM } from '@/lib/solar-data'
 
-const { fiveMin: POINTS, date, isToday, socketUrl } = Astro.props as Pick<SolarData, 'fiveMin'> & { date: string; isToday: boolean; socketUrl: string }
+interface Props extends Pick<SolarData, 'fiveMin'> {
+  date: string
+  isToday: boolean
+  socketUrl: string
+}
+
+const { fiveMin: POINTS, date, isToday, socketUrl } = Astro.props
 const hasData = POINTS.length > 0
 
 const [VW, ML, MR] = [560, 4, 8]

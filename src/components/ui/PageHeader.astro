@@ -1,0 +1,17 @@
+---
+interface Props {
+  /** label ตัวพิมพ์ใหญ่เหนือหัวข้อ เช่น "ระบบไฟฟ้า" */
+  eyebrow: string
+  title: string
+  /** คำอธิบายใต้หัวข้อ (ถ้ามี) */
+  description?: string
+}
+
+const { eyebrow, title, description } = Astro.props
+---
+
+<header class="space-y-3">
+  <p class="text-[11px] uppercase tracking-luxury text-muted-foreground">{eyebrow}</p>
+  <h1 class="font-serif text-4xl font-light leading-tight text-foreground md:text-5xl">{title}</h1>
+  {description && <p class="max-w-2xl text-sm leading-relaxed text-muted-foreground">{description}</p>}
+</header>

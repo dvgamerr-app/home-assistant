@@ -142,7 +142,6 @@ export type PvMorningEnergy = {
 }
 
 export type PvMorningBaseline = PvMorningEnergy & {
-  days: number
   month: string
 }
 
@@ -627,29 +626,6 @@ export async function getMonths(nMonths = 12): Promise<MonthPoint[]> {
   }))
 }
 
-/** Estimate charged-to-battery energy from negative batteryPower samples. */
-export async function getBatteryCharge(nMonths = 12): Promise<number> {
-  const [row] = await sql<{ charged: string }[]>`
-    WITH points AS (
-      SELECT
-        recorded_at,
-        GREATEST(-(value::numeric), 0) as charge_kw,
-        LEAD(recorded_at) OVER (ORDER BY recorded_at) as next_at
-      FROM stash.solar_record
-      WHERE device_id = ${DEVICE}
-        AND attr = 'batteryPower'
-        AND recorded_at >= now() - (${nMonths} || ' months')::interval
-    )
-    SELECT COALESCE(
-      SUM(charge_kw * LEAST(EXTRACT(EPOCH FROM (next_at - recorded_at)) / 3600, 0.25)),
-      0
-    ) as charged
-    FROM points
-    WHERE next_at IS NOT NULL
-  `
-  return n(row?.charged)
-}
-
 /** lifetime totals */
 export async function getLifetime(): Promise<LifetimeData> {
   const [row] = await sql<{ generated: string | null; grid_import: string | null; gen_time: string | null }[]>`
@@ -777,7 +753,7 @@ export async function getPvMorningEnergy(day: string): Promise<PvMorningEnergy> 
 /** ค่าเฉลี่ยพลังงานรายวันแยก MPPT ช่วง 06:00–09:00 รวมวันที่ไม่มีข้อมูลเป็น 0 */
 export async function getPvMorningBaseline(month: string): Promise<PvMorningBaseline> {
   const monthStart = `${month}-01`
-  const [row] = await sql<{ pv1_kwh: string; pv2_kwh: string; days: string }[]>`
+  const [row] = await sql<{ pv1_kwh: string; pv2_kwh: string }[]>`
     WITH days AS (
       SELECT generate_series(
         ${monthStart}::date,
@@ -800,8 +776,7 @@ export async function getPvMorningBaseline(month: string): Promise<PvMorningBase
     )
     SELECT
       AVG(COALESCE(pv1.kwh, 0)) AS pv1_kwh,
-      AVG(COALESCE(pv2.kwh, 0)) AS pv2_kwh,
-      COUNT(*) AS days
+      AVG(COALESCE(pv2.kwh, 0)) AS pv2_kwh
     FROM days
     LEFT JOIN daily pv1 ON pv1.day = days.day AND pv1.attr = 'pv1Power'
     LEFT JOIN daily pv2 ON pv2.day = days.day AND pv2.attr = 'pv2Power'
@@ -809,7 +784,6 @@ export async function getPvMorningBaseline(month: string): Promise<PvMorningBase
 
   return {
     month,
-    days: n(row?.days),
     pv1Kwh: n(row?.pv1_kwh),
     pv2Kwh: n(row?.pv2_kwh),
   }

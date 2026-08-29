@@ -3,7 +3,9 @@ import ChartCard from '@/components/ui/ChartCard.astro'
 import { num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
 
-const { lifetime, months, system } = Astro.props as Pick<SolarData, 'lifetime' | 'months' | 'system'>
+type Props = Pick<SolarData, 'lifetime' | 'months' | 'system'>
+
+const { lifetime, months, system } = Astro.props
 const latestMonth = months.find((month) => month.hasGenerationData)
 const installDate = new Intl.DateTimeFormat('th-TH', {
   dateStyle: 'long',

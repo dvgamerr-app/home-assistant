@@ -5,6 +5,7 @@ import PiggyBank from '@lucide/svelte/icons/piggy-bank'
 import Gauge from '@lucide/svelte/icons/gauge'
 import StatCard from './StatCard.astro'
 import ChartCard from './ui/ChartCard.astro'
+import ChartYAxis from './ui/ChartYAxis.astro'
 import LegendRow from './ui/LegendRow.astro'
 import { svgStackedBars } from '@/lib/chart'
 import { num, thb } from '@/lib/electricity'
@@ -83,8 +84,7 @@ const MB = 24
 const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
 const ph = py1 - py0
 
-const maxTotal = Math.max(...MONTH_DAYS.map((dayPoint) => dayPoint.selfUse + dayPoint.gridImport), 1)
-const bars = svgStackedBars(
+const { bars, maxTotal } = svgStackedBars(
   MONTH_DAYS.map((dayPoint) => [dayPoint.gridImport, dayPoint.selfUse]),
   px0,
   py0,
@@ -98,6 +98,7 @@ const gridLines = [0.25, 0.5, 0.75, 1].map((fraction) => ({
   label: num(+(fraction * maxTotal).toFixed(1), 1),
   isMax: fraction === 1,
 }))
+const yAxisTicks = gridLines.map((gridLine) => ({ label: gridLine.label, topPct: (gridLine.y / VH) * 100, emphasis: gridLine.isMax }))
 
 const padLeft = +((ML / VW) * 100).toFixed(2)
 const padRight = +((MR / VW) * 100).toFixed(2)
@@ -159,18 +160,7 @@ const segOpacity = [0.35, 0.85]
     }
 
     <div class="flex items-start gap-1">
-      <div class="relative hidden shrink-0 overflow-visible sm:block" style="width:1.75rem;height:280px">
-        {
-          gridLines.map((gridLine) => (
-            <span
-              class:list={['absolute right-0 text-right text-[9px] leading-none', gridLine.isMax ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
-              style={`top:${((gridLine.y / VH) * 100).toFixed(2)}%;transform:translateY(-50%)`}
-            >
-              {gridLine.label}
-            </span>
-          ))
-        }
-      </div>
+      <ChartYAxis ticks={yAxisTicks} class="hidden h-[280px] sm:block" />
 
       <div class="min-w-0 flex-1">
         <div class="h-48 overflow-hidden sm:h-[280px]">

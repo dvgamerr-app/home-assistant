@@ -1,8 +1,9 @@
 import { formatISODate, getBangkokISODate } from './date'
 import { cacheData } from './data-cache'
+import { logger } from './logger'
+import { toFiveMinChartPoint } from './solar-fivemin'
 import { calculateMonthlyBill, marginalRate, MONTH_LONG_TH, MONTH_SHORT_TH } from './electricity'
 import {
-  getBatteryCharge,
   getBills,
   get5Min,
   getHourly,
@@ -59,7 +60,17 @@ const EMPTY_LIVE: LiveSnapshot = {
   activeAlarms: [],
 }
 
-export type SolarDataScope = 'all' | 'overview' | 'load' | 'load-history' | 'solar' | 'bill'
+export type SolarDataScope = 'all' | 'overview' | 'load' | 'solar' | 'bill'
+
+/**
+ * แกะผลจาก Promise.allSettled — slot ที่พังจะกลายเป็น null แล้วไปใช้ fallback
+ * พร้อม log ไว้ ไม่ให้ query ที่ล้มหายไปเงียบๆ (db.ts ไม่มี logging ของตัวเอง)
+ */
+function settled<T>(result: PromiseSettledResult<T | null>, slot: string): T | null {
+  if (result.status === 'fulfilled') return result.value
+  logger.error({ err: result.reason, slot }, 'solar data query failed, falling back to empty values')
+  return null
+}
 
 const CACHE = {
   live: 5_000,
@@ -68,6 +79,14 @@ const CACHE = {
   historical: 6 * 60 * 60_000,
   slowMoving: 5 * 60_000,
 } as const
+
+/**
+ * TTL ของข้อมูลรายวัน — วันนี้เปลี่ยนตลอด, วันย้อนหลังนิ่งแล้ว
+ * export ไว้เพราะ `/api/solar/five-min` ใช้ cache key เดียวกัน ถ้าตั้ง TTL คนละค่า
+ * ใครเรียกก่อนจะเป็นคนกำหนด TTL ให้อีกฝ่ายไปด้วย (กราฟวันนี้อาจถูก cache 6 ชม.)
+ */
+export const dayCacheTtl = (iso: string) => (iso === getBangkokISODate() ? CACHE.currentDay : CACHE.historical)
+export const fiveMinCacheKey = (iso: string) => `solar:five-min:${iso}`
 
 function changeFrom(current: number, previous: number) {
   const diff = current - previous
@@ -159,7 +178,6 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
   const month = selectedDate.getMonth() + 1
   const selectedISO = formatISODate(selectedDate)
   const todayISO = getBangkokISODate()
-  const isToday = selectedISO === todayISO
 
   const needsLive = scope === 'all' || scope === 'overview' || scope === 'solar'
   const needsToday = scope === 'all' || scope === 'overview' || scope === 'load' || scope === 'solar'
@@ -171,32 +189,35 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
   const needsBills = scope === 'all' || scope === 'overview' || scope === 'bill'
   const selectedMonth = selectedISO.slice(0, 7)
   const currentMonth = todayISO.slice(0, 7)
-  const dayTtl = isToday ? CACHE.currentDay : CACHE.historical
+  const dayTtl = dayCacheTtl(selectedISO)
   const monthTtl = selectedMonth === currentMonth ? CACHE.currentAggregate : CACHE.historical
 
-  const [liveResult, todayResult, monthDaysResult, rawMonths, hourlyResult, fiveMinResult, lifetimeResult, billsResult, histBatteryChargeResult, pvPeakResult, recentDailyResult] = await Promise.all([
+  // allSettled ไม่ใช่ all — slot ทั้ง 10 อันเป็นอิสระต่อกัน และมี fallback รออยู่แล้วข้างล่าง
+  // ถ้าใช้ Promise.all แล้ว query เดียวพลาด (เช่น bills) หน้าเว็บทั้งหน้าจะ 500
+  // ทั้งที่ควรแสดงส่วนที่เหลือได้ปกติ
+  const [liveResult, todayResult, monthDaysResult, monthsResult, hourlyResult, fiveMinResult, lifetimeResult, billsResult, pvPeakResult, recentDailyResult] = await Promise.allSettled([
     needsLive ? cacheData('solar:live', CACHE.live, getLiveSnapshot) : Promise.resolve(null),
     needsToday ? cacheData(`solar:today:${selectedISO}`, dayTtl, () => getToday(selectedDate)) : Promise.resolve(null),
     needsMonthDays ? cacheData(`solar:month-days:${selectedMonth}`, monthTtl, () => getMonthDays(year, month)) : Promise.resolve(null),
     cacheData('solar:months:12', CACHE.currentAggregate, () => getMonths(12)),
     needsHourly ? cacheData(`solar:hourly:${selectedISO}`, dayTtl, () => getHourly(selectedDate)) : Promise.resolve(null),
-    needsFiveMin ? cacheData(`solar:five-min:${selectedISO}`, dayTtl, () => get5Min(selectedDate)) : Promise.resolve(null),
+    needsFiveMin ? cacheData(fiveMinCacheKey(selectedISO), dayTtl, () => get5Min(selectedDate)) : Promise.resolve(null),
     needsSolarHistory ? cacheData('solar:lifetime', CACHE.slowMoving, getLifetime) : Promise.resolve(null),
     needsBills ? cacheData('utility:bills:36', CACHE.slowMoving, () => getBills(36)) : Promise.resolve(null),
-    needsSolarHistory ? cacheData('solar:battery-charge:12', CACHE.slowMoving, () => getBatteryCharge(12)) : Promise.resolve(null),
     needsSolarHistory ? cacheData('solar:pv-peak', CACHE.slowMoving, getPvPeak) : Promise.resolve(null),
     needsDayComparison ? cacheData(`solar:recent-daily:${selectedISO}:8`, dayTtl, () => getRecentDailyTotals(selectedDate, 8)) : Promise.resolve(null),
   ])
-  const live = liveResult ?? EMPTY_LIVE
-  const today = todayResult ?? { generated: 0, consumed: 0, gridImport: 0, hasGenerationData: false, hasUsageData: false }
-  const monthDays = monthDaysResult ?? []
-  const hourly = hourlyResult ?? []
-  const fiveMinRaw = fiveMinResult ?? []
-  const lifetime = lifetimeResult ?? { generated: 0, gridImport: 0, generationTime: 0, co2ReductionKg: 0, hasGenerationData: false }
-  const bills = billsResult ?? []
-  const histBatteryCharge = histBatteryChargeResult ?? 0
-  const pvPeak = pvPeakResult ?? { pv1: 0, pv2: 0 }
-  const recentDailyRows = recentDailyResult ?? []
+
+  const live = settled(liveResult, 'live') ?? EMPTY_LIVE
+  const today = settled(todayResult, 'today') ?? { generated: 0, consumed: 0, gridImport: 0, hasGenerationData: false, hasUsageData: false }
+  const monthDays = settled(monthDaysResult, 'monthDays') ?? []
+  const rawMonths = settled(monthsResult, 'months') ?? []
+  const hourly = settled(hourlyResult, 'hourly') ?? []
+  const fiveMinRaw = settled(fiveMinResult, 'fiveMin') ?? []
+  const lifetime = settled(lifetimeResult, 'lifetime') ?? { generated: 0, gridImport: 0, generationTime: 0, co2ReductionKg: 0, hasGenerationData: false }
+  const bills = settled(billsResult, 'bills') ?? []
+  const pvPeak = settled(pvPeakResult, 'pvPeak') ?? { pv1: 0, pv2: 0 }
+  const recentDailyRows = settled(recentDailyResult, 'recentDaily') ?? []
 
   const pvStrings = [
     { name: 'แผง MPPT 1', power: live.pv1.power, voltage: live.pv1.voltage, current: live.pv1.current, installed: true, peakKw: pvPeak.pv1 },
@@ -245,16 +266,7 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
 
   const monthLabel = `${MONTH_LONG_TH[month - 1]} ${year + 543}`
 
-  const full5Min = fiveMinRaw.map((sample) => ({
-    minuteOfDay: sample.minuteOfDay,
-    pv: sample.pv,
-    pv1: sample.pv1,
-    pv2: sample.pv2,
-    load: sample.load,
-    batt: sample.batteryPower,
-    grid: sample.gridPower,
-    soc: sample.soc,
-  }))
+  const full5Min = fiveMinRaw.map((sample) => ({ ...toFiveMinChartPoint(sample), soc: sample.soc }))
 
   const batteryChargeKwh = integratePowerSeries(fiveMinRaw, (sample) => Math.max(-sample.batteryPower, 0))
   const batteryDischargeKwh = integratePowerSeries(fiveMinRaw, (sample) => Math.max(sample.batteryPower, 0))
@@ -353,21 +365,6 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
     },
   }
 
-  const histGen = rawMonths.reduce((sum, monthPoint) => sum + monthPoint.generated, 0)
-  const histSolarUse = rawMonths.reduce((sum, monthPoint) => sum + clampZero(monthPoint.consumed - monthPoint.gridImport), 0)
-  const histBatteryUse = Math.min(histBatteryCharge, histGen)
-  const histHomeUse = Math.max(0, histSolarUse - histBatteryUse)
-  const homeUseRatio = histGen > 0 ? histHomeUse / histGen : 0
-  const batteryUseRatio = histGen > 0 ? histBatteryUse / histGen : 0
-  const selfUsedLife = Math.round(lifetime.generated * homeUseRatio)
-  const batteryChargedLife = Math.round(lifetime.generated * batteryUseRatio)
-  const discardedLife = Math.max(0, lifetime.generated - selfUsedLife - batteryChargedLife)
-  const energyDistribution = [
-    { name: 'ใช้เองในบ้าน', value: selfUsedLife, key: 'selfUse' },
-    { name: 'ชาร์จเข้าแบตเตอรี่', value: batteryChargedLife, key: 'batteryCharge' },
-    { name: 'พลังงานส่วนเกิน', value: discardedLife, key: 'clipped' },
-  ]
-
   const totalSavedToDate = months.reduce((sum, monthPoint) => sum + monthPoint.saved, 0)
   // months[0] is the current (in-progress) month; average from last full month onward so a partial month doesn't skew the payback rate
   const completedMonths = months.slice(1)
@@ -421,7 +418,6 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
     months,
     gridOverview,
     fiveMin: full5Min,
-    energyDistribution,
     lifetime,
     payback,
     bills: billsEnhanced,
@@ -431,7 +427,7 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
 export type SolarData = Awaited<ReturnType<typeof getAll>>
 
 export const getOverviewData = () => getAll(undefined, 'overview')
-export const getLoadPageData = (includeCurrentDay = true) => getAll(undefined, includeCurrentDay ? 'load' : 'load-history')
+export const getLoadPageData = () => getAll(undefined, 'load')
 export const getSolarPageData = (date?: Date) => getAll(date, 'solar')
 export const getBillPageData = () => getAll(undefined, 'bill')
 

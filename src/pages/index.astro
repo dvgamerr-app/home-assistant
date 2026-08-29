@@ -12,7 +12,8 @@ import Gauge from '@lucide/svelte/icons/gauge'
 import Receipt from '@lucide/svelte/icons/receipt'
 import Droplets from '@lucide/svelte/icons/droplets'
 import { getOverviewData, getWaterUsageData } from '@/lib/solar-data'
-import { MONTH_SHORT_TH, thb, num } from '@/lib/electricity'
+import { formatBillMonth, thb, num } from '@/lib/electricity'
+import { classifyMeaPayment, classifyMwaPayment } from '@/lib/payment-status'
 import { getSocketUrl } from '@/lib/socket'
 
 const [data, waterData] = await Promise.all([getOverviewData(), getWaterUsageData(1)])
@@ -21,24 +22,8 @@ const socketUrl = getSocketUrl(Astro.request.url)
 const latestElectricityBill = data.bills[0]
 const latestWaterBill = waterData.latest
 
-function electricityPaymentLabel() {
-  if (!latestElectricityBill) return undefined
-
-  const status = latestElectricityBill.paymentStatus?.trim().toLowerCase() ?? ''
-  if (status === 'paid') return 'ชำระแล้ว'
-  if (status === 'partial' || status === 'partially_paid' || ((latestElectricityBill.paymentAmount ?? 0) > 0 && (latestElectricityBill.outstandingAmount ?? 0) > 0)) return 'ชำระบางส่วน'
-  if (status === 'overdue' || status === 'late') return 'เกินกำหนด'
-  if (status === 'pending' || status === 'unpaid' || status === 'outstanding') return 'รอชำระ'
-  return 'ยังไม่พบหลักฐานชำระ'
-}
-
-function electricityMonthLabel(month: string) {
-  const monthName = MONTH_SHORT_TH[parseInt(month.slice(4)) - 1] ?? month
-  return `${monthName} ${parseInt(month.slice(0, 4)) + 543}`
-}
-
-const electricityPayment = electricityPaymentLabel()
-const waterPayment = !latestWaterBill ? undefined : latestWaterBill.isPaid ? 'ชำระแล้ว' : latestWaterBill.paidAmount > 0 && latestWaterBill.remainingAmount > 0 ? 'ชำระบางส่วน' : 'รอชำระ'
+const electricityPayment = latestElectricityBill ? classifyMeaPayment(latestElectricityBill).label : undefined
+const waterPayment = latestWaterBill ? classifyMwaPayment(latestWaterBill).label : undefined
 ---
 
 <Layout title="ภาพรวมพลังงานในบ้าน">
@@ -54,7 +39,7 @@ const waterPayment = !latestWaterBill ? undefined : latestWaterBill.isPaid ? '�
         <StatCard
           label="ค่าไฟเดือนล่าสุด"
           value={latestElectricityBill ? thb(latestElectricityBill.paid, 2) : '—'}
-          sub={latestElectricityBill ? `${electricityMonthLabel(latestElectricityBill.month)} · ใช้ไฟ ${num(latestElectricityBill.kwh, 0)} หน่วย` : 'ยังไม่มีข้อมูลบิลค่าไฟ'}
+          sub={latestElectricityBill ? `${formatBillMonth(latestElectricityBill.month)} · ใช้ไฟ ${num(latestElectricityBill.kwh, 0)} หน่วย` : 'ยังไม่มีข้อมูลบิลค่าไฟ'}
           trend={electricityPayment}
           accent="terracotta"
         >
