@@ -134,3 +134,10 @@
   border-radius: 2px;
   display: inline-block;
 }
+
+@media (max-width: 639px) {
+  .mobile-chart-detail,
+  .mobile-chart-tip {
+    display: none !important;
+  }
+}

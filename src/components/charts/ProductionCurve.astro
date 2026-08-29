@@ -5,6 +5,8 @@ import ChartCard from '@/components/ui/ChartCard.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
 import DatePicker from '@/components/ui/DatePicker.svelte'
 import { buildFiveMinChartPayload } from '@/lib/solar-fivemin'
+import { getBangkokISODate } from '@/lib/date'
+import { SYSTEM } from '@/lib/solar-data'
 
 const { fiveMin: POINTS, date, isToday, socketUrl } = Astro.props as Pick<SolarData, 'fiveMin'> & { date: string; isToday: boolean; socketUrl: string }
 
@@ -32,308 +34,118 @@ const padRight = +((MR / VW) * 100).toFixed(2)
 // data passed to client-side draw()
 const chartJson = JSON.stringify({
   ...initialChart,
+  selectedDate: date,
+  today: getBangkokISODate(),
+  historyStart: SYSTEM.installDate,
   isToday,
   socketUrl,
 })
 ---
 
-<ChartCard eyebrow="พลังงาน" title="กราฟกำลังผลิตรายชั่วโมง" class="flex flex-col overflow-hidden">
-  <div class="flex flex-wrap items-end gap-6 border-b border-border/60 pb-5">
-    <div class="space-y-1">
-      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">พีคโซลาร์</p>
-      <p class="font-serif text-4xl font-light leading-none">
-        <span id="pv-peak-pv">{num(peakPv, 2)}</span><span class="ml-1 text-base text-muted-foreground">kW</span>
-      </p>
-    </div>
-    <div class="space-y-1">
-      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">พีคโหลด</p>
-      <p class="font-serif text-2xl font-light leading-none" style="color:var(--destructive)"><span id="pv-peak-load">{num(peakLoad, 2)}</span> kW</p>
-    </div>
-    <div class="space-y-1">
-      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">แบตจ่ายออกสูงสุด</p>
-      <p class="font-serif text-2xl font-light leading-none" style="color:var(--chart-3)"><span id="pv-peak-batt">{num(peakBattDis, 2)}</span> kW</p>
-    </div>
-    <div class="ml-auto flex items-center">
-      <DatePicker selected={date} client:load />
-    </div>
-  </div>
-
-  <div class="mt-5 flex items-start gap-1">
-    <div id="pv-y-axis" class="relative h-56 shrink-0 overflow-visible md:h-60" style="width:1.75rem">
-      {
-        yLabels.map((l, i) => (
-          <span
-            class:list={['absolute right-0 text-right text-[9px] leading-none', i === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
-            style={`top:${gridPct[i]}%;transform:translateY(-50%)`}
-          >
-            {l}
-          </span>
-        ))
-      }
-    </div>
-    <div class="min-w-0 flex-1">
-      <div class="pv-chart-wrapper h-56 w-full md:h-60" data-chart={chartJson}>
-        <svg width="100%" height="100%"></svg>
+<div class="production-chart-root" data-production-chart={chartJson}>
+  <ChartCard eyebrow="พลังงาน" title="กำลังผลิตวันนี้" class="flex flex-col overflow-hidden">
+    <div class="flex flex-wrap items-end gap-4 border-b border-border/60 pb-4 sm:gap-6 sm:pb-5">
+      <div class="space-y-1">
+        <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">พีคโซลาร์</p>
+        <p class="font-serif text-4xl font-light leading-none">
+          <span id="pv-peak-pv" class="pv-peak-pv">{num(peakPv, 2)}</span><span class="ml-1 text-base text-muted-foreground">kW</span>
+        </p>
       </div>
-      <div id="pv-x-axis" class="mt-1 flex justify-between text-[9px] text-muted-foreground" style={`padding-left:${padLeft}%;padding-right:${padRight}%`}>
-        {xLabels.map((l) => <span>{l}</span>)}
+      <div class="hidden space-y-1 sm:block">
+        <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">พีคโหลด</p>
+        <p class="font-serif text-2xl font-light leading-none" style="color:var(--destructive)"><span id="pv-peak-load" class="pv-peak-load">{num(peakLoad, 2)}</span> kW</p>
+      </div>
+      <div class="hidden space-y-1 sm:block">
+        <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">แบตจ่ายออกสูงสุด</p>
+        <p class="font-serif text-2xl font-light leading-none" style="color:var(--chart-3)"><span id="pv-peak-batt" class="pv-peak-batt">{num(peakBattDis, 2)}</span> kW</p>
+      </div>
+      <div class="w-full sm:ml-auto sm:flex sm:w-auto sm:items-center">
+        <DatePicker selected={date} client:load />
       </div>
     </div>
-  </div>
 
-  <LegendRow
-    class="mt-3"
-    items={[
-      { label: 'โซลาร์ (kW)', color: 'var(--chart-2)' },
-      { label: 'โหลด (kW)', color: 'var(--destructive)' },
-      { label: 'แบตเตอรี่ (kW)', color: 'var(--chart-3)' },
-    ]}
-  >
-    <span class="flex items-center gap-2 text-xs text-muted-foreground">
-      <span class="inline-block h-px w-5 border-t-2 border-dashed opacity-70" style="border-color:var(--chart-4)"></span>
-      กริด (kW)
-    </span>
-  </LegendRow>
-</ChartCard>
+    <div class="mt-4 flex items-start gap-1 sm:mt-5">
+      <div id="pv-y-axis" class="pv-y-axis relative hidden h-56 shrink-0 overflow-visible sm:block md:h-60" style="width:1.75rem">
+        {
+          yLabels.map((l, i) => (
+            <span
+              class:list={['absolute right-0 text-right text-[9px] leading-none', i === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
+              style={`top:${gridPct[i]}%;transform:translateY(-50%)`}
+            >
+              {l}
+            </span>
+          ))
+        }
+      </div>
+      <div class="min-w-0 flex-1">
+        <div class="pv-chart-wrapper h-48 w-full sm:h-56 md:h-60">
+          <svg
+            width="100%"
+            height="100%"
+            role={'img' as const}
+            aria-label="กราฟกำลังผลิต ซูมและเลื่อนดูข้อมูลย้อนหลังได้"
+            style="cursor:grab;touch-action:none;user-select:none;overscroll-behavior:contain"></svg>
+        </div>
+        <div id="pv-x-axis" class="pv-x-axis relative mt-1 flex h-4 justify-between text-[9px] text-muted-foreground" style={`padding-left:${padLeft}%;padding-right:${padRight}%`}>
+          {xLabels.map((label, index) => <span class:list={[index % 6 === 0 || index === xLabels.length - 1 ? 'text-muted-foreground' : 'text-transparent sm:text-muted-foreground']}>{label}</span>)}
+        </div>
+        <div class="mt-1 flex min-h-4 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[9px] text-muted-foreground">
+          <span class="pv-visible-range"></span>
+          <span class="pv-load-state hidden" aria-live={'polite' as const}></span>
+          <span class="hidden sm:inline">หมุนล้อเพื่อซูม · ลากไปทางขวาเพื่อดูย้อนหลัง</span>
+          <span class="sm:hidden">ถ่าง 2 นิ้วเพื่อซูม · ลากเพื่อดูย้อนหลัง</span>
+        </div>
+      </div>
+    </div>
 
-<div class="pv-chart-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:160px">
-  <p class="pv-tip-hour mb-2 text-[10px] uppercase tracking-luxury text-muted-foreground"></p>
-  <div class="space-y-1.5">
-    <div class="flex items-center justify-between gap-4">
-      <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-2)"></span>โซลาร์
+    <LegendRow
+      class="mt-3"
+      items={[
+        { label: 'โซลาร์ (kW)', color: 'var(--chart-2)' },
+        { label: 'โหลด (kW)', color: 'var(--destructive)' },
+        { label: 'แบตเตอรี่ (kW)', color: 'var(--chart-3)', mobileHidden: true },
+      ]}
+    >
+      <span class="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
+        <span class="inline-block h-px w-5 border-t-2 border-dashed opacity-70" style="border-color:var(--chart-4)"></span>
+        กริด (kW)
       </span>
-      <span class="pv-tip-pv font-mono text-[11px] text-foreground"></span>
-    </div>
-    <div class="flex items-center justify-between gap-4">
-      <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--destructive)"></span>โหลด
-      </span>
-      <span class="pv-tip-load font-mono text-[11px] text-foreground"></span>
-    </div>
-    <div class="flex items-center justify-between gap-4">
-      <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-3)"></span>แบตเตอรี่
-      </span>
-      <span class="pv-tip-batt font-mono text-[11px] text-foreground"></span>
-    </div>
-    <div class="flex items-center justify-between gap-4">
-      <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <span class="h-2 w-2 shrink-0 rounded-full opacity-70" style="background:var(--chart-4)"></span>กริด
-      </span>
-      <span class="pv-tip-grid font-mono text-[11px] text-foreground"></span>
+    </LegendRow>
+  </ChartCard>
+
+  <div class="pv-chart-tip mobile-chart-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:160px">
+    <p class="pv-tip-hour mb-2 text-[10px] uppercase tracking-luxury text-muted-foreground"></p>
+    <div class="space-y-1.5">
+      <div class="flex items-center justify-between gap-4">
+        <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-2)"></span>โซลาร์
+        </span>
+        <span class="pv-tip-pv font-mono text-[11px] text-foreground"></span>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--destructive)"></span>โหลด
+        </span>
+        <span class="pv-tip-load font-mono text-[11px] text-foreground"></span>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span class="h-2 w-2 shrink-0 rounded-full" style="background:var(--chart-3)"></span>แบตเตอรี่
+        </span>
+        <span class="pv-tip-batt font-mono text-[11px] text-foreground"></span>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <span class="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span class="h-2 w-2 shrink-0 rounded-full opacity-70" style="background:var(--chart-4)"></span>กริด
+        </span>
+        <span class="pv-tip-grid font-mono text-[11px] text-foreground"></span>
+      </div>
     </div>
   </div>
 </div>
 
 <script>
-  import { io } from 'socket.io-client'
-  import { svgPathFromPoints } from '@/lib/chart'
-  import { SOCKET_CHANNELS } from '@/lib/socket'
+  import { initProductionChart } from '@/lib/production-chart-client'
 
-  {
-    const wrapEl = document.querySelector<HTMLElement>('.pv-chart-wrapper')
-    const svg = wrapEl?.querySelector<SVGSVGElement>('svg')
-    const tip = document.querySelector<HTMLElement>('.pv-chart-tip')
-    const xAxis = document.querySelector<HTMLElement>('#pv-x-axis')
-    if (!wrapEl || !svg || !tip) throw new Error('pv-chart: elements not found')
-
-    // --- server data ---
-    const J = JSON.parse(wrapEl.dataset.chart!)
-    let pvAll: number[] = J.pv
-    let loadAll: number[] = J.load
-    let battAll: number[] = J.batt
-    let gridAll: number[] = J.grid
-    let times: number[] = J.times // minuteOfDay per point
-    let scaleMin: number = J.scaleMin
-    let scaleMax: number = J.scaleMax
-    let hasNeg: boolean = J.hasNeg
-    let tickNorms: number[] = J.tickNorms
-    const isToday: boolean = J.isToday
-    const socketUrl: string = J.socketUrl
-
-    const nm = (v: number) => (v - scaleMin) / (scaleMax - scaleMin)
-
-    // --- bezier path — x positioned by actual minuteOfDay ---
-    const clamp01 = (x: number) => Math.max(0, Math.min(1, x))
-    function smoothLine(values: number[], xMin: number, yMin: number, xMax: number, yMax: number): string {
-      return svgPathFromPoints(
-        values.map((v, i) => ({
-          x: xMin + (times[i] / 1439) * (xMax - xMin),
-          y: yMin + (1 - clamp01(v)) * (yMax - yMin),
-        })),
-      )
-    }
-
-    // --- state updated on each draw ---
-    let curPx0 = 0,
-      curPx1 = 0,
-      curW = 0
-    let crosshair: SVGLineElement | null = null
-
-    function draw() {
-      const w = wrapEl!.clientWidth
-      const h = wrapEl!.clientHeight
-      curW = w
-      const [ML, MT, MR, MB] = [4, 18, 8, 28]
-      const px0 = ML,
-        py0 = MT,
-        px1 = w - MR,
-        py1 = h - MB
-      const ph = py1 - py0
-      curPx0 = px0
-      curPx1 = px1
-
-      svg!.setAttribute('viewBox', `0 0 ${w} ${h}`)
-
-      const N = pvAll.length
-      const lastX = N <= 1 ? px0 : px0 + (times[N - 1] / 1439) * (px1 - px0)
-
-      const pvL = smoothLine(pvAll.map(nm), px0, py0, px1, py1)
-      const ldL = smoothLine(loadAll.map(nm), px0, py0, px1, py1)
-      const btL = smoothLine(battAll.map(nm), px0, py0, px1, py1)
-      const grL = smoothLine(gridAll.map(nm), px0, py0, px1, py1)
-
-      const zeroY = (py0 + (1 - nm(0)) * ph).toFixed(1)
-      const gridYs = tickNorms.map((nv) => (py0 + (1 - nv) * ph).toFixed(1))
-
-      svg!.innerHTML = `
-        <defs>
-          <linearGradient id="pv-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="var(--chart-2)" stop-opacity="0.35"/>
-            <stop offset="100%" stop-color="var(--chart-2)" stop-opacity="0"/>
-          </linearGradient>
-          <linearGradient id="load-grad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="var(--destructive)" stop-opacity="0.2"/>
-            <stop offset="100%" stop-color="var(--destructive)" stop-opacity="0"/>
-          </linearGradient>
-          <clipPath id="pv-clip"><rect x="${px0}" y="${py0}" width="${px1 - px0}" height="${ph}"/></clipPath>
-        </defs>
-        <line x1="${px0}" x2="${px1}" y1="${py1}" y2="${py1}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"/>
-        ${gridYs.map((y) => `<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')}
-        ${hasNeg ? `<line x1="${px0}" x2="${px1}" y1="${zeroY}" y2="${zeroY}" stroke="var(--border)" stroke-opacity="0.7" stroke-width="0.8"/>` : ''}
-        <g clip-path="url(#pv-clip)">
-          <path d="${pvL} L ${lastX},${py1} L ${px0},${py1} Z" fill="url(#pv-grad)"/>
-          <path d="${pvL}" fill="none" stroke="var(--chart-2)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="${ldL} L ${lastX},${py1} L ${px0},${py1} Z" fill="url(#load-grad)"/>
-          <path d="${ldL}" fill="none" stroke="var(--destructive)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="${btL}" fill="none" stroke="var(--chart-3)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="${grL}" fill="none" stroke="var(--chart-4)" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 2" stroke-opacity="0.7"/>
-        </g>
-        <line class="pv-crosshair" x1="0" x2="0" y1="${py0}" y2="${py1}" stroke="var(--foreground)" stroke-opacity="0.2" stroke-width="0.5" visibility="hidden"/>
-        <rect class="pv-overlay" x="${px0}" y="${py0}" width="${px1 - px0}" height="${ph}" fill="transparent" style="cursor:crosshair"/>`
-
-      crosshair = svg!.querySelector('.pv-crosshair')
-
-      if (xAxis) {
-        xAxis.style.paddingLeft = ((ML / w) * 100).toFixed(2) + '%'
-        xAxis.style.paddingRight = ((MR / w) * 100).toFixed(2) + '%'
-      }
-    }
-
-    // --- ResizeObserver + 150ms debounce ---
-    let t: ReturnType<typeof setTimeout>
-    const ro = new ResizeObserver(() => {
-      clearTimeout(t)
-      t = setTimeout(draw, 150)
-    })
-    ro.observe(wrapEl!)
-    draw()
-
-    // --- tooltip ---
-    const fmtBatt = (v: number) => (v > 0.05 ? `+${v.toFixed(2)} kW` : v < -0.05 ? `−${Math.abs(v).toFixed(2)} kW` : '0.00 kW')
-
-    svg!.addEventListener('mousemove', (e) => {
-      if (!crosshair) return
-      const r = svg!.getBoundingClientRect()
-      const sx = ((e.clientX - r.left) / r.width) * curW
-      if (sx < curPx0 || sx > curPx1) {
-        tip!.classList.add('hidden')
-        crosshair.setAttribute('visibility', 'hidden')
-        return
-      }
-      const targetMin = ((sx - curPx0) / (curPx1 - curPx0)) * 1439
-      const idx = times.reduce((best, t, i) => (Math.abs(t - targetMin) < Math.abs(times[best] - targetMin) ? i : best), 0)
-      const cx = (curPx0 + (times[idx] / 1439) * (curPx1 - curPx0)).toFixed(1)
-      crosshair.setAttribute('x1', cx)
-      crosshair.setAttribute('x2', cx)
-      crosshair.setAttribute('visibility', 'visible')
-      const totalMin = times[idx]
-      tip!.querySelector('.pv-tip-hour')!.textContent = `${String(Math.floor(totalMin / 60)).padStart(2, '0')}:${String(totalMin % 60).padStart(2, '0')} น.`
-      tip!.querySelector('.pv-tip-pv')!.textContent = pvAll[idx].toFixed(2) + ' kW'
-      tip!.querySelector('.pv-tip-load')!.textContent = loadAll[idx].toFixed(2) + ' kW'
-      tip!.querySelector('.pv-tip-batt')!.textContent = fmtBatt(battAll[idx])
-      tip!.querySelector('.pv-tip-grid')!.textContent = gridAll[idx] < -0.01 ? Math.abs(gridAll[idx]).toFixed(2) + ' kW' : 'ไม่ซื้อ'
-      tip!.classList.remove('hidden')
-      tip!.style.left = Math.min(e.clientX + 14, window.innerWidth - 180) + 'px'
-      tip!.style.top = Math.max(e.clientY - 90, 8) + 'px'
-    })
-    svg!.addEventListener('mouseleave', () => {
-      tip!.classList.add('hidden')
-      crosshair?.setAttribute('visibility', 'hidden')
-    })
-
-    // --- realtime poll (today only) ---
-    function numFmt(v: number, d: number) {
-      return v.toFixed(d)
-    }
-    function updateYAxis(newGridPct: number[], newYLabels: string[]) {
-      const yAxisEl = document.getElementById('pv-y-axis')
-      if (!yAxisEl) return
-      yAxisEl.innerHTML = newYLabels
-        .map(
-          (l, i) =>
-            `<span class="absolute right-0 text-right text-[9px] leading-none ${i === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground'}" style="top:${newGridPct[i]}%;transform:translateY(-50%)">${l}</span>`,
-        )
-        .join('')
-    }
-    function applyRealtime(d: {
-      pv: number[]
-      load: number[]
-      batt: number[]
-      grid: number[]
-      times: number[]
-      scaleMin: number
-      scaleMax: number
-      hasNeg: boolean
-      tickNorms: number[]
-      gridPct: number[]
-      yLabels: string[]
-      peakPv: number
-      peakLoad: number
-      peakBattDis: number
-    }) {
-      pvAll = d.pv
-      loadAll = d.load
-      battAll = d.batt
-      gridAll = d.grid
-      times = d.times
-      scaleMin = d.scaleMin
-      scaleMax = d.scaleMax
-      hasNeg = d.hasNeg
-      tickNorms = d.tickNorms
-      draw()
-      updateYAxis(d.gridPct, d.yLabels)
-      const ppv = document.getElementById('pv-peak-pv')
-      if (ppv) ppv.textContent = numFmt(d.peakPv, 2)
-      const pld = document.getElementById('pv-peak-load')
-      if (pld) pld.textContent = numFmt(d.peakLoad, 2)
-      const pbt = document.getElementById('pv-peak-batt')
-      if (pbt) pbt.textContent = numFmt(d.peakBattDis, 2)
-    }
-    if (isToday) {
-      const socket = io(socketUrl, { transports: ['websocket'] })
-      socket.on('connect', () => {
-        socket.emit('subscribe', SOCKET_CHANNELS.solarFiveMin)
-      })
-      socket.on(SOCKET_CHANNELS.solarFiveMin, applyRealtime)
-      window.addEventListener(
-        'pagehide',
-        () => {
-          socket.disconnect()
-        },
-        { once: true },
-      )
-    }
-  }
+  document.querySelectorAll<HTMLElement>('.production-chart-root[data-production-chart]').forEach(initProductionChart)
 </script>
