@@ -8,3 +8,4 @@ dist
 .husky
 .vscode
 docs
+.qlty

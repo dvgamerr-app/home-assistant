@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     permissions:
       contents: read
       packages: write
@@ -24,39 +24,54 @@ jobs:
       REGISTRY: ghcr.io
       IMAGE_OWNER: dvgamerr-app
       IMAGE_NAME: home-assistant
-      PLATFORMS: linux/amd64,linux/arm64
+      PLATFORMS: linux/arm64
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # ไม่มี step ไหนต้องใช้ git credential ต่อ — ไม่เก็บไว้ใน .git/config
+          persist-credentials: false
 
       - name: Prepare 🔰
         id: prepare
+        env:
+          # ส่งค่าที่ควบคุมจากภายนอกผ่าน env แล้วอ้างเป็นตัวแปร shell
+          # อย่า interpolate `${{ }}` ลงใน run: ตรงๆ (ชื่อ tag ใส่ ; $ ` ได้ → shell injection)
+          REF_NAME: ${{ github.ref_name }}
+          REGISTRY: ${{ env.REGISTRY }}
+          IMAGE_OWNER: ${{ env.IMAGE_OWNER }}
+          IMAGE_NAME: ${{ env.IMAGE_NAME }}
+          PLATFORMS: ${{ env.PLATFORMS }}
         run: |
-          echo "docker_image=${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}" >> $GITHUB_OUTPUT
+          IMAGE="${REGISTRY}/${IMAGE_OWNER}/${IMAGE_NAME}"
+          echo "docker_image=${IMAGE}" >> "$GITHUB_OUTPUT"
 
-          VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
-          [ "$VERSION" == "main" ] && VERSION=latest
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          VERSION="$REF_NAME"
+          [ "$VERSION" = "main" ] && VERSION=latest
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
-          echo "buildx_args=--platform ${{ env.PLATFORMS }} \
+          echo "buildx_args=--platform ${PLATFORMS} \
             --build-arg VERSION=${VERSION} \
             --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
-            --tag ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ env.IMAGE_NAME }}:${VERSION} ." >> $GITHUB_OUTPUT
+            --tag ${IMAGE}:${VERSION} ." >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx 📐
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4
 
       - name: Log into registry ${{ env.REGISTRY }} 🔍
         if: success() && !contains(github.event_name, 'pull_request')
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ env.IMAGE_OWNER }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker Push 📌
-        run: docker buildx build --output "type=image,push=${{ !contains(github.event_name, 'pull_request') }}" ${{ steps.prepare.outputs.buildx_args }}
+        env:
+          PUSH: ${{ !contains(github.event_name, 'pull_request') }}
+          BUILDX_ARGS: ${{ steps.prepare.outputs.buildx_args }}
+        run: docker buildx build --output "type=image,push=${PUSH}" ${BUILDX_ARGS}
 
   deploy:
     runs-on: self-hosted
@@ -74,7 +89,7 @@ jobs:
     steps:
       - name: Create GitHub Release 🎉
         if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228 # v3
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
@@ -91,48 +106,59 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull new image
+        env:
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+          IMAGE_REF: ${{ needs.build.outputs.docker_image }}:${{ needs.build.outputs.version }}
         run: |
-          container stop ${{ env.CONTAINER_NAME }} || true
-          container delete ${{ env.CONTAINER_NAME }} || true
-          container image delete ${{ needs.build.outputs.docker_image }}:${{ needs.build.outputs.version }} || true
-          container image pull --platform ${{ env.DEPLOY_PLATFORM }} ${{ needs.build.outputs.docker_image }}:${{ needs.build.outputs.version }}
+          container stop "$CONTAINER_NAME" || true
+          container delete "$CONTAINER_NAME" || true
+          container image delete "$IMAGE_REF" || true
+          container image pull "$IMAGE_REF"
 
       - name: Start new container
+        env:
+          # secret/vars ทุกตัวส่งผ่าน env ไม่ interpolate ลง command line
+          # (ค่าที่มีช่องว่างหรือ & จะทำให้คำสั่งเพี้ยน และค่าจะโผล่ใน process list)
+          CONTAINER_NAME: ${{ env.CONTAINER_NAME }}
+          IMAGE_REF: ${{ needs.build.outputs.docker_image }}:${{ needs.build.outputs.version }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          AUTH_DATABASE_URL: ${{ secrets.AUTH_DATABASE_URL }}
+          BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          HA_GITHUB_CLIENT_ID: ${{ secrets.HA_GITHUB_CLIENT_ID }}
+          HA_GITHUB_CLIENT_SECRET: ${{ secrets.HA_GITHUB_CLIENT_SECRET }}
+          LINE_NOTICE_URL: ${{ secrets.LINE_NOTICE_URL }}
+          LINE_NOTICE_API_KEY: ${{ secrets.LINE_NOTICE_API_KEY }}
+          APP_BASE_URL: ${{ vars.APP_BASE_URL }}
+          SOLAR_DEVICE_ID: ${{ vars.SOLAR_DEVICE_ID }}
+          MEA_HOUSE_CA: ${{ vars.MEA_HOUSE_CA }}
+          MWA_ACCOUNT_CODE: ${{ vars.MWA_ACCOUNT_CODE }}
+          MEA_BILL_DAY: ${{ vars.MEA_BILL_DAY }}
+          MWA_BILL_DAY: ${{ vars.MWA_BILL_DAY }}
+          UTILITY_ALERT_GRACE_DAYS: ${{ vars.UTILITY_ALERT_GRACE_DAYS }}
+          ALLOWED_EMAILS: ${{ vars.ALLOWED_EMAILS }}
+          APP_PORT: ${{ vars.PORT }}
+          SOCKET_PORT: ${{ vars.SOCKET_PORT }}
         run: |
+          container rm -f "$CONTAINER_NAME" 2>/dev/null || true
           container run -d \
-            --platform ${{ env.DEPLOY_PLATFORM }} \
-            --name ${{ env.CONTAINER_NAME }} \
-            -e DATABASE_URL=${{ secrets.DATABASE_URL }} \
-            -e AUTH_DATABASE_URL=${{ secrets.AUTH_DATABASE_URL }} \
-            -e BETTER_AUTH_SECRET=${{ secrets.BETTER_AUTH_SECRET }} \
-            -e GITHUB_CLIENT_ID=${{ secrets.HA_GITHUB_CLIENT_ID }} \
-            -e GITHUB_CLIENT_SECRET=${{ secrets.HA_GITHUB_CLIENT_SECRET }} \
-            -e LINE_NOTICE_URL=${{ secrets.LINE_NOTICE_URL }} \
-            -e LINE_NOTICE_API_KEY=${{ secrets.LINE_NOTICE_API_KEY }} \
+            --name "$CONTAINER_NAME" \
+            --cpus 1 --memory 512M \
+            -e DATABASE_URL="$DATABASE_URL" \
+            -e AUTH_DATABASE_URL="$AUTH_DATABASE_URL" \
+            -e BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" \
+            -e GITHUB_CLIENT_ID="$HA_GITHUB_CLIENT_ID" \
+            -e GITHUB_CLIENT_SECRET="$HA_GITHUB_CLIENT_SECRET" \
+            -e LINE_NOTICE_URL="$LINE_NOTICE_URL" \
+            -e LINE_NOTICE_API_KEY="$LINE_NOTICE_API_KEY" \
             -e TZ=Asia/Bangkok \
-            -e APP_BASE_URL=${{ vars.APP_BASE_URL }} \
-            -e SOLAR_DEVICE_ID=${{ vars.SOLAR_DEVICE_ID }} \
-            -e MEA_HOUSE_CA=${{ vars.MEA_HOUSE_CA }} \
-            -e MWA_ACCOUNT_CODE=${{ vars.MWA_ACCOUNT_CODE }} \
-            -e MEA_BILL_DAY=${{ vars.MEA_BILL_DAY }} \
-            -e MWA_BILL_DAY=${{ vars.MWA_BILL_DAY }} \
-            -e UTILITY_ALERT_GRACE_DAYS=${{ vars.UTILITY_ALERT_GRACE_DAYS }} \
-            -e ALLOWED_EMAILS=${{ vars.ALLOWED_EMAILS }} \
-            -p ${{ vars.PORT }}:4321 \
-            -p ${{ vars.SOCKET_PORT }}:3000 \
-            ${{ needs.build.outputs.docker_image }}:${{ needs.build.outputs.version }}
-
-      - name: Alert
-        if: success()
-        run: |
-          curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"content\":\"\`${{ env.CONTAINER_NAME }}\` successfully rolled out image \`${{ needs.build.outputs.docker_image }}:${{ needs.build.outputs.version }}\`\"}"
-
-      - name: Fail Alert
-        continue-on-error: true
-        if: failure()
-        run: |
-          curl -s -X POST "${{ secrets.DISCORD_WEBHOOK }}" \
-            -H "Content-Type: application/json" \
-            -d "{\"content\":\"Rollout \`${{ env.CONTAINER_NAME }}\` failed.\nCheck: <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}>\"}"
+            -e APP_BASE_URL="$APP_BASE_URL" \
+            -e SOLAR_DEVICE_ID="$SOLAR_DEVICE_ID" \
+            -e MEA_HOUSE_CA="$MEA_HOUSE_CA" \
+            -e MWA_ACCOUNT_CODE="$MWA_ACCOUNT_CODE" \
+            -e MEA_BILL_DAY="$MEA_BILL_DAY" \
+            -e MWA_BILL_DAY="$MWA_BILL_DAY" \
+            -e UTILITY_ALERT_GRACE_DAYS="$UTILITY_ALERT_GRACE_DAYS" \
+            -e ALLOWED_EMAILS="$ALLOWED_EMAILS" \
+            -p "$APP_PORT":4321 \
+            -p "$SOCKET_PORT":3000 \
+            "$IMAGE_REF"
