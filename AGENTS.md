@@ -33,6 +33,9 @@ UTILITY_ALERT_POLL_MS # รอบตรวจบิลค่าไฟ/น้ำ 
 SOLAR_DEVICE_ID       # device_id ใน stash.solar_record
 MEA_HOUSE_CA          # เลข CA ของบ้านใน stash.mea_electric
 MWA_ACCOUNT_CODE      # account_code ใน stash.mwa_account (ถ้าไม่ตั้ง ใช้บัญชีแรก)
+MEA_BILLER_ID         # Biller ID QR จ่ายค่าไฟ (15 หลักจาก QR บนบิล) — ไม่ตั้ง = ซ่อน QR
+MWA_BILLER_ID         # Biller ID QR จ่ายค่าน้ำ — เงื่อนไขเดียวกัน · วิธีหาดู docs/bill-qr.md
+QR_SIGN_SECRET        # secret sign URL รูป QR (ไม่ตั้ง = ใช้ BETTER_AUTH_SECRET)
 GITHUB_CLIENT_ID/SECRET  # สำหรับ GitHub OAuth (optional)
 LINE_NOTICE_URL       # endpoint กลางสำหรับส่ง alert เข้า LINE
 LINE_NOTICE_API_KEY   # API key ของ LINE Manager (เก็บใน secret/env เท่านั้น)
@@ -80,6 +83,7 @@ pivot EAV: `DISTINCT ON (attr) ORDER BY attr, recorded_at DESC` ดึงค่�
 - `server/socket.mjs` — socket.io server, poll ทุก 60s แล้ว broadcast ตาม channel ที่ client subscribe (`live`, `solar:fivemin`) พร้อมรัน Energy Lib worker และ utility bill worker แยกกัน
 - `src/styles/global.css` — design tokens (oklch, light/dark), font, tracking-luxury, `.legend-dot`
 - `docs/design-system.html` — design-system reference เปิดในเบราว์เซอร์ได้เลย, token sync กับ global.css
+- `docs/bill-qr.md` — **วิธีสร้าง QR จ่ายบิล MEA/MWA ที่ถูกต้อง** + วิธีหา Biller ID + ผลทดสอบสแกนจริง อ่านก่อนแตะเรื่อง QR ทุกครั้ง
 
 ## ข้อตกลง (สำคัญเวลาแก้)
 

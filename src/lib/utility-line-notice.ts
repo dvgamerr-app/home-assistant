@@ -23,6 +23,8 @@ export type UtilityBillNotice = {
   usage: string
   billDate?: string
   dueDate?: string
+  /** URL รูป QR จ่ายบิล — ไม่ใส่ = ไม่แสดงส่วน QR */
+  qrImageUrl?: string
 }
 
 export function buildUtilityBillFlexMessage(notice: UtilityBillNotice, sentAt = new Date()) {
@@ -85,6 +87,32 @@ export function buildUtilityBillFlexMessage(notice: UtilityBillNotice, sentAt = 
             color: FLEX_COLORS.rule,
           },
           ...details.map((detail, index) => detailRow(detail.label, detail.value, { margin: index === 0 ? 'lg' : 'md', valueSize: 'sm' })),
+          // QR จ่ายบิลข้ามธนาคาร — สแกนจากแอปธนาคารไทยได้เลย
+          ...(notice.qrImageUrl
+            ? [
+                {
+                  type: 'separator',
+                  margin: 'xl',
+                  color: FLEX_COLORS.rule,
+                },
+                {
+                  type: 'text',
+                  text: 'สแกนจ่ายผ่านแอปธนาคาร',
+                  margin: 'lg',
+                  size: 'xs',
+                  color: FLEX_COLORS.muted,
+                  align: 'center',
+                },
+                {
+                  type: 'image',
+                  url: notice.qrImageUrl,
+                  margin: 'md',
+                  size: 'full',
+                  aspectRatio: '1:1',
+                  aspectMode: 'fit',
+                },
+              ]
+            : []),
         ],
       },
       footer: {

@@ -98,6 +98,8 @@ export type LifetimeData = {
 }
 
 export type Bill = {
+  /** เลข CA ของมิเตอร์ — ใช้ประกอบ Ref1 ของ QR จ่ายบิล */
+  ca: string
   month: string // YYYYMM
   billNo: string | null
   billDate: Date | null
@@ -120,6 +122,8 @@ export type Bill = {
 }
 
 export type WaterUsage = {
+  /** เลขบัญชีผู้ใช้น้ำ — ใช้ประกอบ Ref1 ของ QR จ่ายบิล */
+  accountCode: string
   billNumber: string
   year: number
   month: number
@@ -665,6 +669,7 @@ export async function getLifetime(): Promise<LifetimeData> {
 export async function getBills(nMonths = 12): Promise<Bill[]> {
   const rows = await sql<
     {
+      ca: string
       month: string
       bill_no: string | null
       bill_date: Date | null
@@ -687,6 +692,7 @@ export async function getBills(nMonths = 12): Promise<Bill[]> {
     }[]
   >`
     SELECT
+      ca,
       month,
       bill_no,
       bill_date,
@@ -712,6 +718,7 @@ export async function getBills(nMonths = 12): Promise<Bill[]> {
     LIMIT ${nMonths}
   `
   return rows.map((r) => ({
+    ca: r.ca,
     month: r.month,
     billNo: r.bill_no,
     billDate: r.bill_date,
@@ -807,6 +814,7 @@ export async function getBatteryMorningSocPeak(day: string): Promise<number | nu
 export async function getWaterUsage(nMonths = 12): Promise<WaterUsage[]> {
   const rows = await sql<
     {
+      account_code: string
       bill_number: string
       period_year: number
       period_month: number
@@ -823,6 +831,7 @@ export async function getWaterUsage(nMonths = 12): Promise<WaterUsage[]> {
     }[]
   >`
     SELECT DISTINCT ON (period_year, period_month)
+      account_code,
       bill_number,
       period_year,
       period_month,
@@ -853,6 +862,7 @@ export async function getWaterUsage(nMonths = 12): Promise<WaterUsage[]> {
     const remainingAmount = n(row.balance_gross_amount)
 
     return {
+      accountCode: row.account_code,
       billNumber: row.bill_number,
       year: Number(row.period_year),
       month: Number(row.period_month),

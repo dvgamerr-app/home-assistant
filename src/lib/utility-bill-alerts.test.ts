@@ -4,19 +4,19 @@ import { buildUtilityBillFlexMessage } from './utility-line-notice'
 
 describe('Utility bill dedupe', () => {
   test('แจ้งเมื่อเลขบิลเปลี่ยน ไม่ว่าจะเป็นวันที่เท่าไร', () => {
-    expect(shouldNotifyBill({ lastValue: '657137' }, '657138')).toBe('notify')
+    expect(shouldNotifyBill({ lastValue: '900001' }, '900002')).toBe('notify')
   })
 
   test('เลขบิลเดิม = ไม่แจ้งซ้ำ (เรียกกี่รอบก็ปลอดภัย)', () => {
-    expect(shouldNotifyBill({ lastValue: '657138' }, '657138')).toBe('none')
+    expect(shouldNotifyBill({ lastValue: '900002' }, '900002')).toBe('none')
   })
 
   test('ครั้งแรกสุดแค่จดไว้ ไม่แจ้ง กันสแปมตอนตั้งระบบใหม่', () => {
-    expect(shouldNotifyBill(null, '657138')).toBe('record-only')
+    expect(shouldNotifyBill(null, '900002')).toBe('record-only')
   })
 
   test('lastValue ว่างแต่มีบิลอยู่ = ถือว่าบิลใหม่', () => {
-    expect(shouldNotifyBill({ lastValue: null }, '657138')).toBe('notify')
+    expect(shouldNotifyBill({ lastValue: null }, '900002')).toBe('notify')
   })
 })
 

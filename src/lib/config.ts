@@ -32,6 +32,25 @@ export const config = {
   solar: {
     deviceId: trimmedEnv('SOLAR_DEVICE_ID'),
   },
+  /** base URL ของเว็บ — ต้องเป็น absolute https เพราะ LINE fetch รูป QR จากภายนอก */
+  appBaseUrl: trimmedEnv('APP_BASE_URL') || 'http://localhost:4321',
+  /**
+   * Biller ID สำหรับ QR จ่ายบิลข้ามธนาคาร
+   *
+   * ⚠️ **ไม่มี default โดยเจตนา** → ไม่ตั้ง = ซ่อน QR (fail-safe)
+   *
+   * ก่อนหน้านี้เคยใส่ default ที่อ่านด้วยตาจากตัวเลขใต้บาร์โค้ด ซึ่ง **ผิด**
+   * — ตอนถอด QR บนบิลด้วยโปรแกรมพบว่าเป็นเลขอีกชุด และรูปแบบ Ref ก็ไม่ตรง
+   * (ดู docs/bill-qr.md) QR จ่ายเงินที่ผิดอันตรายกว่าไม่มี QR เลย
+   *
+   * ค่าที่ต้องใส่: อ่านจาก QR บนบิล (ไม่ใช่ตัวเลขใต้บาร์โค้ด)
+   */
+  biller: {
+    mea: trimmedEnv('MEA_BILLER_ID'),
+    mwa: trimmedEnv('MWA_BILLER_ID'),
+  },
+  /** secret สำหรับ sign URL รูป QR (LINE ต้อง fetch ได้จากภายนอก) */
+  qrSignSecret: trimmedEnv('QR_SIGN_SECRET') || trimmedEnv('BETTER_AUTH_SECRET'),
   /** อีเมลที่อนุญาต — lowercase ไว้แล้ว, ว่าง = ไม่กรอง */
   allowedEmails: new Set(
     trimmedEnv('ALLOWED_EMAILS')

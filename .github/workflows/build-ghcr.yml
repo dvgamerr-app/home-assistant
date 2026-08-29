@@ -132,6 +132,10 @@ jobs:
           SOLAR_DEVICE_ID: ${{ vars.SOLAR_DEVICE_ID }}
           MEA_HOUSE_CA: ${{ vars.MEA_HOUSE_CA }}
           MWA_ACCOUNT_CODE: ${{ vars.MWA_ACCOUNT_CODE }}
+          # Biller ID ของ QR จ่ายบิล — ค่าคงที่ของผู้ให้บริการ ตั้งครั้งเดียว
+          # MEA มี default ในโค้ดแล้ว · MWA ต้องตั้งก่อน QR ค่าน้ำจะโผล่
+          MEA_BILLER_ID: ${{ vars.MEA_BILLER_ID }}
+          MWA_BILLER_ID: ${{ vars.MWA_BILLER_ID }}
           ALLOWED_EMAILS: ${{ vars.ALLOWED_EMAILS }}
           APP_PORT: ${{ vars.PORT }}
           SOCKET_PORT: ${{ vars.SOCKET_PORT }}
@@ -152,6 +156,8 @@ jobs:
             -e SOLAR_DEVICE_ID="$SOLAR_DEVICE_ID" \
             -e MEA_HOUSE_CA="$MEA_HOUSE_CA" \
             -e MWA_ACCOUNT_CODE="$MWA_ACCOUNT_CODE" \
+            -e MEA_BILLER_ID="$MEA_BILLER_ID" \
+            -e MWA_BILLER_ID="$MWA_BILLER_ID" \
             -e ALLOWED_EMAILS="$ALLOWED_EMAILS" \
             -p "$APP_PORT":4321 \
             -p "$SOCKET_PORT":3000 \

@@ -1,4 +1,6 @@
 import { createAlertWorker, runAlertChecks } from './alert-worker'
+import { buildMeaBillPayload, buildMwaBillPayload, buildQrImageUrl } from './bill-qr'
+import { config } from './config'
 import { formatThaiDate } from './date'
 import { getBills, getWaterUsage } from './db'
 import { getAlertState, setAlertState } from './alert-state'
@@ -48,6 +50,8 @@ async function checkElectricityBill() {
     return
   }
 
+  const qrPayload = buildMeaBillPayload({ ca: bill.ca, billNo: bill.billNo ?? '', amount: bill.paid })
+
   await sendUtilityBillNotice({
     utility: 'electricity',
     period: electricityBillingPeriod(bill.month),
@@ -55,6 +59,7 @@ async function checkElectricityBill() {
     usage: `${oneDecimal(bill.kwh)} kWh`,
     ...(bill.billDate ? { billDate: formatThaiDate(bill.billDate) } : {}),
     ...(bill.dueDate ? { dueDate: formatThaiDate(bill.dueDate) } : {}),
+    ...(qrPayload ? { qrImageUrl: buildQrImageUrl(qrPayload, config.appBaseUrl) } : {}),
   })
   await setAlertState({ alertKey, status: 'seen', lastValue: identity, notified: true })
 }
@@ -72,6 +77,10 @@ async function checkWaterBill() {
     return
   }
 
+  // เอา account_code จากแถวข้อมูลตรงๆ ไม่พึ่ง env (MWA_ACCOUNT_CODE อาจไม่ได้ตั้ง
+  // และ query ก็ fallback ไปบัญชีแรกอยู่แล้ว — ต้องใช้เลขของบิลใบที่แจ้งจริง)
+  const qrPayload = buildMwaBillPayload({ accountCode: bill.accountCode, billNumber: bill.billNumber, amount: bill.billedAmount })
+
   await sendUtilityBillNotice({
     utility: 'water',
     period: thaiBillingPeriod(bill.year, bill.month),
@@ -79,6 +88,7 @@ async function checkWaterBill() {
     usage: `${oneDecimal(bill.consumption)} m³`,
     ...(bill.billDate ? { billDate: formatThaiDate(bill.billDate) } : {}),
     ...(bill.dueDate ? { dueDate: formatThaiDate(bill.dueDate) } : {}),
+    ...(qrPayload ? { qrImageUrl: buildQrImageUrl(qrPayload, config.appBaseUrl) } : {}),
   })
   await setAlertState({ alertKey, status: 'seen', lastValue: identity, notified: true })
 }

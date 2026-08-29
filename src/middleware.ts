@@ -2,7 +2,9 @@ import { defineMiddleware } from 'astro:middleware'
 import { auth } from '@/lib/auth'
 import { isEmailAllowed } from '@/lib/config'
 
-const PUBLIC = ['/login', '/two-factor', '/no-permission', '/api/auth']
+// `/api/qr` ต้อง public เพราะ LINE fetch รูปในการ์ดเองโดยไม่มี session
+// ป้องกันด้วยลายเซ็น HMAC ใน token แทน (ดู src/lib/bill-qr.ts)
+const PUBLIC = ['/login', '/two-factor', '/no-permission', '/api/auth', '/api/qr']
 
 export const onRequest = defineMiddleware(async ({ request, redirect }, next) => {
   const { pathname } = new URL(request.url)
