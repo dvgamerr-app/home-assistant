@@ -5,6 +5,7 @@ import PiggyBank from '@lucide/svelte/icons/piggy-bank'
 import Gauge from '@lucide/svelte/icons/gauge'
 import StatCard from './StatCard.astro'
 import ChartCard from './ui/ChartCard.astro'
+import ChartYAxis from './ui/ChartYAxis.astro'
 import LegendRow from './ui/LegendRow.astro'
 import { svgStackedBars } from '@/lib/chart'
 import { num, thb } from '@/lib/electricity'
@@ -83,8 +84,7 @@ const MB = 24
 const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
 const ph = py1 - py0
 
-const maxTotal = Math.max(...MONTH_DAYS.map((dayPoint) => dayPoint.selfUse + dayPoint.gridImport), 1)
-const bars = svgStackedBars(
+const { bars, maxTotal } = svgStackedBars(
   MONTH_DAYS.map((dayPoint) => [dayPoint.gridImport, dayPoint.selfUse]),
   px0,
   py0,
@@ -98,6 +98,7 @@ const gridLines = [0.25, 0.5, 0.75, 1].map((fraction) => ({
   label: num(+(fraction * maxTotal).toFixed(1), 1),
   isMax: fraction === 1,
 }))
+const yAxisTicks = gridLines.map((gridLine) => ({ label: gridLine.label, topPct: (gridLine.y / VH) * 100, emphasis: gridLine.isMax }))
 
 const padLeft = +((ML / VW) * 100).toFixed(2)
 const padRight = +((MR / VW) * 100).toFixed(2)
@@ -126,13 +127,14 @@ const segOpacity = [0.35, 0.85]
     </StatCard>
   </div>
 
-  <ChartCard title="ไฟที่ใช้แต่ละวัน จากโซลาร์เทียบกับที่ซื้อ" subtitle={`เดือน${monthLabel} · หน่วยเป็น kWh ต่อวัน`}>
+  <ChartCard title="การใช้ไฟในแต่ละวัน" subtitle={`เดือน${monthLabel} · แบ่งเป็นไฟจากโซลาร์และไฟที่ซื้อ`}>
     {
       availableMonths && availableMonths.length > 0 && (
-        <label slot="header-action" class="relative inline-flex items-center">
+        <label slot="header-action" class="relative flex w-full items-center sm:inline-flex sm:w-auto">
           <select
             onchange="location.href='?m='+this.value"
-            class="min-w-28 cursor-pointer appearance-none rounded border border-border/60 bg-card py-1.5 pl-3 pr-7 text-[10px] uppercase tracking-luxury text-muted-foreground outline-none transition-colors hover:border-foreground/30 hover:text-foreground focus:border-foreground/30 focus:text-foreground"
+            aria-label="เลือกเดือน"
+            class="w-full cursor-pointer appearance-none rounded border border-border/60 bg-card py-2 pl-3 pr-7 text-[10px] uppercase tracking-luxury text-muted-foreground outline-none transition-colors hover:border-foreground/30 hover:text-foreground focus:border-foreground/30 focus:text-foreground sm:min-w-28"
           >
             {availableMonths.map((month) => (
               <option value={month.value} selected={month.value === selectedMonth}>
@@ -158,21 +160,10 @@ const segOpacity = [0.35, 0.85]
     }
 
     <div class="flex items-start gap-1">
-      <div class="relative shrink-0 overflow-visible" style="width:1.75rem;height:280px">
-        {
-          gridLines.map((gridLine) => (
-            <span
-              class:list={['absolute right-0 text-right text-[9px] leading-none', gridLine.isMax ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
-              style={`top:${((gridLine.y / VH) * 100).toFixed(2)}%;transform:translateY(-50%)`}
-            >
-              {gridLine.label}
-            </span>
-          ))
-        }
-      </div>
+      <ChartYAxis ticks={yAxisTicks} class="hidden h-[280px] sm:block" />
 
       <div class="min-w-0 flex-1">
-        <div class="chart-frame">
+        <div class="h-48 overflow-hidden sm:h-[280px]">
           <svg class="daily-chart-svg" viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
             {
               gridLines.map((gridLine) => (
@@ -208,7 +199,13 @@ const segOpacity = [0.35, 0.85]
           </svg>
         </div>
         <div class="mt-1 grid text-[9px] text-muted-foreground" style={`grid-template-columns:repeat(${MONTH_DAYS.length},1fr);padding-left:${padLeft}%;padding-right:${padRight}%`}>
-          {MONTH_DAYS.map((dayPoint) => <span class="truncate text-center">{dayPoint.day}</span>)}
+          {
+            MONTH_DAYS.map((dayPoint, index) => (
+              <span class:list={['truncate text-center', index % 7 === 0 || index === MONTH_DAYS.length - 1 ? 'text-muted-foreground' : 'text-transparent sm:text-muted-foreground']}>
+                {dayPoint.day}
+              </span>
+            ))
+          }
         </div>
       </div>
     </div>
@@ -216,8 +213,8 @@ const segOpacity = [0.35, 0.85]
     <LegendRow
       class="mt-5"
       items={[
-        { label: 'ใช้ไฟจากโซลาร์', color: 'var(--chart-1)' },
-        { label: 'ซื้อจากการไฟฟ้า', color: 'color-mix(in oklch, var(--chart-4) 40%, transparent)' },
+        { label: 'ใช้จากโซลาร์', color: 'var(--chart-1)' },
+        { label: 'ซื้อจากกริด', color: 'color-mix(in oklch, var(--chart-4) 40%, transparent)' },
       ]}
     />
   </ChartCard>
@@ -239,7 +236,7 @@ const segOpacity = [0.35, 0.85]
           <div class="rounded-md border border-border/60 p-4">
             <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">{item.label}</p>
             <p class:list={['mt-2 font-serif text-2xl font-light', item.accent]}>{item.current}</p>
-            <p class="mt-1 text-xs text-muted-foreground">เดือนก่อน {item.previous}</p>
+            <p class="mt-1 hidden text-xs text-muted-foreground sm:block">เดือนก่อน {item.previous}</p>
             <p class="mt-1 text-xs text-muted-foreground">{item.delta === null ? 'ยังไม่มีค่าที่เทียบได้' : `${item.delta > 0 ? '+' : ''}${num(item.delta, 0)}% จากเดือนก่อน`}</p>
           </div>
         ))
@@ -247,7 +244,7 @@ const segOpacity = [0.35, 0.85]
     </div>
   </section>
 
-  <div class="daily-chart-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:140px;transition:opacity 0.1s">
+  <div class="daily-chart-tip mobile-chart-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:140px;transition:opacity 0.1s">
     <p class="tip-day mb-2 text-[10px] uppercase tracking-luxury text-muted-foreground"></p>
     <div class="space-y-1.5">
       <div class="flex items-center justify-between gap-4">

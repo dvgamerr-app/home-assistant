@@ -1,17 +1,17 @@
 import js from '@eslint/js'
+import { defineConfig, globalIgnores } from 'eslint/config'
 import globals from 'globals'
 import ts from 'typescript-eslint'
 import svelte from 'eslint-plugin-svelte'
 import astro from 'eslint-plugin-astro'
 import prettier from 'eslint-config-prettier'
 
-/** @type {import('eslint').Linter.Config[]} */
-export default ts.config(
-  { ignores: ['dist/', '.astro/', 'node_modules/', 'docs/', 'public/'] },
+export default defineConfig(
+  globalIgnores(['dist/', '.astro/', 'node_modules/', 'docs/', 'public/', '.qlty/']),
   js.configs.recommended,
-  ...ts.configs.recommended,
-  ...svelte.configs.recommended,
-  ...astro.configs.recommended,
+  ts.configs.recommended,
+  svelte.configs.recommended,
+  astro.configs.recommended,
   {
     languageOptions: {
       globals: { ...globals.browser, ...globals.node },
@@ -25,5 +25,5 @@ export default ts.config(
   },
   // prettier last: turns off all stylistic rules that conflict with Prettier
   prettier,
-  ...svelte.configs.prettier,
+  svelte.configs.prettier,
 )

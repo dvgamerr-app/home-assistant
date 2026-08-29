@@ -1,7 +1,9 @@
 ---
 import ChartCard from '@/components/ui/ChartCard.astro'
+import ChartYAxis from '@/components/ui/ChartYAxis.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
-import { svgPathFromPoints } from '@/lib/chart'
+import type { BatteryConnectionState } from '@/lib/battery'
+import { clamp01, svgAreaFromPoints, svgPathFromPoints } from '@/lib/chart'
 import { num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
 
@@ -12,9 +14,14 @@ type BatteryPoint = {
   gridImport: number
 }
 
-const { fiveMin: points, dayFlow } = Astro.props as Pick<SolarData, 'fiveMin' | 'dayFlow'>
+interface Props extends Pick<SolarData, 'fiveMin' | 'dayFlow'> {
+  currentBatteryConnection?: BatteryConnectionState | null
+}
 
-const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
+const { fiveMin: points, dayFlow, currentBatteryConnection = null } = Astro.props
+const batteryReadingReliable = currentBatteryConnection === null || currentBatteryConnection === 'connected'
+const batteryReadingMessage = currentBatteryConnection === 'disconnected' ? 'แบตเตอรี่ไม่ได้เชื่อมต่อ ค่า SOC ที่อินเวอร์เตอร์รายงานอาจเป็นค่าค้าง' : 'ข้อมูลสถานะแบตเตอรี่ไม่เป็นปัจจุบัน'
+
 const fmtMinute = (minuteOfDay: number) => `${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')}`
 
 const rawBatteryPoints: BatteryPoint[] = points.map((point) => ({
@@ -64,7 +71,7 @@ const socLinePoints = chartPoints.map((point) => ({
   y: yForNormalized(point.soc / 100),
 }))
 const socPath = svgPathFromPoints(socLinePoints)
-const socArea = `${socPath} L ${socLinePoints.at(-1)?.x.toFixed(1)},${py1} L ${socLinePoints[0]?.x.toFixed(1)},${py1} Z`
+const socArea = svgAreaFromPoints(socLinePoints, py1)
 
 const battAbsMax = Math.max(...windowPoints.map((point) => Math.abs(point.batt)), ...windowPoints.map((point) => point.gridImport), 0.5)
 const scaleMin = -battAbsMax
@@ -86,6 +93,7 @@ const zeroY = yForNormalized(normPower(0))
 const powerTicks = [battAbsMax, battAbsMax * 0.5, 0, -battAbsMax * 0.5, -battAbsMax]
 const powerTickLabels = powerTicks.map((tick) => (tick < 0 ? '−' : '') + num(Math.abs(tick), 1))
 const powerGridYs = powerTicks.map((tick) => yForNormalized(normPower(tick)))
+const powerAxisTicks = powerGridYs.map((tickY, index) => ({ label: powerTickLabels[index]!, topPct: (tickY / VH) * 100, emphasis: powerTicks[index] === 0 }))
 
 const chargeMinutes = windowPoints.reduce((total, point, index, source) => {
   const next = source[index + 1]
@@ -96,50 +104,47 @@ const activeWindowLabel = `${fmtMinute(startMinute)}–${fmtMinute(endMinute)}`
 const maxGridImportKw = Math.max(...windowPoints.map((point) => point.gridImport), 0)
 const socTicks = [100, 50, 0]
 const socGridYs = socTicks.map((tick) => yForNormalized(tick / 100))
+const socAxisTicks = socGridYs.map((tickY, index) => ({ label: `${socTicks[index]}%`, topPct: (tickY / VH) * 100 }))
 const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
 ---
 
-<ChartCard eyebrow="แบตเตอรี่" title="พฤติกรรมการชาร์จและการจ่ายไฟ" subtitle="ดูระดับแบตเตอรี่ควบคู่กับจังหวะที่แบตตอบสนองโหลดของบ้าน โดยแสดงเฉพาะช่วงที่ค่ามีการเปลี่ยนแปลง">
-  <div class="grid gap-4 border-b border-border/60 pb-5 md:grid-cols-4">
+<ChartCard eyebrow="แบตเตอรี่" title="ระดับแบตเตอรี่วันนี้" subtitle="ดูระดับคงเหลือและพฤติกรรมการชาร์จตลอดวัน">
+  <div class="grid gap-4 border-b border-border/60 pb-4 sm:grid-cols-2 sm:pb-5 md:grid-cols-4">
     <div class="space-y-1">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">SOC ล่าสุด</p>
-      <p class="font-serif text-4xl font-light leading-none text-foreground">{num(points.at(-1)?.soc ?? 0, 0)}<span class="ml-1 text-base text-muted-foreground">%</span></p>
+      <p class="font-serif text-4xl font-light leading-none text-foreground">
+        {batteryReadingReliable ? num(points.at(-1)?.soc ?? 0, 0) : '—'}{batteryReadingReliable && <span class="ml-1 text-base text-muted-foreground">%</span>}
+      </p>
     </div>
-    <div class="space-y-1">
+    <div class="hidden space-y-1 sm:block">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">จ่ายออกสูงสุด</p>
       <p class="font-serif text-2xl font-light leading-none text-foreground" style="color:var(--chart-1)">
         {num(dayFlow.peakBatteryDischargeKw, 2)}<span class="ml-1 text-base text-muted-foreground">kW</span>
       </p>
     </div>
-    <div class="space-y-1">
+    <div class="hidden space-y-1 sm:block">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ซื้อไฟสูงสุด</p>
       <p class="font-serif text-2xl font-light leading-none text-foreground" style="color:var(--chart-4)">{num(maxGridImportKw, 2)}<span class="ml-1 text-base text-muted-foreground">kW</span></p>
     </div>
-    <div class="space-y-1 md:text-right">
+    <div class="hidden space-y-1 sm:block md:text-right">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ช่วงที่แสดง</p>
       <p class="font-serif text-xl font-light leading-none text-foreground">{activeWindowLabel}</p>
       <p class="text-sm text-muted-foreground">ชาร์จอยู่ประมาณ {num(chargeMinutes / 60, 1)} ชม.</p>
     </div>
   </div>
 
-  <div class="mt-5 grid gap-5 lg:grid-cols-2">
+  {!batteryReadingReliable && <p class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{batteryReadingMessage}</p>}
+
+  <div class="mt-4 grid gap-5 sm:mt-5 lg:grid-cols-2">
     <div>
       <div class="mb-2 flex items-center justify-between text-[10px] uppercase tracking-luxury text-muted-foreground">
         <span>ระดับแบตเตอรี่</span>
-        <span>100% / 50% / 0%</span>
+        <span class="hidden sm:inline">100% / 50% / 0%</span>
       </div>
       <div class="flex items-start gap-1">
-        <div class="relative h-44 shrink-0 overflow-visible" style="width:1.75rem">
-          {
-            socGridYs.map((tickY, index) => (
-              <span class="absolute right-0 text-right text-[9px] leading-none text-muted-foreground" style={`top:${((tickY / VH) * 100).toFixed(2)}%;transform:translateY(-50%)`}>
-                {socTicks[index]}%
-              </span>
-            ))
-          }
-        </div>
+        <ChartYAxis ticks={socAxisTicks} class="hidden h-44 sm:block" />
         <div class="min-w-0 flex-1">
-          <div class="h-44 w-full">
+          <div class="h-40 w-full sm:h-44">
             <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
               <defs>
                 <linearGradient id="battery-soc-grad" x1="0" y1="0" x2="0" y2="1">
@@ -153,8 +158,8 @@ const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
                 ))
               }
               <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
-              <path d={socArea} fill="url(#battery-soc-grad)"></path>
-              <path d={socPath} fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap={'round' as const} stroke-linejoin={'round' as const}></path>
+              {batteryReadingReliable && <path d={socArea} fill="url(#battery-soc-grad)" />}
+              {batteryReadingReliable && <path d={socPath} fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap={'round' as const} stroke-linejoin={'round' as const} />}
             </svg>
           </div>
         </div>
@@ -164,24 +169,13 @@ const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
       </div>
     </div>
 
-    <div>
+    <div class="hidden sm:block">
       <div class="mb-2 flex items-center justify-between text-[10px] uppercase tracking-luxury text-muted-foreground">
         <span>แบตเตอรี่เทียบกับการซื้อไฟ</span>
         <span>+ จ่ายออก / − ชาร์จ</span>
       </div>
       <div class="flex items-start gap-1">
-        <div class="relative h-44 shrink-0 overflow-visible" style="width:1.75rem">
-          {
-            powerGridYs.map((tickY, index) => (
-              <span
-                class:list={['absolute right-0 text-right text-[9px] leading-none', powerTicks[index] === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
-                style={`top:${((tickY / VH) * 100).toFixed(2)}%;transform:translateY(-50%)`}
-              >
-                {powerTickLabels[index]}
-              </span>
-            ))
-          }
-        </div>
+        <ChartYAxis ticks={powerAxisTicks} class="h-44" />
         <div class="min-w-0 flex-1">
           <div class="h-44 w-full">
             <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">

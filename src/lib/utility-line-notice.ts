@@ -1,3 +1,4 @@
+import { detailRow, FLEX_COLORS, NO_SEPARATOR_STYLES, sentAtText, truncate } from './line-flex'
 import { sendLineMessages } from './line-transport'
 
 const UTILITY_THEMES = {
@@ -5,11 +6,13 @@ const UTILITY_THEMES = {
     displayName: 'ค่าไฟ',
     title: 'ค่าไฟฟ้า',
     avatarUrl: 'https://home.ourkk.com/mea.png',
+    usageLabel: 'พลังงานที่ใช้',
   },
   water: {
     displayName: 'ค่าน้ำ',
     title: 'ค่าน้ำประปา',
     avatarUrl: 'https://home.ourkk.com/mwa.png',
+    usageLabel: 'ปริมาณน้ำที่ใช้',
   },
 } as const
 
@@ -20,25 +23,15 @@ export type UtilityBillNotice = {
   usage: string
   billDate?: string
   dueDate?: string
+  /** URL รูป QR จ่ายบิล — ไม่ใส่ = ไม่แสดงส่วน QR */
+  qrImageUrl?: string
 }
-
-const truncate = (value: string, max: number) => (value.length > max ? `${value.slice(0, Math.max(0, max - 1))}…` : value)
-
-const formatSentAt = (sentAt: Date) =>
-  new Intl.DateTimeFormat('th-TH', {
-    timeZone: 'Asia/Bangkok',
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(sentAt)
 
 export function buildUtilityBillFlexMessage(notice: UtilityBillNotice, sentAt = new Date()) {
   const theme = UTILITY_THEMES[notice.utility]
   const details = [
     { label: 'รอบบิล', value: notice.period },
-    { label: notice.utility === 'electricity' ? 'พลังงานที่ใช้' : 'ปริมาณน้ำที่ใช้', value: notice.usage },
+    { label: theme.usageLabel, value: notice.usage },
     ...(notice.billDate ? [{ label: 'วันที่ออกบิล', value: notice.billDate }] : []),
     ...(notice.dueDate ? [{ label: 'กำหนดชำระ', value: notice.dueDate }] : []),
   ]
@@ -57,13 +50,13 @@ export function buildUtilityBillFlexMessage(notice: UtilityBillNotice, sentAt = 
         type: 'box',
         layout: 'vertical',
         paddingAll: '20px',
-        backgroundColor: '#FFFEFB',
+        backgroundColor: FLEX_COLORS.card,
         contents: [
           {
             type: 'text',
             text: 'ยอดชำระ',
             size: 'xs',
-            color: '#8C8379',
+            color: FLEX_COLORS.muted,
           },
           {
             type: 'box',
@@ -75,7 +68,7 @@ export function buildUtilityBillFlexMessage(notice: UtilityBillNotice, sentAt = 
                 text: notice.amount,
                 size: '3xl',
                 weight: 'bold',
-                color: '#2F2B27',
+                color: FLEX_COLORS.foreground,
                 flex: 0,
               },
               {
@@ -83,7 +76,7 @@ export function buildUtilityBillFlexMessage(notice: UtilityBillNotice, sentAt = 
                 text: 'บาท',
                 margin: 'sm',
                 size: 'sm',
-                color: '#5E5851',
+                color: FLEX_COLORS.subtle,
                 flex: 0,
               },
             ],
@@ -91,32 +84,35 @@ export function buildUtilityBillFlexMessage(notice: UtilityBillNotice, sentAt = 
           {
             type: 'separator',
             margin: 'xl',
-            color: '#E8E0D4',
+            color: FLEX_COLORS.rule,
           },
-          ...details.map((detail, index) => ({
-            type: 'box',
-            layout: 'horizontal',
-            margin: index === 0 ? 'lg' : 'md',
-            contents: [
-              {
-                type: 'text',
-                text: detail.label,
-                size: 'xs',
-                color: '#8C8379',
-                flex: 4,
-              },
-              {
-                type: 'text',
-                text: detail.value,
-                size: 'sm',
-                color: '#2F2B27',
-                weight: 'bold',
-                align: 'end',
-                flex: 6,
-                wrap: true,
-              },
-            ],
-          })),
+          ...details.map((detail, index) => detailRow(detail.label, detail.value, { margin: index === 0 ? 'lg' : 'md', valueSize: 'sm' })),
+          // QR จ่ายบิลข้ามธนาคาร — สแกนจากแอปธนาคารไทยได้เลย
+          ...(notice.qrImageUrl
+            ? [
+                {
+                  type: 'separator',
+                  margin: 'xl',
+                  color: FLEX_COLORS.rule,
+                },
+                {
+                  type: 'text',
+                  text: 'สแกนจ่ายผ่านแอปธนาคาร',
+                  margin: 'lg',
+                  size: 'xs',
+                  color: FLEX_COLORS.muted,
+                  align: 'center',
+                },
+                {
+                  type: 'image',
+                  url: notice.qrImageUrl,
+                  margin: 'md',
+                  size: 'full',
+                  aspectRatio: '1:1',
+                  aspectMode: 'fit',
+                },
+              ]
+            : []),
         ],
       },
       footer: {
@@ -124,27 +120,12 @@ export function buildUtilityBillFlexMessage(notice: UtilityBillNotice, sentAt = 
         layout: 'vertical',
         paddingAll: '20px',
         paddingTop: '10px',
-        backgroundColor: '#FFFEFB',
-        contents: [
-          {
-            type: 'text',
-            text: `อัปเดต ${formatSentAt(sentAt)}`,
-            size: 'xxs',
-            color: '#9A9187',
-            align: 'end',
-          },
-        ],
+        backgroundColor: FLEX_COLORS.card,
+        contents: [sentAtText(sentAt)],
       },
-      styles: {
-        body: { separator: false },
-        footer: { separator: false },
-      },
+      styles: NO_SEPARATOR_STYLES,
     },
   }
-}
-
-export function buildUtilityBillNoticeRequest(notice: UtilityBillNotice, sentAt = new Date()) {
-  return { messages: [buildUtilityBillFlexMessage(notice, sentAt)] }
 }
 
 export async function sendUtilityBillNotice(notice: UtilityBillNotice) {

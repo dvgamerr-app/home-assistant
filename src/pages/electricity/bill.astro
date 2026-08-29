@@ -2,6 +2,7 @@
 import Layout from '@/layouts/Layout.astro'
 import Nav from '@/components/Nav.astro'
 import ElectricityNav from '@/components/ElectricityNav.astro'
+import PageHeader from '@/components/ui/PageHeader.astro'
 import StatCard from '@/components/StatCard.astro'
 import Plug from '@lucide/svelte/icons/plug'
 import PiggyBank from '@lucide/svelte/icons/piggy-bank'
@@ -12,13 +13,14 @@ import Landmark from '@lucide/svelte/icons/landmark'
 import CalendarRange from '@lucide/svelte/icons/calendar-range'
 import Target from '@lucide/svelte/icons/target'
 import { getBillPageData } from '@/lib/solar-data'
-import { MONTH_SHORT_TH, num, thb } from '@/lib/electricity'
+import { formatBillMonth, num, thb } from '@/lib/electricity'
+import { classifyMeaPayment } from '@/lib/payment-status'
 import { formatThaiDate } from '@/lib/date'
 
 const data = await getBillPageData()
 
 const billRows = data.bills.map((bill) => ({
-  month: `${MONTH_SHORT_TH[parseInt(bill.month.slice(4)) - 1] ?? bill.month} ${parseInt(bill.month.slice(0, 4)) + 543}`,
+  month: formatBillMonth(bill.month),
   kwh: bill.kwh,
   billAmount: bill.paid,
   withoutSolar: bill.withoutSolar,
@@ -42,44 +44,27 @@ for (const bill of billRows) {
   else paymentGroups.set(bill.paymentKey, { count: 1, primaryMonth: bill.month })
 }
 
+/** ป้าย/โทนสีมาจาก `classifyMeaPayment` ส่วน `detail` เป็นบริบทเฉพาะหน้านี้ */
 function paymentState(bill: BillRow) {
-  const status = bill.paymentStatus?.trim().toLowerCase() ?? ''
+  const state = classifyMeaPayment(bill)
+  const outstanding = bill.outstandingAmount !== null ? `คงเหลือ ${thb(bill.outstandingAmount, 2)}` : ''
 
-  if (status === 'paid') {
-    const group = bill.paymentKey ? paymentGroups.get(bill.paymentKey) : undefined
-    const parts = [bill.paidAt ? `ชำระ ${formatThaiDate(bill.paidAt)}` : '', bill.paymentChannel ?? '', group && group.count > 1 ? `รวม ${group.count} บิล` : ''].filter(Boolean)
-    return { label: 'ชำระแล้ว', tone: 'text-chart-1', detail: parts.join(' · '), needsReview: false }
-  }
-
-  if (status === 'partial' || status === 'partially_paid' || ((bill.paymentAmount ?? 0) > 0 && (bill.outstandingAmount ?? 0) > 0)) {
-    return {
-      label: 'ชำระบางส่วน',
-      tone: 'text-chart-2',
-      detail: bill.outstandingAmount !== null ? `คงเหลือ ${thb(bill.outstandingAmount, 2)}` : '',
-      needsReview: true,
+  switch (state.kind) {
+    case 'paid': {
+      const group = bill.paymentKey ? paymentGroups.get(bill.paymentKey) : undefined
+      const parts = [bill.paidAt ? `ชำระ ${formatThaiDate(bill.paidAt)}` : '', bill.paymentChannel ?? '', group && group.count > 1 ? `รวม ${group.count} บิล` : ''].filter(Boolean)
+      return { ...state, detail: parts.join(' · ') }
     }
+    case 'partial':
+    case 'overdue':
+      return { ...state, detail: outstanding }
+    case 'pending':
+      return { ...state, detail: bill.dueDate ? `ครบกำหนด ${formatThaiDate(bill.dueDate)}` : '' }
+    case 'unmapped':
+      return { ...state, detail: 'สถานะใหม่ที่ยังไม่ได้กำหนดคำแปล' }
+    default:
+      return { ...state, detail: 'รอตรวจสอบกับประวัติการชำระ MEA' }
   }
-
-  if (status === 'overdue' || status === 'late') {
-    return {
-      label: 'เกินกำหนด',
-      tone: 'text-chart-4',
-      detail: bill.outstandingAmount !== null ? `คงเหลือ ${thb(bill.outstandingAmount, 2)}` : '',
-      needsReview: true,
-    }
-  }
-
-  if (status === 'pending' || status === 'unpaid' || status === 'outstanding') {
-    return {
-      label: 'รอชำระ',
-      tone: 'text-chart-4',
-      detail: bill.dueDate ? `ครบกำหนด ${formatThaiDate(bill.dueDate)}` : '',
-      needsReview: true,
-    }
-  }
-
-  if (status) return { label: bill.paymentStatus ?? status, tone: 'text-muted-foreground', detail: 'สถานะใหม่ที่ยังไม่ได้กำหนดคำแปล', needsReview: true }
-  return { label: 'ยังไม่พบหลักฐานชำระ', tone: 'text-chart-2', detail: 'รอตรวจสอบกับประวัติการชำระ MEA', needsReview: true }
 }
 
 const totalSaved = billRows.reduce((sum: number, row: (typeof billRows)[0]) => sum + row.saved, 0)
@@ -97,10 +82,7 @@ const latestVsPrevious = previousBill
 <Layout title="การจ่ายค่าไฟ — บ้าน">
   <Nav />
   <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
-    <header class="space-y-3">
-      <p class="text-[11px] uppercase tracking-luxury text-muted-foreground">ระบบไฟฟ้า</p>
-      <h1 class="font-serif text-4xl font-light leading-tight text-foreground md:text-5xl">ข้อมูลพลังงาน</h1>
-    </header>
+    <PageHeader eyebrow="ระบบไฟฟ้า" title="ข้อมูลพลังงาน" />
 
     <ElectricityNav active="bill" />
 

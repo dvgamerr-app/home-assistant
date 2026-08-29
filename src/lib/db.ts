@@ -11,30 +11,46 @@ const CO2_KG_PER_KWH = 0.4999 // Thailand grid emission factor
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export type SolarAlarm = {
+  key: string
+  level: number | null
+  name: string | null
+  description: string | null
+  firedAt: string
+  firedValue: string | null
+}
+
 export type LiveSnapshot = {
   pvPowerKw: number
   loadPowerKw: number
   batteryPowerKw: number // negative = charging
   batterySoc: number
-  batterySoh: number
-  gridPowerKw: number // negative = export to grid
+  batterySoh: number | null
+  gridPowerKw: number // negative = importing (buying from grid)
   batteryVoltage: number
   batteryCurrent: number
   cyclePeriod: number
   pv1: { power: number; voltage: number; current: number }
   pv2: { power: number; voltage: number; current: number }
   gridVoltage: number
+  gridFrequencyHz: number | null
   totalGenerationTime: number
   powerRating: number // kW rated capacity from inverter
   offGridPowerKw: number
   isOnline: boolean
   lastUpdate: string
+  batteryStatus: string | null
+  firmwareVersion: string | null
+  serialNumber: string | null
+  activeAlarms: SolarAlarm[]
 }
 
 export type TodayData = {
-  generated: number // kWh today (delta of totalPowerGeneration)
+  generated: number // kWh today from category_monthly station summary
   consumed: number // kWh today (loadDayElectricityConsumption max)
   gridImport: number // kWh today (dayPurchaseElectricityConsumption max)
+  hasGenerationData: boolean
+  hasUsageData: boolean
 }
 
 export type DailyTotal = {
@@ -42,6 +58,8 @@ export type DailyTotal = {
   generated: number
   consumed: number
   gridImport: number
+  hasGenerationData: boolean
+  hasUsageData: boolean
 }
 
 export type HourlyPoint = {
@@ -58,6 +76,8 @@ export type DayPoint = {
   generated: number // kWh
   consumed: number // kWh
   gridImport: number // kWh
+  hasGenerationData: boolean
+  hasUsageData: boolean
 }
 
 export type MonthPoint = {
@@ -65,6 +85,8 @@ export type MonthPoint = {
   generated: number
   consumed: number
   gridImport: number
+  hasGenerationData: boolean
+  hasUsageData: boolean
 }
 
 export type LifetimeData = {
@@ -72,9 +94,12 @@ export type LifetimeData = {
   gridImport: number // kWh total
   generationTime: number // raw unit from inverter
   co2ReductionKg: number
+  hasGenerationData: boolean
 }
 
 export type Bill = {
+  /** เลข CA ของมิเตอร์ — ใช้ประกอบ Ref1 ของ QR จ่ายบิล */
+  ca: string
   month: string // YYYYMM
   billNo: string | null
   billDate: Date | null
@@ -97,6 +122,8 @@ export type Bill = {
 }
 
 export type WaterUsage = {
+  /** เลขบัญชีผู้ใช้น้ำ — ใช้ประกอบ Ref1 ของ QR จ่ายบิล */
+  accountCode: string
   billNumber: string
   year: number
   month: number
@@ -119,7 +146,6 @@ export type PvMorningEnergy = {
 }
 
 export type PvMorningBaseline = PvMorningEnergy & {
-  days: number
   month: string
 }
 
@@ -147,51 +173,115 @@ function monthBounds(year: number, month: number) {
 
 /** ค่า snapshot ล่าสุดต่อ attr ทุกตัว → pivot เป็น object เดียว */
 export async function getLiveSnapshot(): Promise<LiveSnapshot> {
-  const rows = await sql<{ attr: string; value: string; recorded_at: Date }[]>`
-    WITH attrs(attr) AS (
-      VALUES
-        ('generationPower'),
-        ('totalLoadPower'),
-        ('batteryPower'),
-        ('batterySOC'),
-        ('batterySOH'),
-        ('aPhaseFeederPower'),
-        ('batteryVoltage'),
-        ('batteryCurrent'),
-        ('cyclePeriod'),
-        ('pv1Power'),
-        ('pv1Voltage'),
-        ('pv1Current'),
-        ('pv2Power'),
-        ('pv2Voltage'),
-        ('pv2Current'),
-        ('gridVoltage'),
-        ('totalGenerationTime'),
-        ('powerRating'),
-        ('offGridPortTotalPower')
-    )
-    SELECT attrs.attr, latest.value, latest.recorded_at
-    FROM attrs
-    CROSS JOIN LATERAL (
-      SELECT value, recorded_at
-      FROM stash.solar_record
+  const [rows, textRows, statusRows, deviceRows, alarmRows] = await Promise.all([
+    sql<{ attr: string; value: string | null; recorded_at: Date }[]>`
+      WITH attrs(attr) AS (
+        VALUES
+          ('generationPower'),
+          ('totalLoadPower'),
+          ('batteryPower'),
+          ('batterySOC'),
+          ('batterySOH'),
+          ('aPhaseFeederPower'),
+          ('batteryVoltage'),
+          ('batteryCurrent'),
+          ('cyclePeriod'),
+          ('pv1Power'),
+          ('pv1Voltage'),
+          ('pv1Current'),
+          ('pv2Power'),
+          ('pv2Voltage'),
+          ('pv2Current'),
+          ('gridVoltage'),
+          ('aPhaseGridFrequency'),
+          ('totalGenerationTime'),
+          ('powerRating'),
+          ('offGridPortTotalPower')
+      )
+      SELECT attrs.attr, latest.value, latest.recorded_at
+      FROM attrs
+      CROSS JOIN LATERAL (
+        SELECT value, recorded_at
+        FROM stash.solar_record
+        WHERE device_id = ${DEVICE}
+          AND attr = attrs.attr
+        ORDER BY recorded_at DESC
+        LIMIT 1
+      ) latest
+    `,
+    sql<{ attr: string; display_value: string | null }[]>`
+      WITH attrs(attr) AS (VALUES ('firmwareVersion'), ('productSerialNumber'))
+      SELECT attrs.attr, latest.display_value
+      FROM attrs
+      CROSS JOIN LATERAL (
+        SELECT COALESCE(value_display, value_text, value::text) AS display_value
+        FROM stash.solar_record
+        WHERE device_id = ${DEVICE} AND attr = attrs.attr
+        ORDER BY recorded_at DESC
+        LIMIT 1
+      ) latest
+    `,
+    sql<{ display_value: string | null }[]>`
+      WITH newest AS (
+        SELECT MAX(recorded_at) AS recorded_at
+        FROM stash.solar_record
+        WHERE device_id = ${DEVICE} AND attr = 'batteryStatus'
+      )
+      SELECT COALESCE(value_display, value_text, value::text) AS display_value
+      FROM stash.solar_record, newest
       WHERE device_id = ${DEVICE}
-        AND attr = attrs.attr
-      ORDER BY recorded_at DESC
+        AND attr = 'batteryStatus'
+        AND stash.solar_record.recorded_at >= newest.recorded_at - INTERVAL '1 minute'
+      ORDER BY
+        (source IN ('latest_state', 'energy_flow_state', 'record_list')) DESC,
+        stash.solar_record.recorded_at DESC
       LIMIT 1
-    ) latest
-  `
-  const m = Object.fromEntries(rows.map((r) => [r.attr, n(r.value)]))
-  const lastUpdate = rows.reduce<Date | null>((latest, row) => (!latest || row.recorded_at > latest ? row.recorded_at : latest), null)
-  // online = ข้อมูลล่าสุดไม่เกิน 15 นาที
-  const isOnline = lastUpdate !== null && Date.now() - lastUpdate.getTime() < 15 * 60 * 1000
+    `,
+    sql<
+      {
+        serial_number: string | null
+        software_version: string | null
+        is_online: boolean | null
+        last_data_at: Date | null
+      }[]
+    >`
+      SELECT serial_number, software_version, is_online, last_data_at
+      FROM stash.solar_device_snapshot
+      WHERE device_id = ${DEVICE}
+      ORDER BY observed_at DESC
+      LIMIT 1
+    `,
+    sql<
+      {
+        alarm_key: string
+        level: number | null
+        name: string | null
+        description: string | null
+        fired_at: Date
+        fired_value: string | null
+      }[]
+    >`
+      SELECT alarm_key, level, name, description, fired_at, fired_value
+      FROM stash.solar_alarm
+      WHERE device_id = ${DEVICE} AND cleared_at IS NULL
+      ORDER BY fired_at DESC
+      LIMIT 5
+    `,
+  ])
+  const m = Object.fromEntries(rows.flatMap((row) => (row.value === null ? [] : [[row.attr, Number(row.value)]])))
+  const text = Object.fromEntries(textRows.map((row) => [row.attr, row.display_value]))
+  const latestTelemetryAt = rows.reduce<Date | null>((latest, row) => (!latest || row.recorded_at > latest ? row.recorded_at : latest), null)
+  const device = deviceRows[0]
+  const lastUpdate = device?.last_data_at ?? latestTelemetryAt
+  const isFresh = lastUpdate !== null && Date.now() - lastUpdate.getTime() < 15 * 60 * 1000
+  const isOnline = isFresh && device?.is_online !== false
 
   return {
     pvPowerKw: m.generationPower ?? 0,
     loadPowerKw: m.totalLoadPower ?? 0,
     batteryPowerKw: m.batteryPower ?? 0,
     batterySoc: m.batterySOC ?? 0,
-    batterySoh: m.batterySOH ?? 100,
+    batterySoh: m.batterySOH ?? null,
     gridPowerKw: m.aPhaseFeederPower ?? 0,
     batteryVoltage: m.batteryVoltage ?? 0,
     batteryCurrent: m.batteryCurrent ?? 0,
@@ -199,11 +289,23 @@ export async function getLiveSnapshot(): Promise<LiveSnapshot> {
     pv1: { power: m.pv1Power ?? 0, voltage: m.pv1Voltage ?? 0, current: m.pv1Current ?? 0 },
     pv2: { power: m.pv2Power ?? 0, voltage: m.pv2Voltage ?? 0, current: m.pv2Current ?? 0 },
     gridVoltage: m.gridVoltage ?? 0,
+    gridFrequencyHz: m.aPhaseGridFrequency ?? null,
     totalGenerationTime: m.totalGenerationTime ?? 0,
     powerRating: m.powerRating ?? 0,
     offGridPowerKw: m.offGridPortTotalPower ?? 0,
     isOnline,
     lastUpdate: (lastUpdate ?? new Date(0)).toISOString(),
+    batteryStatus: statusRows[0]?.display_value ?? null,
+    firmwareVersion: text.firmwareVersion ?? device?.software_version ?? null,
+    serialNumber: text.productSerialNumber ?? device?.serial_number ?? null,
+    activeAlarms: alarmRows.map((alarm) => ({
+      key: alarm.alarm_key,
+      level: alarm.level,
+      name: alarm.name,
+      description: alarm.description,
+      firedAt: alarm.fired_at.toISOString(),
+      firedValue: alarm.fired_value,
+    })),
   }
 }
 
@@ -213,19 +315,30 @@ export async function getToday(date?: Date): Promise<TodayData> {
   const dayStr = toDayString(d)
   const nextDayStr = shiftDayString(dayStr, 1)
 
-  const [row] = await sql<{ generated: string; consumed: string; grid_import: string }[]>`
+  const [row] = await sql<{ generated: string | null; consumed: string | null; grid_import: string | null }[]>`
     SELECT
-      GREATEST(
-        COALESCE(MAX(value) FILTER (WHERE attr = 'totalPowerGeneration'), 0) -
-        COALESCE(MIN(value) FILTER (WHERE attr = 'totalPowerGeneration'), 0),
-        0
+      (
+        SELECT value
+        FROM stash.solar_station_summary
+        WHERE station_id = (
+            SELECT station_id
+            FROM stash.solar_device_snapshot
+            WHERE device_id = ${DEVICE}
+            ORDER BY observed_at DESC
+            LIMIT 1
+          )
+          AND source = 'category_monthly'
+          AND category_key = 'pvInverterElectricityQuantityClass'
+          AND attr = 'pvGeneratedEnergy'
+          AND time_key = ${dayStr}
+          AND is_real_value IS NOT FALSE
+        LIMIT 1
       ) AS generated,
-      COALESCE(MAX(value) FILTER (WHERE attr = 'loadDayElectricityConsumption'), 0) AS consumed,
-      COALESCE(MAX(value) FILTER (WHERE attr = 'dayPurchaseElectricityConsumption'), 0) AS grid_import
+      MAX(value) FILTER (WHERE attr = 'loadDayElectricityConsumption') AS consumed,
+      MAX(value) FILTER (WHERE attr = 'dayPurchaseElectricityConsumption') AS grid_import
     FROM stash.solar_record
     WHERE device_id = ${DEVICE}
-      AND attr IN ('loadDayElectricityConsumption', 'dayPurchaseElectricityConsumption',
-                   'totalPowerGeneration')
+      AND attr IN ('loadDayElectricityConsumption', 'dayPurchaseElectricityConsumption')
       AND recorded_at >= (${dayStr} || ' 00:00 ' || ${TZ})::timestamptz
       AND recorded_at < (${nextDayStr} || ' 00:00 ' || ${TZ})::timestamptz
   `
@@ -234,6 +347,8 @@ export async function getToday(date?: Date): Promise<TodayData> {
     generated: n(row?.generated),
     consumed: n(row?.consumed),
     gridImport: n(row?.grid_import),
+    hasGenerationData: row?.generated != null,
+    hasUsageData: row?.consumed != null || row?.grid_import != null,
   }
 }
 
@@ -332,28 +447,51 @@ export async function getPvPeak(): Promise<{ pv1: number; pv2: number }> {
 export async function getMonthDays(year: number, month: number): Promise<DayPoint[]> {
   const { start, end } = monthBounds(year, month)
 
-  const rows = await sql<{ day: string; generated: string; consumed: string; grid_import: string }[]>`
-    WITH daily AS (
+  const rows = await sql<{ day: string; generated: string | null; consumed: string | null; grid_import: string | null }[]>`
+    WITH production AS (
+      SELECT time_key::date AS day, value AS generated
+      FROM stash.solar_station_summary
+      WHERE station_id = (
+          SELECT station_id
+          FROM stash.solar_device_snapshot
+          WHERE device_id = ${DEVICE}
+          ORDER BY observed_at DESC
+          LIMIT 1
+        )
+        AND source = 'category_monthly'
+        AND category_key = 'pvInverterElectricityQuantityClass'
+        AND attr = 'pvGeneratedEnergy'
+        AND time_key >= ${start}
+        AND time_key < ${end}
+        AND is_real_value IS NOT FALSE
+    ),
+    telemetry AS (
       SELECT
         (recorded_at AT TIME ZONE ${TZ})::date as day,
         attr,
-        MIN(value) as v_min,
         MAX(value) as v_max
       FROM stash.solar_record
       WHERE device_id = ${DEVICE}
-        AND attr IN ('totalPowerGeneration', 'loadDayElectricityConsumption',
-                     'dayPurchaseElectricityConsumption')
+        AND attr IN ('loadDayElectricityConsumption', 'dayPurchaseElectricityConsumption')
         AND recorded_at >= (${start} || ' 00:00 ' || ${TZ})::timestamptz
         AND recorded_at < (${end} || ' 00:00 ' || ${TZ})::timestamptz
       GROUP BY day, attr
+    ),
+    usage AS (
+      SELECT
+        day,
+        MAX(v_max) FILTER (WHERE attr = 'loadDayElectricityConsumption') AS consumed,
+        MAX(v_max) FILTER (WHERE attr = 'dayPurchaseElectricityConsumption') AS grid_import
+      FROM telemetry
+      GROUP BY day
     )
     SELECT
-      day::text,
-      MAX(CASE WHEN attr = 'totalPowerGeneration' THEN GREATEST(v_max - v_min, 0) END) as generated,
-      MAX(CASE WHEN attr = 'loadDayElectricityConsumption' THEN v_max END) as consumed,
-      MAX(CASE WHEN attr = 'dayPurchaseElectricityConsumption' THEN v_max END) as grid_import
-    FROM daily
-    GROUP BY day
+      COALESCE(production.day, usage.day)::text AS day,
+      production.generated,
+      usage.consumed,
+      usage.grid_import
+    FROM production
+    FULL OUTER JOIN usage ON usage.day = production.day
     ORDER BY day
   `
   return rows.map((r) => ({
@@ -361,6 +499,8 @@ export async function getMonthDays(year: number, month: number): Promise<DayPoin
     generated: n(r.generated),
     consumed: n(r.consumed),
     gridImport: n(r.grid_import),
+    hasGenerationData: r.generated != null,
+    hasUsageData: r.consumed != null || r.grid_import != null,
   }))
 }
 
@@ -372,28 +512,51 @@ export async function getRecentDailyTotals(endDate: Date, days = 8): Promise<Dai
   const endStr = toDayString(end)
   const endExclusiveStr = shiftDayString(endStr, 1)
 
-  const rows = await sql<{ day: string; generated: string; consumed: string; grid_import: string }[]>`
-    WITH daily AS (
+  const rows = await sql<{ day: string; generated: string | null; consumed: string | null; grid_import: string | null }[]>`
+    WITH production AS (
+      SELECT time_key::date AS day, value AS generated
+      FROM stash.solar_station_summary
+      WHERE station_id = (
+          SELECT station_id
+          FROM stash.solar_device_snapshot
+          WHERE device_id = ${DEVICE}
+          ORDER BY observed_at DESC
+          LIMIT 1
+        )
+        AND source = 'category_monthly'
+        AND category_key = 'pvInverterElectricityQuantityClass'
+        AND attr = 'pvGeneratedEnergy'
+        AND time_key >= ${startStr}
+        AND time_key < ${endExclusiveStr}
+        AND is_real_value IS NOT FALSE
+    ),
+    telemetry AS (
       SELECT
         (recorded_at AT TIME ZONE ${TZ})::date as day,
         attr,
-        MIN(value) as v_min,
         MAX(value) as v_max
       FROM stash.solar_record
       WHERE device_id = ${DEVICE}
-        AND attr IN ('totalPowerGeneration', 'loadDayElectricityConsumption',
-                     'dayPurchaseElectricityConsumption')
+        AND attr IN ('loadDayElectricityConsumption', 'dayPurchaseElectricityConsumption')
         AND recorded_at >= (${startStr} || ' 00:00 ' || ${TZ})::timestamptz
         AND recorded_at < (${endExclusiveStr} || ' 00:00 ' || ${TZ})::timestamptz
       GROUP BY day, attr
+    ),
+    usage AS (
+      SELECT
+        day,
+        MAX(v_max) FILTER (WHERE attr = 'loadDayElectricityConsumption') AS consumed,
+        MAX(v_max) FILTER (WHERE attr = 'dayPurchaseElectricityConsumption') AS grid_import
+      FROM telemetry
+      GROUP BY day
     )
     SELECT
-      day::text,
-      MAX(CASE WHEN attr = 'totalPowerGeneration' THEN GREATEST(v_max - v_min, 0) END) as generated,
-      MAX(CASE WHEN attr = 'loadDayElectricityConsumption' THEN v_max END) as consumed,
-      MAX(CASE WHEN attr = 'dayPurchaseElectricityConsumption' THEN v_max END) as grid_import
-    FROM daily
-    GROUP BY day
+      COALESCE(production.day, usage.day)::text AS day,
+      production.generated,
+      usage.consumed,
+      usage.grid_import
+    FROM production
+    FULL OUTER JOIN usage ON usage.day = production.day
     ORDER BY day
   `
 
@@ -402,78 +565,95 @@ export async function getRecentDailyTotals(endDate: Date, days = 8): Promise<Dai
     generated: n(row.generated),
     consumed: n(row.consumed),
     gridImport: n(row.grid_import),
+    hasGenerationData: row.generated != null,
+    hasUsageData: row.consumed != null || row.grid_import != null,
   }))
 }
 
 /** สรุปรายเดือน n เดือนย้อนหลัง */
 export async function getMonths(nMonths = 12): Promise<MonthPoint[]> {
-  const rows = await sql<{ month: string; generated: string; consumed: string; grid_import: string }[]>`
-    WITH daily AS (
+  const rows = await sql<{ month: string; generated: string | null; consumed: string | null; grid_import: string | null }[]>`
+    WITH production AS (
+      SELECT time_key AS month, value AS generated
+      FROM stash.solar_station_summary
+      WHERE station_id = (
+          SELECT station_id
+          FROM stash.solar_device_snapshot
+          WHERE device_id = ${DEVICE}
+          ORDER BY observed_at DESC
+          LIMIT 1
+        )
+        AND source = 'category_yearly'
+        AND category_key = 'pvInverterElectricityQuantityClass'
+        AND attr = 'pvGeneratedEnergy'
+        AND time_key >= to_char((now() AT TIME ZONE ${TZ}) - (${nMonths - 1} || ' months')::interval, 'YYYY-MM')
+        AND time_key <= to_char(now() AT TIME ZONE ${TZ}, 'YYYY-MM')
+        AND is_real_value IS NOT FALSE
+    ),
+    daily AS (
       SELECT
         to_char(recorded_at AT TIME ZONE ${TZ}, 'YYYY-MM') as month,
         (recorded_at AT TIME ZONE ${TZ})::date as day,
         attr,
-        MIN(value::numeric) as v_min,
         MAX(value::numeric) as v_max
       FROM stash.solar_record
       WHERE device_id = ${DEVICE}
-        AND attr IN ('totalPowerGeneration', 'loadDayElectricityConsumption',
-                     'dayPurchaseElectricityConsumption')
+        AND attr IN ('loadDayElectricityConsumption', 'dayPurchaseElectricityConsumption')
         AND recorded_at >= now() - (${nMonths} || ' months')::interval
       GROUP BY month, day, attr
     ),
-    monthly AS (
+    usage AS (
       SELECT
         month,
-        SUM(CASE WHEN attr = 'totalPowerGeneration' THEN GREATEST(v_max - v_min, 0) END) as generated,
         SUM(CASE WHEN attr = 'loadDayElectricityConsumption' THEN v_max END) as consumed,
         SUM(CASE WHEN attr = 'dayPurchaseElectricityConsumption' THEN v_max END) as grid_import
       FROM daily
       GROUP BY month
     )
-    SELECT * FROM monthly ORDER BY month DESC LIMIT ${nMonths}
+    SELECT
+      COALESCE(production.month, usage.month) AS month,
+      production.generated,
+      usage.consumed,
+      usage.grid_import
+    FROM production
+    FULL OUTER JOIN usage ON usage.month = production.month
+    ORDER BY month DESC
+    LIMIT ${nMonths}
   `
   return rows.map((r) => ({
     month: r.month,
     generated: n(r.generated),
     consumed: n(r.consumed),
     gridImport: n(r.grid_import),
+    hasGenerationData: r.generated != null,
+    hasUsageData: r.consumed != null || r.grid_import != null,
   }))
-}
-
-/** Estimate charged-to-battery energy from negative batteryPower samples. */
-export async function getBatteryCharge(nMonths = 12): Promise<number> {
-  const [row] = await sql<{ charged: string }[]>`
-    WITH points AS (
-      SELECT
-        recorded_at,
-        GREATEST(-(value::numeric), 0) as charge_kw,
-        LEAD(recorded_at) OVER (ORDER BY recorded_at) as next_at
-      FROM stash.solar_record
-      WHERE device_id = ${DEVICE}
-        AND attr = 'batteryPower'
-        AND recorded_at >= now() - (${nMonths} || ' months')::interval
-    )
-    SELECT COALESCE(
-      SUM(charge_kw * LEAST(EXTRACT(EPOCH FROM (next_at - recorded_at)) / 3600, 0.25)),
-      0
-    ) as charged
-    FROM points
-    WHERE next_at IS NOT NULL
-  `
-  return n(row?.charged)
 }
 
 /** lifetime totals */
 export async function getLifetime(): Promise<LifetimeData> {
-  const [row] = await sql<{ generated: string; grid_import: string; gen_time: string }[]>`
-    SELECT DISTINCT ON (1)
-      MAX(CASE WHEN attr = 'totalPowerGeneration'               THEN value::numeric END) as generated,
+  const [row] = await sql<{ generated: string | null; grid_import: string | null; gen_time: string | null }[]>`
+    SELECT
+      (
+        SELECT SUM(value)
+        FROM stash.solar_station_summary
+        WHERE station_id = (
+            SELECT station_id
+            FROM stash.solar_device_snapshot
+            WHERE device_id = ${DEVICE}
+            ORDER BY observed_at DESC
+            LIMIT 1
+          )
+          AND source = 'generated_total'
+          AND category_key = 'generatedEnergy'
+          AND attr = 'generatedEnergy'
+          AND is_real_value IS NOT FALSE
+      ) AS generated,
       MAX(CASE WHEN attr = 'totalPurchaseElectricityConsumption' THEN value::numeric END) as grid_import,
       MAX(CASE WHEN attr = 'totalGenerationTime'                THEN value::numeric END) as gen_time
     FROM stash.solar_record
     WHERE device_id = ${DEVICE}
-      AND attr IN ('totalPowerGeneration', 'totalPurchaseElectricityConsumption', 'totalGenerationTime')
+      AND attr IN ('totalPurchaseElectricityConsumption', 'totalGenerationTime')
   `
   const generated = n(row?.generated)
   return {
@@ -481,6 +661,7 @@ export async function getLifetime(): Promise<LifetimeData> {
     gridImport: n(row?.grid_import),
     generationTime: n(row?.gen_time),
     co2ReductionKg: Math.round(generated * CO2_KG_PER_KWH * 100) / 100,
+    hasGenerationData: row?.generated != null,
   }
 }
 
@@ -488,6 +669,7 @@ export async function getLifetime(): Promise<LifetimeData> {
 export async function getBills(nMonths = 12): Promise<Bill[]> {
   const rows = await sql<
     {
+      ca: string
       month: string
       bill_no: string | null
       bill_date: Date | null
@@ -510,6 +692,7 @@ export async function getBills(nMonths = 12): Promise<Bill[]> {
     }[]
   >`
     SELECT
+      ca,
       month,
       bill_no,
       bill_date,
@@ -535,6 +718,7 @@ export async function getBills(nMonths = 12): Promise<Bill[]> {
     LIMIT ${nMonths}
   `
   return rows.map((r) => ({
+    ca: r.ca,
     month: r.month,
     billNo: r.bill_no,
     billDate: r.bill_date,
@@ -576,7 +760,7 @@ export async function getPvMorningEnergy(day: string): Promise<PvMorningEnergy> 
 /** ค่าเฉลี่ยพลังงานรายวันแยก MPPT ช่วง 06:00–09:00 รวมวันที่ไม่มีข้อมูลเป็น 0 */
 export async function getPvMorningBaseline(month: string): Promise<PvMorningBaseline> {
   const monthStart = `${month}-01`
-  const [row] = await sql<{ pv1_kwh: string; pv2_kwh: string; days: string }[]>`
+  const [row] = await sql<{ pv1_kwh: string; pv2_kwh: string }[]>`
     WITH days AS (
       SELECT generate_series(
         ${monthStart}::date,
@@ -599,8 +783,7 @@ export async function getPvMorningBaseline(month: string): Promise<PvMorningBase
     )
     SELECT
       AVG(COALESCE(pv1.kwh, 0)) AS pv1_kwh,
-      AVG(COALESCE(pv2.kwh, 0)) AS pv2_kwh,
-      COUNT(*) AS days
+      AVG(COALESCE(pv2.kwh, 0)) AS pv2_kwh
     FROM days
     LEFT JOIN daily pv1 ON pv1.day = days.day AND pv1.attr = 'pv1Power'
     LEFT JOIN daily pv2 ON pv2.day = days.day AND pv2.attr = 'pv2Power'
@@ -608,7 +791,6 @@ export async function getPvMorningBaseline(month: string): Promise<PvMorningBase
 
   return {
     month,
-    days: n(row?.days),
     pv1Kwh: n(row?.pv1_kwh),
     pv2Kwh: n(row?.pv2_kwh),
   }
@@ -632,6 +814,7 @@ export async function getBatteryMorningSocPeak(day: string): Promise<number | nu
 export async function getWaterUsage(nMonths = 12): Promise<WaterUsage[]> {
   const rows = await sql<
     {
+      account_code: string
       bill_number: string
       period_year: number
       period_month: number
@@ -648,6 +831,7 @@ export async function getWaterUsage(nMonths = 12): Promise<WaterUsage[]> {
     }[]
   >`
     SELECT DISTINCT ON (period_year, period_month)
+      account_code,
       bill_number,
       period_year,
       period_month,
@@ -678,6 +862,7 @@ export async function getWaterUsage(nMonths = 12): Promise<WaterUsage[]> {
     const remainingAmount = n(row.balance_gross_amount)
 
     return {
+      accountCode: row.account_code,
       billNumber: row.bill_number,
       year: Number(row.period_year),
       month: Number(row.period_month),

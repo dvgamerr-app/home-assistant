@@ -1,6 +1,6 @@
 // Pure-math helpers for SVG charts — used server-side in Astro frontmatter and client-side in chart scripts.
 
-const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
+export const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
 
 export type ChartPoint = { x: number; y: number }
 
@@ -66,6 +66,17 @@ export function svgLine(values: number[], xMin: number, yMin: number, xMax: numb
   )
 }
 
+/**
+ * เส้นโค้งจาก svgPathFromPoints ปิดลงหา baseline — ใช้กับ area gradient
+ * คืนค่าว่างเมื่อจุดไม่พอ เพื่อไม่ให้เกิด `d="… L undefined,y"` ที่ทำให้ path เพี้ยนเงียบๆ
+ */
+export function svgAreaFromPoints(pts: ChartPoint[], baselineY: number, tension = 0.9): string {
+  if (pts.length < 2) return ''
+  const first = pts[0]!
+  const last = pts.at(-1)!
+  return `${svgPathFromPoints(pts, tension)} L ${last.x.toFixed(1)},${baselineY} L ${first.x.toFixed(1)},${baselineY} Z`
+}
+
 /** svgLine closed to the bottom — for area gradient fills. */
 export function svgArea(values: number[], xMin: number, yMin: number, xMax: number, yMax: number, tension = 0.9): string {
   return `${svgLine(values, xMin, yMin, xMax, yMax, tension)} L ${xMax},${yMax} L ${xMin},${yMax} Z`
@@ -76,17 +87,18 @@ export type BarSegment = { x: number; y: number; w: number; h: number; value: nu
 /**
  * Stacked bar rects.
  * data[barIndex] = [bottomValue, ...topValues] stacked upward.
- * Returns rects[barIndex][stackIndex].
+ * Returns `bars[barIndex][stackIndex]` พร้อม `maxTotal` ที่ใช้ scale
+ * (คืน maxTotal ออกมาด้วยเพื่อให้ป้ายแกน Y ใช้ค่าเดียวกับความสูงแท่ง — อย่าคำนวณซ้ำ)
  * The topmost visible segment gets rx=1.5 for rounded top corners.
  */
-export function svgStackedBars(data: number[][], xMin: number, yMin: number, xMax: number, yMax: number, gapFrac = 0.2): BarSegment[][] {
+export function svgStackedBars(data: number[][], xMin: number, yMin: number, xMax: number, yMax: number, gapFrac = 0.2): { bars: BarSegment[][]; maxTotal: number } {
   const n = data.length
   const maxTotal = Math.max(...data.map((d) => d.reduce((s, v) => s + v, 0)), 1)
   const groupW = (xMax - xMin) / n
   const barW = groupW * (1 - gapFrac)
   const plotH = yMax - yMin
 
-  return data.map((stacks, i) => {
+  const bars = data.map((stacks, i) => {
     const x = xMin + i * groupW + (groupW - barW) / 2
     let bottom = yMax
     const topIdx = stacks.reduceRight((found, v, idx) => (found === -1 && v > 0 ? idx : found), -1)
@@ -97,4 +109,6 @@ export function svgStackedBars(data: number[][], xMin: number, yMin: number, xMa
       return { x, y, w: barW, h, value: v, rx: j === topIdx ? 1.5 : 0 }
     })
   })
+
+  return { bars, maxTotal }
 }

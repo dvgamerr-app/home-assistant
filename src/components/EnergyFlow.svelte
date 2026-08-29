@@ -1,22 +1,26 @@
 <script lang="ts">
   import { untrack, onMount } from 'svelte'
   import { io } from 'socket.io-client'
+  import { getBatteryConnectionState } from '@/lib/battery'
   import { num } from '@/lib/electricity'
   import type { LiveSnapshot } from '@/lib/db'
+  import type { SolarData } from '@/lib/solar-data'
   import { SOCKET_CHANNELS } from '@/lib/socket'
   import Sun from '@lucide/svelte/icons/sun'
   import BatteryCharging from '@lucide/svelte/icons/battery-charging'
   import Battery from '@lucide/svelte/icons/battery'
+  import BatteryWarning from '@lucide/svelte/icons/battery-warning'
   import House from '@lucide/svelte/icons/house'
   import Zap from '@lucide/svelte/icons/zap'
 
-  let { live: init, socketUrl }: { live: LiveSnapshot; socketUrl: string } = $props()
+  let { live: init, system, socketUrl }: { live: LiveSnapshot; system: SolarData['system']; socketUrl: string } = $props()
 
   let pv = $state(untrack(() => init.pvPowerKw))
   let load = $state(untrack(() => init.loadPowerKw))
   let battPower = $state(untrack(() => init.batteryPowerKw))
   let soc = $state(untrack(() => init.batterySoc))
   let grid = $state(untrack(() => init.gridPowerKw))
+  let batteryTelemetry = $state(untrack(() => init))
   let svgEl: SVGSVGElement | undefined
   let containerEl: HTMLElement | undefined
   let svgW = $state(0)
@@ -43,8 +47,10 @@
 
   // sign convention (per real inverter data): battPower < 0 = charging, grid < 0 = buying from grid
   const producing = $derived(pv > 0.05)
-  const charging = $derived(battPower < -0.05) // solar surplus → battery
-  const discharging = $derived(battPower > 0.05) // battery supplements home
+  const batteryConnection = $derived(getBatteryConnectionState(batteryTelemetry, system.batteryConnectedMinVoltage))
+  const batteryConnected = $derived(batteryConnection === 'connected')
+  const charging = $derived(batteryConnected && battPower < -0.05) // solar surplus → battery
+  const discharging = $derived(batteryConnected && battPower > 0.05) // battery supplements home
   const importing = $derived(grid < -0.05) // grid supplies home
 
   const durN = (kw: number) => Math.max(0.8, 2.4 - Math.abs(kw) * 0.4)
@@ -62,6 +68,7 @@
       connected = false
     })
     socket.on(SOCKET_CHANNELS.live, (data: LiveSnapshot) => {
+      batteryTelemetry = data
       animateTo(
         'pv',
         () => pv,
@@ -222,21 +229,25 @@
       <foreignObject x="20" y="250" width="120" height="120">
         <div class="flex flex-col items-center text-center">
           <div
-            class="flex size-14 items-center justify-center rounded-full border transition-colors {charging
-              ? 'border-chart-1/40 bg-chart-1/10 text-chart-1'
-              : discharging
+            class="flex size-14 items-center justify-center rounded-full border transition-colors {batteryConnection === 'disconnected'
+              ? 'border-destructive/40 bg-destructive/5 text-destructive'
+              : charging || discharging
                 ? 'border-chart-1/40 bg-chart-1/10 text-chart-1'
                 : 'border-border bg-card text-muted-foreground'}"
           >
-            {#if charging}
+            {#if batteryConnection === 'disconnected'}
+              <BatteryWarning size={20} strokeWidth={1.5} aria-hidden="true" />
+            {:else if charging}
               <BatteryCharging size={20} strokeWidth={1.5} aria-hidden="true" />
             {:else}
               <Battery size={20} strokeWidth={1.5} aria-hidden="true" />
             {/if}
           </div>
           <p class="mt-2 text-[10px] uppercase tracking-luxury text-muted-foreground">แบตเตอรี่</p>
-          <p class="mt-1 font-serif text-base font-light leading-none">{soc}%</p>
-          <p class="mt-1 text-[10px] text-muted-foreground">{charging ? 'กำลังชาร์จ' : discharging ? 'จ่ายไฟ' : 'คงที่'}</p>
+          <p class="mt-1 font-serif text-base font-light leading-none">{batteryConnected ? `${soc}%` : '—'}</p>
+          <p class="mt-1 text-[10px] text-muted-foreground">
+            {batteryConnection === 'disconnected' ? 'ไม่ได้เชื่อมต่อ' : batteryConnection === 'unknown' ? 'ไม่ทราบสถานะ' : charging ? 'กำลังชาร์จ' : discharging ? 'จ่ายไฟ' : 'รอทำงาน'}
+          </p>
         </div>
       </foreignObject>
 
@@ -251,7 +262,7 @@
             <Zap size={20} strokeWidth={1.5} aria-hidden="true" />
           </div>
           <p class="mt-2 text-[10px] uppercase tracking-luxury text-muted-foreground">การไฟฟ้า</p>
-          <p class="mt-1 font-serif text-base font-light leading-none">{num(grid, 2)} kW</p>
+          <p class="mt-1 font-serif text-base font-light leading-none">{num(importing ? Math.abs(grid) : grid, 2)} kW</p>
           <p class="mt-1 text-[10px] text-muted-foreground">{importing ? 'นำเข้าจากกริด' : 'ไม่ได้ซื้อไฟ'}</p>
         </div>
       </foreignObject>

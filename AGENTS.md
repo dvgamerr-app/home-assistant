@@ -29,13 +29,13 @@ ALLOWED_EMAILS        # comma-separated อีเมลที่อนุญา�
 SOCKET_PORT           # port socket.io server (default 3000)
 SOCKET_POLL_MS        # ตรวจ source timestamp สำหรับ socket (default 60000; emit เมื่อข้อมูลเปลี่ยน)
 ENERGY_ALERT_POLL_MS  # รอบตรวจ Energy Lib alert (default 300000 ตาม cadence ข้อมูล ~5 นาที)
-UTILITY_ALERT_POLL_MS # รอบตรวจบิลค่าไฟ/น้ำ (default 3600000)
-MEA_BILL_DAY          # วันที่ค่าไฟเข้าในแต่ละเดือน (default 12)
-MWA_BILL_DAY          # วันที่ค่าน้ำเข้าในแต่ละเดือน (default 22)
-UTILITY_ALERT_GRACE_DAYS # จำนวนวันเผื่อ collector ส่งช้า (default 1)
+UTILITY_ALERT_POLL_MS # รอบตรวจบิลค่าไฟ/น้ำ (default 3600000; collector ดึงบิลทุกวัน 09:00 — เช็คทุกรอบแล้ว dedupe ด้วยเลขบิล ไม่กรองตามวันที่)
 SOLAR_DEVICE_ID       # device_id ใน stash.solar_record
 MEA_HOUSE_CA          # เลข CA ของบ้านใน stash.mea_electric
 MWA_ACCOUNT_CODE      # account_code ใน stash.mwa_account (ถ้าไม่ตั้ง ใช้บัญชีแรก)
+MEA_BILLER_ID         # Biller ID QR จ่ายค่าไฟ (15 หลักจาก QR บนบิล) — ไม่ตั้ง = ซ่อน QR
+MWA_BILLER_ID         # Biller ID QR จ่ายค่าน้ำ — เงื่อนไขเดียวกัน · วิธีหาดู docs/bill-qr.md
+QR_SIGN_SECRET        # secret sign URL รูป QR (ไม่ตั้ง = ใช้ BETTER_AUTH_SECRET)
 GITHUB_CLIENT_ID/SECRET  # สำหรับ GitHub OAuth (optional)
 LINE_NOTICE_URL       # endpoint กลางสำหรับส่ง alert เข้า LINE
 LINE_NOTICE_API_KEY   # API key ของ LINE Manager (เก็บใน secret/env เท่านั้น)
@@ -55,7 +55,7 @@ bun run preview   # bun ./dist/server/entry.mjs  (รันผลลัพธ์
 bun run check     # astro check (typecheck .astro/.svelte/.ts)
 bun run lint      # eslint .
 bun run format    # prettier --check .  (format:fix = เขียนทับ)
-bun test          # bun test (มี src/lib/chart.test.ts)
+bun test          # bun test (chart / chart-viewport / battery / energy-alerts / utility-bill-alerts / line-transport)
 bun run migration:run   # รัน Kysely migrations สำหรับ auth DB
 bun run dev:socket      # รัน socket.io server แยก process (ใช้คู่กับ preview)
 ```
@@ -78,18 +78,24 @@ pivot EAV: `DISTINCT ON (attr) ORDER BY attr, recorded_at DESC` ดึงค่�
 - `src/middleware.ts` — ตรวจ session + allowlist ทุก request ยกเว้น `/login`, `/no-permission`, `/api/auth`
 - `src/layouts/Layout.astro` — shell, โหลดฟอนต์ + script set theme กัน flash
 - `src/components/` — `.astro` static เป็นหลัก, Svelte islands: `LiveClock.svelte` · `ThemeToggle.svelte` · `LogoutButton.svelte` · `LoginForm.svelte` · `EnergyFlow.svelte` (socket.io) · `SolarStatusCards.svelte` (socket.io) · `ui/DatePicker.svelte`. กราฟอยู่ใน `components/charts/`
-- `src/lib/` — `solar-data.ts` (async `getAll()`/`getMonthLoad()` ดึงข้อมูลจาก db), `db.ts` (postgres.js queries), `solar-fivemin.ts` (payload กราฟ 5 นาที ใช้ร่วมกับ socket server), `energy-alerts.ts` (เฉพาะ Energy Lib: device/battery/solar), `utility-bill-alerts.ts` (เฉพาะบิลค่าไฟ/ค่าน้ำ), `auth.ts` (better-auth config), `electricity.ts` (MEA bill formula + `thb()`/`num()` + ชื่อเดือนไทย), `chart.ts` (`svgPathFromPoints`/`svgLine`/`svgArea`/`svgStackedBars`), `date.ts` (วันที่ Bangkok), `socket.ts` (channel + `getSocketUrl`), `logger.ts` (pino)
+- `src/lib/` — `config.ts` (**อ่าน ENV ที่เดียว** — LINE / poll interval / เกณฑ์ alert / allowlist; อย่าอ่าน `process.env` ตรงๆ ในไฟล์อื่น), `solar-data.ts` (async `getAll()`/`getMonthLoad()` ดึงข้อมูลจาก db + `dayCacheTtl()`/`fiveMinCacheKey()`), `db.ts` (postgres.js queries), `solar-fivemin.ts` (payload กราฟ 5 นาที + `toFiveMinChartPoints()` ใช้ร่วมกับ socket server/API), `alert-worker.ts` (`createAlertWorker()` + `runAlertChecks()` — โครง cycle ที่แยก error ต่อ check), `energy-alerts.ts` (เฉพาะ Energy Lib: device/battery/solar), `utility-bill-alerts.ts` (เฉพาะบิลค่าไฟ/ค่าน้ำ), `line-flex.ts` (token + primitive ของ LINE Flex card), `line-transport.ts` (`sendLineMessages()` + `LineNoticeError` แยก retryable), `auth.ts` (better-auth config), `electricity.ts` (MEA bill formula + `thb()`/`num()`/`formatBillMonth()` + ชื่อเดือนไทย), `payment-status.ts` (`classifyMeaPayment()`/`classifyMwaPayment()` — ตีความสถานะชำระที่เดียว), `chart.ts` (`svgPathFromPoints`/`svgLine`/`svgArea`/`svgAreaFromPoints`/`svgStackedBars`/`clamp01`), `date.ts` (วันที่ Bangkok), `socket.ts` (channel + `getSocketUrl`), `logger.ts` (pino)
 - `src/db/` — `auth-db.ts` (Kysely instance) · `migrate.ts` · `migrations/`
 - `server/socket.mjs` — socket.io server, poll ทุก 60s แล้ว broadcast ตาม channel ที่ client subscribe (`live`, `solar:fivemin`) พร้อมรัน Energy Lib worker และ utility bill worker แยกกัน
 - `src/styles/global.css` — design tokens (oklch, light/dark), font, tracking-luxury, `.legend-dot`
 - `docs/design-system.html` — design-system reference เปิดในเบราว์เซอร์ได้เลย, token sync กับ global.css
+- `docs/bill-qr.md` — **วิธีสร้าง QR จ่ายบิล MEA/MWA ที่ถูกต้อง** + วิธีหา Biller ID + ผลทดสอบสแกนจริง อ่านก่อนแตะเรื่อง QR ทุกครั้ง
 
 ## ข้อตกลง (สำคัญเวลาแก้)
 
 - **Static ก่อน:** เขียนเป็น `.astro` เว้นแต่ต้องโต้ตอบจริงค่อยทำเป็น Svelte island (`client:load`). icon ของ lucide render เป็น SVG static ใน `.astro` ได้ ไม่ต้อง hydrate
 - **Design:** หัวข้อ/ตัวเลขเด่นใช้ `font-serif font-light`; label พิมพ์ใหญ่ใช้ `text-[10px] uppercase tracking-luxury text-muted-foreground`; การ์ดใช้ `border border-border/70 bg-card` (เส้นบาง ไม่ใช้ shadow); สีอ้างอิง token `--chart-1..5` / `text-chart-*`
 - **กราฟ:** เป็น SVG ที่ประกอบเองผ่าน helper ใน `chart.ts` (อย่าเพิ่ม charting lib). เส้นโค้งใช้ `svgPathFromPoints`/`svgLine` ตัวเดียวทั้ง server และ client script, สีอ้าง `var(--chart-*)`, แนบ legend ด้วย `LegendRow` + `.legend-dot`
-- **ข้อมูล:** ตัวเลขทั้งหมดมาจาก `src/lib/solar-data.ts` ผ่าน `await getAll()` (ดึงจาก DB จริง). แก้สมมติฐานระบบที่ object `SYSTEM` ที่หัวไฟล์
+- **แกน Y ของกราฟ:** ใช้ `ui/ChartYAxis.astro` และคำนวณ `topPct` จากตำแหน่ง gridline จริงเสมอ — **ห้าม hardcode `top:NN%`** (เคยทำให้ป้ายของ `GridDependencyChart` เลื่อนจากเส้นถึง 45px). ฝั่ง client ต้องใช้ความสูงที่วัดได้ (`clientHeight`) ไม่ใช่ค่าคงที่
+- **Props ของ `.astro`:** ประกาศ `interface Props` / `type Props` แล้วอ่าน `Astro.props` ตรงๆ — **อย่าใช้ `Astro.props as ...`** เพราะ cast ทำให้ `astro check` ไม่จับ prop ที่ลืมส่ง
+- **ข้อมูล:** ตัวเลขทั้งหมดมาจาก `src/lib/solar-data.ts` ผ่าน `await getAll()` (ดึงจาก DB จริง). แก้สมมติฐานระบบที่ object `SYSTEM` ที่หัวไฟล์. query หลายตัวใน `getAll()` ใช้ `Promise.allSettled` — slot ที่พังจะ log แล้ว fallback ไม่ทำให้หน้าเว็บ 500 ทั้งหน้า
+- **Alert:** เพิ่ม check ใหม่ให้ผ่าน `runAlertChecks()` เสมอ เพื่อให้ check หนึ่งพัง (เช่น LINE ตอบ 403) ไม่ทำให้ check ที่เหลือไม่ถูกรัน
+- **ENV:** อ่านผ่าน `src/lib/config.ts` เท่านั้น (มี clamp + default อยู่ที่เดียว)
+- **`astro dev` เท่านั้นที่ spawn socket server:** ผ่าน hook `astro:server:start` ใน `astro.config.mjs` — อย่าย้ายกลับไปใช้ vite `configureServer` เพราะ `astro check`/`astro build` ก็สร้าง vite server ทำให้ typecheck ไปยิง LINE notice จริง
 - **Lucide + Astro JSX:** Svelte 5 `Component<Props>` ทำให้ TypeScript ใช้ `ComponentInternals` เป็น props แทน `Props`. แก้ด้วย `LibraryManagedAttributes` ใน `src/env.d.ts`. HTML attr literals เช่น `type="radio"` ต้องเขียน `type={"radio" as const}` ในไฟล์ที่ error
 - **ภาษา:** UI เป็นไทยสุภาพ เน้นความหมายต่อเจ้าของบ้าน ตัวเลขมาพร้อมบริบท
 - **Commit:** conventional commits (husky + commitlint บังคับ), `pre-commit` รัน lint-staged (prettier + eslint). **ห้ามใส่ `Co-Authored-By`** หรือ signature ใดๆ

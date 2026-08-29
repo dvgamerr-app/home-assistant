@@ -4,17 +4,17 @@ import type { SolarData } from '@/lib/solar-data'
 import ChartCard from '@/components/ui/ChartCard.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
 import { buildFiveMinChartPayload } from '@/lib/solar-fivemin'
+import type { SolarRateChartConfig } from '@/lib/solar-rate-chart'
 
-const {
-  fiveMin: POINTS,
-  isToday,
-  ratedPowerKw,
-  socketUrl,
-} = Astro.props as Pick<SolarData, 'fiveMin'> & {
+// interface Props ให้ astro check ตรวจ call site ได้ — `Astro.props as ...` ทำให้ prop ที่ลืมส่งเงียบ
+interface Props extends Pick<SolarData, 'fiveMin'> {
   isToday: boolean
-  ratedPowerKw: number
+  pv1MaxKw: number
+  pv2MaxKw: number
   socketUrl: string
 }
+
+const { fiveMin: POINTS, isToday, pv1MaxKw, pv2MaxKw, socketUrl } = Astro.props
 
 const [VH, MT, MB] = [220, 18, 28]
 
@@ -33,15 +33,13 @@ const initialChart = buildFiveMinChartPayload(
   currentMinute,
 )
 
-const safeRatedPowerKw = ratedPowerKw > 0 ? ratedPowerKw : 1
-const totalKwSeries = initialChart.pv2.map((value, index) => value + (initialChart.pv1[index] ?? 0))
-const latestPv1Kw = initialChart.pv1.at(-1) ?? 0
-const latestPv2Kw = initialChart.pv2.at(-1) ?? 0
-const latestPv1Pct = (latestPv1Kw / safeRatedPowerKw) * 100
-const latestPv2Pct = (latestPv2Kw / safeRatedPowerKw) * 100
-const peakPct = Math.max(...totalKwSeries.map((value) => (value / safeRatedPowerKw) * 100), 0)
-const latestMinute = initialChart.times.at(-1)
-const latestTimeLabel = latestMinute === undefined ? 'ยังไม่มีข้อมูล' : `${String(Math.floor(latestMinute / 60)).padStart(2, '0')}:${String(latestMinute % 60).padStart(2, '0')} น.`
+const safePv1MaxKw = Math.max(pv1MaxKw, ...initialChart.pv1, 0.01)
+const safePv2MaxKw = Math.max(pv2MaxKw, ...initialChart.pv2, 0.01)
+const peakPv1Kw = Math.max(...initialChart.pv1, 0)
+const peakPv2Kw = Math.max(...initialChart.pv2, 0)
+const peakPv1Pct = (peakPv1Kw / safePv1MaxKw) * 100
+const peakPv2Pct = (peakPv2Kw / safePv2MaxKw) * 100
+const peakPct = Math.max(peakPv1Pct, peakPv2Pct, 0)
 
 function scaleTopForPeak(peakPercent: number) {
   return Math.max(100, Math.ceil(Math.max(peakPercent, 1) / 25) * 25)
@@ -58,41 +56,44 @@ function buildYAxis(scaleTop: number) {
 
 const { yLabels, gridPct } = buildYAxis(scaleTopForPeak(peakPct))
 
-const chartJson = JSON.stringify({
+// สัญญาระหว่าง frontmatter กับ <script> — ประกาศครั้งเดียวแล้วใช้ทั้งสองฝั่ง
+const chartConfig: SolarRateChartConfig = {
   pv1: initialChart.pv1,
   pv2: initialChart.pv2,
   times: initialChart.times,
-  ratedPowerKw: safeRatedPowerKw,
+  pv1MaxKw: safePv1MaxKw,
+  pv2MaxKw: safePv2MaxKw,
   isToday,
   socketUrl,
-})
+}
+const chartJson = JSON.stringify(chartConfig)
 ---
 
-<ChartCard eyebrow="กำลังผลิต" title="อัตราการผลิตของโซลาร์" subtitle="แสดง MPPT 1 และ MPPT 2 ในกราฟเดียวกัน โดยให้ MPPT 2 เป็นฐานล่าง" class="overflow-hidden">
-  <div class="grid gap-4 border-b border-border/60 pb-5 md:grid-cols-3">
+<ChartCard eyebrow="ขีดความสามารถ" title="กำลังผลิตเทียบค่าสูงสุด" subtitle="แต่ละชุดคำนวณเปอร์เซ็นต์จากค่าสูงสุดของตัวเองตลอดทั้งวัน" class="overflow-hidden">
+  <div class="grid grid-cols-2 gap-4 border-b border-border/60 pb-4 sm:pb-5 md:grid-cols-3">
     <div class="space-y-1">
-      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">MPPT 1 ล่าสุด</p>
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">MPPT 1 สูงสุดวันนี้</p>
       <p class="font-serif text-4xl font-light leading-none">
-        <span id="solar-rate-pv1-pct">{num(latestPv1Pct, 0)}</span><span class="ml-1 text-base text-muted-foreground">%</span>
+        <span id="solar-rate-pv1-pct">{num(peakPv1Pct, 0)}</span><span class="ml-1 text-base text-muted-foreground">%</span>
       </p>
-      <p class="text-sm text-chart-4"><span id="solar-rate-pv1-kw">{num(latestPv1Kw, 2)}</span> kW</p>
+      <p class="text-sm text-chart-4"><span id="solar-rate-pv1-kw">{num(peakPv1Kw, 2)}</span> kW</p>
     </div>
     <div class="space-y-1">
-      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">MPPT 2 ล่าสุด</p>
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">MPPT 2 สูงสุดวันนี้</p>
       <p class="font-serif text-4xl font-light leading-none">
-        <span id="solar-rate-pv2-pct">{num(latestPv2Pct, 0)}</span><span class="ml-1 text-base text-muted-foreground">%</span>
+        <span id="solar-rate-pv2-pct">{num(peakPv2Pct, 0)}</span><span class="ml-1 text-base text-muted-foreground">%</span>
       </p>
-      <p class="text-sm text-chart-1"><span id="solar-rate-pv2-kw">{num(latestPv2Kw, 2)}</span> kW</p>
+      <p class="text-sm text-chart-1"><span id="solar-rate-pv2-kw">{num(peakPv2Kw, 2)}</span> kW</p>
     </div>
-    <div class="space-y-1">
-      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">อ้างอิงกำลังติดตั้ง</p>
-      <p class="font-serif text-2xl font-light leading-none text-foreground">{num(safeRatedPowerKw, 0)} kW</p>
-      <p id="solar-rate-latest-time" class="text-sm text-muted-foreground">{latestTimeLabel}</p>
+    <div class="hidden space-y-1 md:block">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ค่าสูงสุดที่ใช้เป็นฐาน</p>
+      <p class="font-serif text-xl font-light leading-none text-foreground">MPPT 1 · {num(safePv1MaxKw, 2)} kW</p>
+      <p class="text-sm text-muted-foreground">MPPT 2 · {num(safePv2MaxKw, 2)} kW</p>
     </div>
   </div>
 
-  <div class="mt-5 flex items-start gap-1">
-    <div id="solar-rate-y-axis" class="relative h-56 shrink-0 overflow-visible md:h-60" style="width:2.1rem">
+  <div class="mt-4 flex items-start gap-1 sm:mt-5">
+    <div id="solar-rate-y-axis" class="relative hidden h-56 shrink-0 overflow-visible sm:block md:h-60" style="width:2.1rem">
       {
         yLabels.map((label, index) => (
           <span
@@ -105,11 +106,15 @@ const chartJson = JSON.stringify({
       }
     </div>
     <div class="min-w-0 flex-1">
-      <div class="solar-rate-chart-wrapper h-56 w-full md:h-60" data-chart={chartJson}>
+      <div class="solar-rate-chart-wrapper h-48 w-full sm:h-56 md:h-60" data-chart={chartJson}>
         <svg width="100%" height="100%"></svg>
       </div>
       <div id="solar-rate-x-axis" class="mt-1 flex justify-between text-[9px] text-muted-foreground" style="padding-left:0.72%;padding-right:1.44%">
-        {Array.from({ length: 24 }, (_, i) => <span>{String(i).padStart(2, '0')}</span>)}
+        {
+          Array.from({ length: 24 }, (_, index) => (
+            <span class:list={[index % 6 === 0 || index === 23 ? 'text-muted-foreground' : 'text-transparent sm:text-muted-foreground']}>{String(index).padStart(2, '0')}</span>
+          ))
+        }
       </div>
     </div>
   </div>
@@ -121,14 +126,14 @@ const chartJson = JSON.stringify({
       { label: 'MPPT 2', color: 'var(--chart-1)' },
     ]}
   >
-    <span class="flex items-center gap-2 text-xs text-muted-foreground">
+    <span class="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
       <span class="inline-block h-px w-5 border-t-2 border-dashed opacity-70" style="border-color:var(--foreground)"></span>
-      MPPT 2 เป็นฐานล่าง และ MPPT 1 ซ้อนด้านบน
+      แต่ละเส้นเทียบกับค่าสูงสุดของชุดตัวเอง
     </span>
   </LegendRow>
 </ChartCard>
 
-<div class="solar-rate-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:184px">
+<div class="solar-rate-tip mobile-chart-tip pointer-events-none fixed z-50 hidden rounded-lg border border-border/70 bg-card px-3 py-2.5 shadow-md" style="min-width:184px">
   <p class="solar-rate-tip-hour mb-2 text-[10px] uppercase tracking-luxury text-muted-foreground"></p>
   <div class="space-y-1.5">
     <div class="flex items-center justify-between gap-4">
@@ -150,6 +155,8 @@ const chartJson = JSON.stringify({
   import { io } from 'socket.io-client'
   import { svgPathFromPoints } from '@/lib/chart'
   import { SOCKET_CHANNELS } from '@/lib/socket'
+  import type { FiveMinChartPayload } from '@/lib/solar-fivemin'
+  import type { SolarRateChartConfig } from '@/lib/solar-rate-chart'
 
   {
     const wrapNullable = document.querySelector<HTMLElement>('.solar-rate-chart-wrapper')
@@ -167,38 +174,35 @@ const chartJson = JSON.stringify({
     const tipPv1El = tip.querySelector('.solar-rate-tip-pv1')!
     const tipPv2El = tip.querySelector('.solar-rate-tip-pv2')!
 
-    const J = JSON.parse(wrapEl.dataset.chart!)
-    let pv1All: number[] = J.pv1
-    let pv2All: number[] = J.pv2
-    let times: number[] = J.times
-    const ratedPowerKw: number = J.ratedPowerKw
-    const isToday: boolean = J.isToday
-    const socketUrl: string = J.socketUrl
+    const chartConfig = JSON.parse(wrapEl.dataset.chart!) as SolarRateChartConfig
+    let pv1All = chartConfig.pv1
+    let pv2All = chartConfig.pv2
+    let times = chartConfig.times
+    const { pv1MaxKw, pv2MaxKw, isToday, socketUrl } = chartConfig
 
     const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
-    const toPct = (kw: number) => (ratedPowerKw > 0 ? (kw / ratedPowerKw) * 100 : 0)
+    /** ระยะขอบของพื้นที่วาด — ต้องเป็นค่าเดียวกันทั้ง draw() และ renderYAxis() */
+    const INSET = { left: 4, top: 18, right: 8, bottom: 28 } as const
+    const toPct = (kw: number, maxKw: number) => (maxKw > 0 ? (kw / maxKw) * 100 : 0)
     const fmtKw = (kw: number) => `${kw.toFixed(2)} kW`
     const fmtPct = (pct: number) => `${pct.toFixed(0)}%`
     const fmtTime = (minuteOfDay: number) => `${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')} น.`
 
-    function totalSeries() {
-      return pv2All.map((value, index) => value + (pv1All[index] ?? 0))
-    }
-
     function scaleTop() {
-      const peakPct = Math.max(...totalSeries().map(toPct), 0)
+      const peakPct = Math.max(...pv1All.map((value) => toPct(value, pv1MaxKw)), ...pv2All.map((value) => toPct(value, pv2MaxKw)), 0)
       return Math.max(100, Math.ceil(Math.max(peakPct, 1) / 25) * 25)
     }
 
-    function renderYAxis(maxPct: number) {
+    /**
+     * ตำแหน่งป้ายต้องคิดจากความสูงจริงที่วัดได้ (h-48/sm:h-56/md:h-60 = 192/224/240px)
+     * เดิม hardcode 220 ซึ่งไม่เคยตรงกับความสูงจริงเลย ป้ายจึงเลื่อนจากเส้น gridline
+     */
+    function renderYAxis(maxPct: number, chartHeight: number) {
       const ticks = Array.from({ length: 5 }, (_, index) => maxPct - (maxPct / 4) * index)
-      const chartHeight = 220
-      const topInset = 18
-      const bottomInset = 28
-      const plotHeight = chartHeight - topInset - bottomInset
+      const plotHeight = chartHeight - INSET.top - INSET.bottom
       yAxis.innerHTML = ticks
         .map((value, index) => {
-          const top = (((topInset + (1 - value / maxPct) * plotHeight) / chartHeight) * 100).toFixed(2)
+          const top = (((INSET.top + (1 - value / maxPct) * plotHeight) / chartHeight) * 100).toFixed(2)
           const cls = index === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground'
           return `<span class="absolute right-0 text-right text-[9px] leading-none ${cls}" style="top:${top}%;transform:translateY(-50%)">${value.toFixed(0)}%</span>`
         })
@@ -229,27 +233,24 @@ const chartJson = JSON.stringify({
     let crosshair: SVGLineElement | null = null
 
     function syncSummary() {
-      const latestMinute = times.at(-1)
-      const latestPv1Kw = pv1All.at(-1) ?? 0
-      const latestPv2Kw = pv2All.at(-1) ?? 0
+      const peakPv1Kw = Math.max(...pv1All, 0)
+      const peakPv2Kw = Math.max(...pv2All, 0)
 
       const pv1PctEl = document.getElementById('solar-rate-pv1-pct')
-      if (pv1PctEl) pv1PctEl.textContent = toPct(latestPv1Kw).toFixed(0)
+      if (pv1PctEl) pv1PctEl.textContent = toPct(peakPv1Kw, pv1MaxKw).toFixed(0)
       const pv1KwEl = document.getElementById('solar-rate-pv1-kw')
-      if (pv1KwEl) pv1KwEl.textContent = latestPv1Kw.toFixed(2)
+      if (pv1KwEl) pv1KwEl.textContent = peakPv1Kw.toFixed(2)
       const pv2PctEl = document.getElementById('solar-rate-pv2-pct')
-      if (pv2PctEl) pv2PctEl.textContent = toPct(latestPv2Kw).toFixed(0)
+      if (pv2PctEl) pv2PctEl.textContent = toPct(peakPv2Kw, pv2MaxKw).toFixed(0)
       const pv2KwEl = document.getElementById('solar-rate-pv2-kw')
-      if (pv2KwEl) pv2KwEl.textContent = latestPv2Kw.toFixed(2)
-      const latestTimeEl = document.getElementById('solar-rate-latest-time')
-      if (latestTimeEl) latestTimeEl.textContent = latestMinute === undefined ? 'ยังไม่มีข้อมูล' : fmtTime(latestMinute)
+      if (pv2KwEl) pv2KwEl.textContent = peakPv2Kw.toFixed(2)
     }
 
     function draw() {
       const w = wrapEl.clientWidth
       const h = wrapEl.clientHeight
       curW = w
-      const [ML, MT, MR, MB] = [4, 18, 8, 28]
+      const [ML, MT, MR, MB] = [INSET.left, INSET.top, INSET.right, INSET.bottom]
       const px0 = ML
       const py0 = MT
       const px1 = w - MR
@@ -260,15 +261,23 @@ const chartJson = JSON.stringify({
 
       svg.setAttribute('viewBox', `0 0 ${w} ${h}`)
 
-      const mppt1Pct = pv1All.map((value) => Math.max(0, toPct(value)))
-      const mppt2Pct = pv2All.map((value) => Math.max(0, toPct(value)))
-      const totalPct = mppt2Pct.map((value, index) => value + (mppt1Pct[index] ?? 0))
+      const mppt1Pct = pv1All.map((value) => Math.max(0, toPct(value, pv1MaxKw)))
+      const mppt2Pct = pv2All.map((value) => Math.max(0, toPct(value, pv2MaxKw)))
       const maxPct = scaleTop()
-      renderYAxis(maxPct)
+      renderYAxis(maxPct, h)
 
+      const mppt1Line = smoothPath(mppt1Pct, px0, py0, px1, py1, maxPct)
       const mppt2Line = smoothPath(mppt2Pct, px0, py0, px1, py1, maxPct)
-      const mppt1TopLine = smoothPath(totalPct, px0, py0, px1, py1, maxPct)
-      const baseArea = stackAreaPath(
+      const mppt1Area = stackAreaPath(
+        mppt1Pct,
+        mppt1Pct.map(() => 0),
+        px0,
+        py0,
+        px1,
+        py1,
+        maxPct,
+      )
+      const mppt2Area = stackAreaPath(
         mppt2Pct,
         mppt2Pct.map(() => 0),
         px0,
@@ -277,7 +286,6 @@ const chartJson = JSON.stringify({
         py1,
         maxPct,
       )
-      const topArea = stackAreaPath(totalPct, mppt2Pct, px0, py0, px1, py1, maxPct)
       const gridYs = Array.from({ length: 5 }, (_, index) => py0 + (plotHeight * index) / 4).map((value) => value.toFixed(1))
 
       svg.innerHTML = `
@@ -295,10 +303,10 @@ const chartJson = JSON.stringify({
         <line x1="${px0}" x2="${px1}" y1="${py1}" y2="${py1}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"/>
         ${gridYs.map((y) => `<line x1="${px0}" x2="${px1}" y1="${y}" y2="${y}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')}
         <g clip-path="url(#solar-rate-clip)">
-          <path d="${baseArea}" fill="url(#solar-rate-mppt2-grad)"/>
-          <path d="${topArea}" fill="url(#solar-rate-mppt1-grad)"/>
-          <path d="${mppt2Line}" fill="none" stroke="var(--chart-1)" stroke-width="0.95" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" stroke-opacity="0.9"/>
-          <path d="${mppt1TopLine}" fill="none" stroke="var(--chart-4)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 3" stroke-opacity="0.9"/>
+          <path d="${mppt1Area}" fill="url(#solar-rate-mppt1-grad)"/>
+          <path d="${mppt2Area}" fill="url(#solar-rate-mppt2-grad)"/>
+          <path d="${mppt1Line}" fill="none" stroke="var(--chart-4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="${mppt2Line}" fill="none" stroke="var(--chart-1)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3"/>
         </g>
         <line class="solar-rate-crosshair" x1="0" x2="0" y1="${py0}" y2="${py1}" stroke="var(--foreground)" stroke-opacity="0.2" stroke-width="0.5" visibility="hidden"/>
         <rect x="${px0}" y="${py0}" width="${px1 - px0}" height="${plotHeight}" fill="transparent" style="cursor:crosshair"/>
@@ -342,8 +350,8 @@ const chartJson = JSON.stringify({
       crosshair.setAttribute('visibility', 'visible')
 
       tipHourEl.textContent = fmtTime(times[idx])
-      tipPv1El.textContent = `${fmtPct(toPct(pv1All[idx] ?? 0))} • ${fmtKw(pv1All[idx] ?? 0)}`
-      tipPv2El.textContent = `${fmtPct(toPct(pv2All[idx] ?? 0))} • ${fmtKw(pv2All[idx] ?? 0)}`
+      tipPv1El.textContent = `${fmtPct(toPct(pv1All[idx] ?? 0, pv1MaxKw))} • ${fmtKw(pv1All[idx] ?? 0)}`
+      tipPv2El.textContent = `${fmtPct(toPct(pv2All[idx] ?? 0, pv2MaxKw))} • ${fmtKw(pv2All[idx] ?? 0)}`
       tip.classList.remove('hidden')
       tip.style.left = Math.min(event.clientX + 14, window.innerWidth - 204) + 'px'
       tip.style.top = Math.max(event.clientY - 96, 8) + 'px'
@@ -359,7 +367,7 @@ const chartJson = JSON.stringify({
       socket.on('connect', () => {
         socket.emit('subscribe', SOCKET_CHANNELS.solarFiveMin)
       })
-      socket.on(SOCKET_CHANNELS.solarFiveMin, (payload: { pv1?: number[]; pv2?: number[]; times?: number[] }) => {
+      socket.on(SOCKET_CHANNELS.solarFiveMin, (payload: Partial<FiveMinChartPayload>) => {
         pv1All = payload.pv1 ?? pv1All
         pv2All = payload.pv2 ?? pv2All
         times = payload.times ?? times

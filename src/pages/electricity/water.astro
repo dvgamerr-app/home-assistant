@@ -2,6 +2,7 @@
 import Layout from '@/layouts/Layout.astro'
 import Nav from '@/components/Nav.astro'
 import ElectricityNav from '@/components/ElectricityNav.astro'
+import PageHeader from '@/components/ui/PageHeader.astro'
 import StatCard from '@/components/StatCard.astro'
 import Droplets from '@lucide/svelte/icons/droplets'
 import Receipt from '@lucide/svelte/icons/receipt'
@@ -9,6 +10,7 @@ import Coins from '@lucide/svelte/icons/coins'
 import Gauge from '@lucide/svelte/icons/gauge'
 import { getWaterUsageData, type WaterUsageData } from '@/lib/solar-data'
 import { num, thb } from '@/lib/electricity'
+import { classifyMwaPayment } from '@/lib/payment-status'
 import { formatThaiDate } from '@/lib/date'
 
 const data = await getWaterUsageData()
@@ -30,27 +32,17 @@ const amountComparison =
 
 type WaterBill = WaterUsageData['months'][number]
 
+/** ป้าย/โทนสีมาจาก `classifyMwaPayment` ส่วน `detail` เป็นบริบทเฉพาะหน้านี้ */
 function paymentStatus(bill: WaterBill) {
-  if (bill.isPaid) {
-    return {
-      label: 'ชำระแล้ว',
-      tone: 'text-chart-1',
-      detail: bill.paidDate ? `ชำระ ${formatThaiDate(bill.paidDate)}` : '',
-    }
-  }
+  const state = classifyMwaPayment(bill)
 
-  if (bill.paidAmount > 0 && bill.remainingAmount > 0) {
-    return {
-      label: 'ชำระบางส่วน',
-      tone: 'text-chart-2',
-      detail: `คงเหลือ ${thb(bill.remainingAmount, 2)}`,
-    }
-  }
-
-  return {
-    label: 'รอชำระ',
-    tone: 'text-chart-4',
-    detail: bill.dueDate ? `ครบกำหนด ${formatThaiDate(bill.dueDate)}` : '',
+  switch (state.kind) {
+    case 'paid':
+      return { ...state, detail: bill.paidDate ? `ชำระ ${formatThaiDate(bill.paidDate)}` : '' }
+    case 'partial':
+      return { ...state, detail: `คงเหลือ ${thb(bill.remainingAmount, 2)}` }
+    default:
+      return { ...state, detail: bill.dueDate ? `ครบกำหนด ${formatThaiDate(bill.dueDate)}` : '' }
   }
 }
 
@@ -60,10 +52,7 @@ const latestStatus = latest ? paymentStatus(latest) : null
 <Layout title="ค่าน้ำและการใช้น้ำ — บ้าน">
   <Nav />
   <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
-    <header class="space-y-3">
-      <p class="text-[11px] uppercase tracking-luxury text-muted-foreground">ระบบสาธารณูปโภค</p>
-      <h1 class="font-serif text-4xl font-light leading-tight text-foreground md:text-5xl">ค่าน้ำและการใช้น้ำ</h1>
-    </header>
+    <PageHeader eyebrow="ระบบสาธารณูปโภค" title="ค่าน้ำและการใช้น้ำ" />
 
     <ElectricityNav active="water" />
 

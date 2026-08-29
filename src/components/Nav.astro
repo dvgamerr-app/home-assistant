@@ -1,7 +1,9 @@
 ---
-import Search from '@lucide/svelte/icons/search'
 import Bell from '@lucide/svelte/icons/bell'
+import Menu from '@lucide/svelte/icons/menu'
+import Search from '@lucide/svelte/icons/search'
 import Settings from '@lucide/svelte/icons/settings'
+import X from '@lucide/svelte/icons/x'
 import ThemeToggle from './ThemeToggle.svelte'
 import LogoutButton from './LogoutButton.svelte'
 import { auth } from '@/lib/auth'
@@ -15,8 +17,8 @@ const initials = (parts.length > 1 ? parts[0][0] + parts[1][0] : displayName.sli
 const path = Astro.url.pathname
 const NAV = [
   { label: 'ภาพรวม', href: '/' },
-  { label: 'ห้องต่าง ๆ', href: '#' },
-  { label: 'โหมดบ้าน', href: '#' },
+  { label: 'ห้องต่าง ๆ', href: '#', disabled: true },
+  { label: 'โหมดบ้าน', href: '#', disabled: true },
   { label: 'พลังงาน', href: '/electricity' },
   { label: 'ตั้งค่า', href: '/settings' },
 ]
@@ -24,65 +26,165 @@ const isActive = (href: string) => (href === '/' ? path === '/' : href !== '#' &
 const btn = 'button' as const
 ---
 
-<header class="flex items-center justify-between border-b border-border/60 px-6 py-5 md:px-10">
-  <div class="flex items-center gap-10">
-    <a href="/" class="flex items-center gap-3">
-      <span aria-hidden={true} class="flex h-8 w-8 items-center justify-center rounded-full border border-foreground/80">
-        <span class="font-serif text-sm leading-none tracking-tight text-foreground">KK</span>
-      </span>
-      <span class="font-serif text-xl tracking-wide">OurKK</span>
-    </a>
+<header class="sticky top-0 z-40 border-b border-border/60 bg-background/95">
+  <div class="flex min-h-16 items-center justify-between gap-3 px-4 py-3 sm:px-6 md:px-8 xl:min-h-20 xl:px-10 xl:py-5">
+    <div class="flex min-w-0 items-center xl:gap-8 2xl:gap-10">
+      <a href="/" class="flex shrink-0 items-center gap-2.5 sm:gap-3" aria-label="OurKK — หน้าภาพรวม">
+        <span aria-hidden={true} class="flex h-8 w-8 items-center justify-center rounded-full border border-foreground/80">
+          <span class="font-serif text-sm leading-none tracking-tight text-foreground">KK</span>
+        </span>
+        <span class="font-serif text-lg tracking-wide sm:text-xl">OurKK</span>
+      </a>
 
-    <nav aria-label="เมนูหลัก" class="hidden items-center gap-8 md:flex">
-      {
-        NAV.map((item) => (
-          <a
-            href={item.href}
-            aria-current={isActive(item.href) ? ('page' as const) : undefined}
-            class={`text-xs uppercase tracking-luxury transition-colors ${isActive(item.href) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
-          >
-            {item.label}
-          </a>
-        ))
-      }
-    </nav>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <button type={btn} aria-label="ค้นหา" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
-      <Search size={16} strokeWidth={1.25} />
-    </button>
-    <button
-      type={btn}
-      aria-label="การแจ้งเตือน"
-      class="relative flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-    >
-      <Bell size={16} strokeWidth={1.25} />
-      <span class="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent"></span>
-    </button>
-    <a
-      href="/settings"
-      aria-label="ตั้งค่าบัญชี"
-      aria-current={path.startsWith('/settings') ? ('page' as const) : undefined}
-      class:list={[
-        'flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-secondary hover:text-foreground',
-        path.startsWith('/settings') ? 'bg-secondary text-foreground' : 'text-muted-foreground',
-      ]}
-    >
-      <Settings size={16} strokeWidth={1.25} />
-    </a>
-    <ThemeToggle client:load />
-
-    <div class="ml-3 hidden items-center gap-3 border-l border-border/60 pl-4 md:flex">
-      <div class="text-right">
-        <p class="max-w-35 truncate text-xs font-medium leading-none text-foreground">{displayName}</p>
-        <p class="mt-1 text-[10px] uppercase tracking-luxury text-muted-foreground">เจ้าของบ้าน</p>
-      </div>
-      <div aria-hidden={true} class="flex h-9 w-9 items-center justify-center rounded-full bg-foreground text-[11px] uppercase tracking-widest text-primary-foreground">
-        {initials}
-      </div>
+      <nav aria-label="เมนูหลัก" class="hidden items-center gap-5 xl:flex 2xl:gap-8">
+        {
+          NAV.map((item) =>
+            item.disabled ? (
+              <span aria-disabled={true} title="กำลังพัฒนา" class="cursor-not-allowed text-[11px] uppercase tracking-luxury text-muted-foreground/45">
+                {item.label}
+              </span>
+            ) : (
+              <a
+                href={item.href}
+                aria-current={isActive(item.href) ? ('page' as const) : undefined}
+                class:list={[
+                  'relative py-2 text-[11px] uppercase tracking-luxury transition-colors after:absolute after:inset-x-0 after:-bottom-0.5 after:h-px after:origin-left after:bg-accent after:transition-transform',
+                  isActive(item.href) ? 'text-foreground after:scale-x-100' : 'text-muted-foreground after:scale-x-0 hover:text-foreground hover:after:scale-x-100',
+                ]}
+              >
+                {item.label}
+              </a>
+            ),
+          )
+        }
+      </nav>
     </div>
 
-    <LogoutButton client:load />
+    <div class="flex shrink-0 items-center gap-1 sm:gap-2">
+      <div class="hidden items-center gap-1 xl:flex 2xl:gap-2">
+        <button type={btn} aria-label="ค้นหา" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+          <Search size={16} strokeWidth={1.25} />
+        </button>
+        <button
+          type={btn}
+          aria-label="การแจ้งเตือน"
+          class="relative flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        >
+          <Bell size={16} strokeWidth={1.25} />
+          <span class="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent"></span>
+        </button>
+        <a
+          href="/settings"
+          aria-label="ตั้งค่าบัญชี"
+          aria-current={path.startsWith('/settings') ? ('page' as const) : undefined}
+          class:list={[
+            'flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-secondary hover:text-foreground',
+            path.startsWith('/settings') ? 'bg-secondary text-foreground' : 'text-muted-foreground',
+          ]}
+        >
+          <Settings size={16} strokeWidth={1.25} />
+        </a>
+      </div>
+
+      <ThemeToggle client:load />
+
+      <div class="ml-1 hidden items-center gap-3 border-l border-border/60 pl-4 2xl:flex">
+        <div class="text-right">
+          <p class="max-w-35 truncate text-xs font-medium leading-none text-foreground">{displayName}</p>
+          <p class="mt-1 text-[10px] uppercase tracking-luxury text-muted-foreground">เจ้าของบ้าน</p>
+        </div>
+        <div aria-hidden={true} class="flex h-9 w-9 items-center justify-center rounded-full bg-foreground text-[11px] uppercase tracking-widest text-primary-foreground">
+          {initials}
+        </div>
+      </div>
+
+      <div class="hidden xl:block">
+        <LogoutButton client:load />
+      </div>
+
+      <details class="group relative xl:hidden">
+        <summary
+          aria-label="เปิดเมนูหลัก"
+          class="relative z-10 flex h-10 cursor-pointer list-none items-center gap-2 rounded-full border border-border/70 px-3 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground group-open:bg-secondary group-open:text-foreground [&::-webkit-details-marker]:hidden"
+        >
+          <Menu class="group-open:hidden" size={17} strokeWidth={1.25} />
+          <X class="hidden group-open:block" size={17} strokeWidth={1.25} />
+          <span class="hidden text-[10px] uppercase tracking-luxury sm:inline">
+            <span class="group-open:hidden">เมนู</span>
+            <span class="hidden group-open:inline">ปิด</span>
+          </span>
+        </summary>
+
+        <div class="fixed inset-x-0 bottom-0 top-16 z-50 overflow-y-auto border-t border-border/60 bg-background">
+          <div class="mx-auto flex min-h-full max-w-4xl flex-col px-6 py-8 sm:px-10 sm:py-12 md:px-14">
+            <div class="flex items-start justify-between gap-6">
+              <div>
+                <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">Navigation · OurKK</p>
+                <h2 class="mt-2 font-serif text-3xl font-light text-foreground sm:text-4xl">เลือกพื้นที่ที่ต้องการ</h2>
+              </div>
+              <div class="flex min-w-0 shrink-0 items-center gap-3">
+                <div class="hidden min-w-0 text-right sm:block">
+                  <p class="max-w-48 truncate text-sm font-medium text-foreground">{displayName}</p>
+                  <p class="mt-1 max-w-48 truncate text-xs text-muted-foreground">{user?.email}</p>
+                </div>
+                <div aria-hidden={true} class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] uppercase tracking-widest text-primary-foreground">
+                  {initials}
+                </div>
+              </div>
+            </div>
+
+            <nav aria-label="เมนูหลักบนมือถือ" class="mt-8 border-t border-border/70 sm:mt-10">
+              {
+                NAV.map((item, index) =>
+                  item.disabled ? (
+                    <span
+                      aria-disabled={true}
+                      class="grid cursor-not-allowed grid-cols-[2rem_1fr_auto] items-center gap-3 border-b border-border/70 py-5 text-muted-foreground/40 sm:grid-cols-[3rem_1fr_auto] sm:py-6"
+                    >
+                      <span class="font-mono text-[10px]">{String(index + 1).padStart(2, '0')}</span>
+                      <span class="font-serif text-2xl font-light sm:text-3xl">{item.label}</span>
+                      <span class="text-[9px] uppercase tracking-luxury">เร็ว ๆ นี้</span>
+                    </span>
+                  ) : (
+                    <a
+                      href={item.href}
+                      aria-current={isActive(item.href) ? ('page' as const) : undefined}
+                      class:list={[
+                        'group/item grid grid-cols-[2rem_1fr_auto] items-center gap-3 border-b border-border/70 py-5 transition-colors sm:grid-cols-[3rem_1fr_auto] sm:py-6',
+                        isActive(item.href) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                      ]}
+                    >
+                      <span class:list={['font-mono text-[10px] transition-colors', isActive(item.href) ? 'text-accent' : 'group-hover/item:text-accent']}>{String(index + 1).padStart(2, '0')}</span>
+                      <span class="font-serif text-2xl font-light sm:text-3xl">{item.label}</span>
+                      {isActive(item.href) ? (
+                        <span class="flex items-center gap-2 text-[9px] uppercase tracking-luxury text-muted-foreground">
+                          <span aria-hidden={true} class="h-1.5 w-1.5 rounded-full bg-accent" />
+                          กำลังดู
+                        </span>
+                      ) : (
+                        <span aria-hidden={true} class="text-xl font-light transition-transform group-hover/item:translate-x-1">
+                          →
+                        </span>
+                      )}
+                    </a>
+                  ),
+                )
+              }
+            </nav>
+
+            <div class="mt-auto flex items-center justify-between gap-4 pt-8">
+              <div class="min-w-0 sm:hidden">
+                <p class="truncate text-sm font-medium text-foreground">{displayName}</p>
+                <p class="mt-1 truncate text-xs text-muted-foreground">{user?.email}</p>
+              </div>
+              <div class="ml-auto flex items-center gap-3">
+                <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ออกจากระบบ</p>
+                <LogoutButton client:load />
+              </div>
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
   </div>
 </header>

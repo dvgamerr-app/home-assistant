@@ -2,15 +2,15 @@
 import Layout from '@/layouts/Layout.astro'
 import Nav from '@/components/Nav.astro'
 import ElectricityNav from '@/components/ElectricityNav.astro'
-import SolarAlertStrip from '@/components/SolarAlertStrip.astro'
-import SolarDaySummary from '@/components/SolarDaySummary.astro'
+import PageHeader from '@/components/ui/PageHeader.astro'
 import SolarStatusCards from '@/components/SolarStatusCards.svelte'
+import SolarDaySummary from '@/components/SolarDaySummary.astro'
+import SolarLifetimeSummary from '@/components/SolarLifetimeSummary.astro'
 import BatteryBehaviorChart from '@/components/charts/BatteryBehaviorChart.astro'
-import EnergyDistributionChart from '@/components/charts/EnergyDistributionChart.astro'
 import GridDependencyChart from '@/components/charts/GridDependencyChart.astro'
 import ProductionCurve from '@/components/charts/ProductionCurve.astro'
 import SolarProductionRateCurve from '@/components/charts/SolarProductionRateCurve.astro'
-import SelfSufficiencyChart from '@/components/charts/SelfSufficiencyChart.astro'
+import { getBatteryConnectionState } from '@/lib/battery'
 import { getBangkokISODate, isISODate, parseISODate } from '@/lib/date'
 import { getSolarPageData } from '@/lib/solar-data'
 import { getSocketUrl } from '@/lib/socket'
@@ -21,6 +21,7 @@ const selectedISO = isISODate(dateParam) ? dateParam : todayISO
 const selectedDate = parseISODate(selectedISO)
 const isToday = selectedISO === todayISO
 const data = await getSolarPageData(selectedDate)
+const currentBatteryConnection = isToday ? getBatteryConnectionState(data.live, data.system.batteryConnectedMinVoltage) : null
 
 const socketUrl = getSocketUrl(Astro.request.url)
 ---
@@ -28,33 +29,29 @@ const socketUrl = getSocketUrl(Astro.request.url)
 <Layout title="ผลิตไฟ — บ้าน">
   <Nav />
   <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
-    <header class="space-y-3">
-      <p class="text-[11px] uppercase tracking-luxury text-muted-foreground">ระบบไฟฟ้า</p>
-      <h1 class="font-serif text-4xl font-light leading-tight text-foreground md:text-5xl">ข้อมูลพลังงาน</h1>
-    </header>
+    <PageHeader eyebrow="ระบบไฟฟ้า" title="การผลิตพลังงานโซลาร์" description="ดูผลผลิตจากแผง การทำงานของแบตเตอรี่ และสัดส่วนไฟที่บ้านผลิตใช้เอง โดยแยกข้อมูลจริงออกจากค่าประมาณอย่างชัดเจน" />
 
     <ElectricityNav active="solar" />
 
-    <div class="space-y-6">
-      <SolarAlertStrip freshness={data.freshness} alerts={data.alerts} />
-      <SolarDaySummary dayFlow={data.dayFlow} dayComparison={data.dayComparison} />
-
+    <div class="grid gap-6">
       <ProductionCurve fiveMin={data.fiveMin} date={selectedISO} isToday={isToday} socketUrl={socketUrl} />
 
-      <SolarStatusCards live={data.live} pvStrings={data.pvStrings} system={data.system} socketUrl={socketUrl} client:load />
+      <SolarDaySummary dayFlow={data.dayFlow} dayComparison={data.dayComparison} isToday={isToday} />
 
-      <div class="pt-2 md:pt-4">
-        <SolarProductionRateCurve fiveMin={data.fiveMin} isToday={isToday} ratedPowerKw={data.system.ratedPowerKw} socketUrl={socketUrl} />
-      </div>
+      {isToday && <SolarStatusCards live={data.live} pvStrings={data.pvStrings} system={data.system} socketUrl={socketUrl} client:load />}
 
-      <div class="grid gap-6 lg:grid-cols-2">
-        <BatteryBehaviorChart fiveMin={data.fiveMin} dayFlow={data.dayFlow} />
-        <SelfSufficiencyChart months={data.months} />
-      </div>
+      {
+        data.fiveMin.length > 0 && (
+          <div class="grid gap-6 lg:grid-cols-2">
+            <BatteryBehaviorChart fiveMin={data.fiveMin} dayFlow={data.dayFlow} currentBatteryConnection={currentBatteryConnection} />
+            <SolarProductionRateCurve fiveMin={data.fiveMin} isToday={isToday} pv1MaxKw={data.pvStrings[0]?.peakKw ?? 0} pv2MaxKw={data.pvStrings[1]?.peakKw ?? 0} socketUrl={socketUrl} />
+          </div>
+        )
+      }
 
       <div class="grid gap-6 lg:grid-cols-2">
         <GridDependencyChart months={data.months} gridOverview={data.gridOverview} />
-        <EnergyDistributionChart energyDistribution={data.energyDistribution} />
+        <SolarLifetimeSummary lifetime={data.lifetime} months={data.months} system={data.system} />
       </div>
     </div>
   </main>

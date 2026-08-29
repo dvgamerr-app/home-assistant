@@ -1,5 +1,6 @@
 ---
 import LiveClock from './LiveClock.svelte'
+import { getBatteryConnectionState } from '@/lib/battery'
 import { num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
 import { auth } from '@/lib/auth'
@@ -9,12 +10,18 @@ import Wind from '@lucide/svelte/icons/wind'
 
 type Props = Pick<SolarData, 'live' | 'system'>
 
-const { live } = Astro.props
+const { live, system } = Astro.props
 const session = await auth.api.getSession({ headers: Astro.request.headers })
 const displayName = session?.user.name?.trim() || session?.user.email?.split('@')[0] || 'คุณ'
 const firstName = displayName.split(' ')[0]
-const charging = live.batteryPowerKw < 0
-const buyingNothing = live.gridPowerKw < 0.05
+const batteryConnection = getBatteryConnectionState(live, system.batteryConnectedMinVoltage)
+const charging = batteryConnection === 'connected' && live.batteryPowerKw < -0.05
+const importing = live.gridPowerKw < -0.05
+const energySummary = !live.isOnline
+  ? 'ยังยืนยันสถานะพลังงานในบ้านไม่ได้ เนื่องจากข้อมูลอินเวอร์เตอร์ไม่เป็นปัจจุบัน'
+  : batteryConnection === 'disconnected'
+    ? `ระบบโซลาร์ออนไลน์และผลิตไฟอยู่ ${num(live.pvPowerKw, 2)} กิโลวัตต์ แต่แบตเตอรี่ไม่ได้เชื่อมต่อ${importing ? ` ขณะนี้ซื้อไฟจากการไฟฟ้า ${num(Math.abs(live.gridPowerKw), 2)} กิโลวัตต์` : ''}`
+    : `บ้านกำลังทำงานเป็นปกติ แผงโซลาร์ผลิตไฟอยู่ ${num(live.pvPowerKw, 2)} กิโลวัตต์${charging ? ' และพลังงานส่วนเกินกำลังชาร์จเข้าแบตเตอรี่' : ''}${importing ? ` — ขณะนี้ซื้อไฟจากการไฟฟ้า ${num(Math.abs(live.gridPowerKw), 2)} กิโลวัตต์` : ' — ขณะนี้ไม่ได้ซื้อไฟจากการไฟฟ้าเลย'}`
 
 // ponytail: static weather — wire to a real API when you have a key
 const weather = { tempC: 22, humidity: 48, windKph: 6 }
@@ -31,9 +38,7 @@ const weather = { tempC: 22, humidity: 48, windKph: 6 }
         <span class="italic text-foreground/90">{firstName}</span>
       </h1>
       <p class="max-w-md text-pretty text-sm leading-relaxed text-muted-foreground">
-        บ้านกำลังทำงานเป็นปกติ แผงโซลาร์ผลิตไฟอยู่ {num(live.pvPowerKw, 2)} กิโลวัตต์{charging ? ' และพลังงานส่วนเกินกำลังชาร์จเข้าแบตเตอรี่' : ''}{
-          buyingNothing ? ' — ขณะนี้ไม่ได้ซื้อไฟจากการไฟฟ้าเลย' : ''
-        }
+        {energySummary}
       </p>
     </div>
 

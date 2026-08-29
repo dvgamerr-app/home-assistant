@@ -1,42 +1,31 @@
-import { formatThaiDate, getBangkokISODate } from './date'
+import { createAlertWorker, runAlertChecks } from './alert-worker'
+import { buildMeaBillPayload, buildMwaBillPayload, buildQrImageUrl } from './bill-qr'
+import { config } from './config'
+import { formatThaiDate } from './date'
 import { getBills, getWaterUsage } from './db'
 import { getAlertState, setAlertState } from './alert-state'
-import { MONTH_LONG_TH } from './electricity'
-import { logger } from './logger'
+import { MONTH_LONG_TH, num } from './electricity'
 import { sendUtilityBillNotice } from './utility-line-notice'
 
-let running = false
-let missingConfigLogged = false
-
 export type UtilityBillType = 'electricity' | 'water'
-export type UtilityBillSchedule = {
-  electricityDay: number
-  waterDay: number
-  graceDays: number
+
+/**
+ * ตัดสินว่าควรแจ้งบิลใบนี้หรือยัง โดยดูจาก "เลขบิล" ไม่ใช่วันที่
+ *
+ * collector ดึงบิล MEA/MWA ใหม่ทุกวัน 09:00 (cron `0 9 * * *`) ดังนั้นบิลใบใหม่
+ * โผล่วันไหนก็ได้ ตรรกะเดิมที่กรองตาม MEA_BILL_DAY/MWA_BILL_DAY จึงพลาดบิล
+ * ที่มาไม่ตรงวัน แล้วไปโผล่ตอน container restart แทน
+ *
+ * การเทียบด้วยเลขบิลทำให้เรียกซ้ำกี่รอบก็ปลอดภัย — ส่งแค่ตอนเลขบิลเปลี่ยนจริง
+ */
+export function shouldNotifyBill(state: { lastValue: string | null } | null, identity: string) {
+  // ครั้งแรกสุด: จดไว้เฉยๆ ไม่แจ้ง กันสแปมตอนตั้งระบบใหม่
+  if (!state) return 'record-only' as const
+  return state.lastValue === identity ? ('none' as const) : ('notify' as const)
 }
 
-const integerEnv = (name: string, fallback: number, min: number, max: number) => {
-  const value = Number(process.env[name])
-  return Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value), min), max) : fallback
-}
-
-export function getUtilityBillSchedule(): UtilityBillSchedule {
-  return {
-    electricityDay: integerEnv('MEA_BILL_DAY', 12, 1, 28),
-    waterDay: integerEnv('MWA_BILL_DAY', 22, 1, 28),
-    graceDays: integerEnv('UTILITY_ALERT_GRACE_DAYS', 1, 0, 7),
-  }
-}
-
-export function getScheduledUtilityBillTypes(now = new Date(), schedule = getUtilityBillSchedule()): UtilityBillType[] {
-  const day = Number(getBangkokISODate(now).slice(8, 10))
-  const withinWindow = (dueDay: number) => day >= dueDay && day <= dueDay + schedule.graceDays
-
-  return [...(withinWindow(schedule.electricityDay) ? (['electricity'] as const) : []), ...(withinWindow(schedule.waterDay) ? (['water'] as const) : [])]
-}
-
-const oneDecimal = (value: number) => value.toLocaleString('th-TH', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-const amount = (value: number) => value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const oneDecimal = (value: number) => num(value, 1)
+const amount = (value: number) => num(value, 2)
 
 function thaiBillingPeriod(year: number, month: number) {
   const monthName = MONTH_LONG_TH[month - 1]
@@ -54,12 +43,14 @@ async function checkElectricityBill() {
 
   const identity = bill.billNoNormalized ?? bill.billNo ?? bill.month
   const alertKey = 'electricity-bill'
-  const state = await getAlertState(alertKey)
-  if (!state) {
+  const decision = shouldNotifyBill(await getAlertState(alertKey), identity)
+  if (decision === 'none') return
+  if (decision === 'record-only') {
     await setAlertState({ alertKey, status: 'seen', lastValue: identity })
     return
   }
-  if (state.lastValue === identity) return
+
+  const qrPayload = buildMeaBillPayload({ ca: bill.ca, billNo: bill.billNo ?? '', amount: bill.paid })
 
   await sendUtilityBillNotice({
     utility: 'electricity',
@@ -68,6 +59,7 @@ async function checkElectricityBill() {
     usage: `${oneDecimal(bill.kwh)} kWh`,
     ...(bill.billDate ? { billDate: formatThaiDate(bill.billDate) } : {}),
     ...(bill.dueDate ? { dueDate: formatThaiDate(bill.dueDate) } : {}),
+    ...(qrPayload ? { qrImageUrl: buildQrImageUrl(qrPayload, config.appBaseUrl) } : {}),
   })
   await setAlertState({ alertKey, status: 'seen', lastValue: identity, notified: true })
 }
@@ -78,12 +70,16 @@ async function checkWaterBill() {
 
   const identity = bill.billNumber || `${bill.year}-${bill.month}`
   const alertKey = 'water-bill'
-  const state = await getAlertState(alertKey)
-  if (!state) {
+  const decision = shouldNotifyBill(await getAlertState(alertKey), identity)
+  if (decision === 'none') return
+  if (decision === 'record-only') {
     await setAlertState({ alertKey, status: 'seen', lastValue: identity })
     return
   }
-  if (state.lastValue === identity) return
+
+  // เอา account_code จากแถวข้อมูลตรงๆ ไม่พึ่ง env (MWA_ACCOUNT_CODE อาจไม่ได้ตั้ง
+  // และ query ก็ fallback ไปบัญชีแรกอยู่แล้ว — ต้องใช้เลขของบิลใบที่แจ้งจริง)
+  const qrPayload = buildMwaBillPayload({ accountCode: bill.accountCode, billNumber: bill.billNumber, amount: bill.billedAmount })
 
   await sendUtilityBillNotice({
     utility: 'water',
@@ -92,33 +88,23 @@ async function checkWaterBill() {
     usage: `${oneDecimal(bill.consumption)} m³`,
     ...(bill.billDate ? { billDate: formatThaiDate(bill.billDate) } : {}),
     ...(bill.dueDate ? { dueDate: formatThaiDate(bill.dueDate) } : {}),
+    ...(qrPayload ? { qrImageUrl: buildQrImageUrl(qrPayload, config.appBaseUrl) } : {}),
   })
   await setAlertState({ alertKey, status: 'seen', lastValue: identity, notified: true })
 }
 
-async function runCycle(types: UtilityBillType[]) {
-  if (types.length === 0) return
-
-  const noticeUrl = process.env.LINE_NOTICE_URL?.trim()
-  const apiKey = process.env.LINE_NOTICE_API_KEY?.trim()
-  if (!noticeUrl || !apiKey) {
-    if (!missingConfigLogged) logger.warn('Utility bill alerts disabled: LINE_NOTICE_URL or LINE_NOTICE_API_KEY is missing')
-    missingConfigLogged = true
-    return
-  }
-  missingConfigLogged = false
-
-  await Promise.all([...(types.includes('electricity') ? [checkElectricityBill()] : []), ...(types.includes('water') ? [checkWaterBill()] : [])])
-}
-
-export async function runUtilityBillAlerts(types: UtilityBillType[] = ['electricity', 'water']) {
-  if (running) return
-  running = true
-  try {
-    await runCycle(types)
-  } catch (err) {
-    logger.error({ err }, 'Utility bill alert cycle failed')
-  } finally {
-    running = false
-  }
-}
+/**
+ * เช็คบิลทั้งสองทุกรอบ ไม่กรองตามวันที่ — dedupe ด้วยเลขบิลใน shouldNotifyBill()
+ * ทำให้ปลอดภัยที่จะเรียกบ่อย และบิลจะถูกแจ้งภายใน 1 รอบ poll หลัง collector ดึงมา
+ */
+export const runUtilityBillAlerts = createAlertWorker({
+  name: 'utility-bill-alerts',
+  requiresLineNotice: true,
+  run: async () => {
+    // runAlertChecks ไม่ใช่ Promise.all — ถ้าค่าไฟ reject ค่าน้ำต้องยังได้เช็คและมี log
+    await runAlertChecks('utility-bill-alerts', [
+      { name: 'electricity-bill', run: checkElectricityBill },
+      { name: 'water-bill', run: checkWaterBill },
+    ])
+  },
+})
