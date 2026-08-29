@@ -1,8 +1,6 @@
 ---
-import Bell from '@lucide/svelte/icons/bell'
 import Menu from '@lucide/svelte/icons/menu'
 import Search from '@lucide/svelte/icons/search'
-import Settings from '@lucide/svelte/icons/settings'
 import X from '@lucide/svelte/icons/x'
 import ThemeToggle from './ThemeToggle.svelte'
 import LogoutButton from './LogoutButton.svelte'
@@ -65,25 +63,6 @@ const btn = 'button' as const
         <button type={btn} aria-label="ค้นหา" class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
           <Search size={16} strokeWidth={1.25} />
         </button>
-        <button
-          type={btn}
-          aria-label="การแจ้งเตือน"
-          class="relative flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-        >
-          <Bell size={16} strokeWidth={1.25} />
-          <span class="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-accent"></span>
-        </button>
-        <a
-          href="/settings"
-          aria-label="ตั้งค่าบัญชี"
-          aria-current={path.startsWith('/settings') ? ('page' as const) : undefined}
-          class:list={[
-            'flex h-9 w-9 items-center justify-center rounded-full transition-colors hover:bg-secondary hover:text-foreground',
-            path.startsWith('/settings') ? 'bg-secondary text-foreground' : 'text-muted-foreground',
-          ]}
-        >
-          <Settings size={16} strokeWidth={1.25} />
-        </a>
       </div>
 
       <ThemeToggle client:load />
