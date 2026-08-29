@@ -1,12 +1,10 @@
+import { createAlertWorker, runAlertChecks } from './alert-worker'
+import { config } from './config'
 import { formatThaiDate, getBangkokISODate } from './date'
 import { getBills, getWaterUsage } from './db'
 import { getAlertState, setAlertState } from './alert-state'
-import { MONTH_LONG_TH } from './electricity'
-import { logger } from './logger'
+import { MONTH_LONG_TH, num } from './electricity'
 import { sendUtilityBillNotice } from './utility-line-notice'
-
-let running = false
-let missingConfigLogged = false
 
 export type UtilityBillType = 'electricity' | 'water'
 export type UtilityBillSchedule = {
@@ -15,17 +13,8 @@ export type UtilityBillSchedule = {
   graceDays: number
 }
 
-const integerEnv = (name: string, fallback: number, min: number, max: number) => {
-  const value = Number(process.env[name])
-  return Number.isFinite(value) ? Math.min(Math.max(Math.trunc(value), min), max) : fallback
-}
-
 export function getUtilityBillSchedule(): UtilityBillSchedule {
-  return {
-    electricityDay: integerEnv('MEA_BILL_DAY', 12, 1, 28),
-    waterDay: integerEnv('MWA_BILL_DAY', 22, 1, 28),
-    graceDays: integerEnv('UTILITY_ALERT_GRACE_DAYS', 1, 0, 7),
-  }
+  return config.utilityBill
 }
 
 export function getScheduledUtilityBillTypes(now = new Date(), schedule = getUtilityBillSchedule()): UtilityBillType[] {
@@ -35,8 +24,8 @@ export function getScheduledUtilityBillTypes(now = new Date(), schedule = getUti
   return [...(withinWindow(schedule.electricityDay) ? (['electricity'] as const) : []), ...(withinWindow(schedule.waterDay) ? (['water'] as const) : [])]
 }
 
-const oneDecimal = (value: number) => value.toLocaleString('th-TH', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-const amount = (value: number) => value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const oneDecimal = (value: number) => num(value, 1)
+const amount = (value: number) => num(value, 2)
 
 function thaiBillingPeriod(year: number, month: number) {
   const monthName = MONTH_LONG_TH[month - 1]
@@ -96,29 +85,14 @@ async function checkWaterBill() {
   await setAlertState({ alertKey, status: 'seen', lastValue: identity, notified: true })
 }
 
-async function runCycle(types: UtilityBillType[]) {
-  if (types.length === 0) return
-
-  const noticeUrl = process.env.LINE_NOTICE_URL?.trim()
-  const apiKey = process.env.LINE_NOTICE_API_KEY?.trim()
-  if (!noticeUrl || !apiKey) {
-    if (!missingConfigLogged) logger.warn('Utility bill alerts disabled: LINE_NOTICE_URL or LINE_NOTICE_API_KEY is missing')
-    missingConfigLogged = true
-    return
-  }
-  missingConfigLogged = false
-
-  await Promise.all([...(types.includes('electricity') ? [checkElectricityBill()] : []), ...(types.includes('water') ? [checkWaterBill()] : [])])
-}
-
-export async function runUtilityBillAlerts(types: UtilityBillType[] = ['electricity', 'water']) {
-  if (running) return
-  running = true
-  try {
-    await runCycle(types)
-  } catch (err) {
-    logger.error({ err }, 'Utility bill alert cycle failed')
-  } finally {
-    running = false
-  }
-}
+export const runUtilityBillAlerts = createAlertWorker<[UtilityBillType[]?]>({
+  name: 'utility-bill-alerts',
+  requiresLineNotice: true,
+  run: async (types = ['electricity', 'water']) => {
+    // เดิมใช้ Promise.all — ถ้าค่าไฟ reject ด้วย ค่าน้ำจะถูกทิ้งเงียบๆ ไม่มี log
+    await runAlertChecks('utility-bill-alerts', [
+      ...(types.includes('electricity') ? [{ name: 'electricity-bill', run: checkElectricityBill }] : []),
+      ...(types.includes('water') ? [{ name: 'water-bill', run: checkWaterBill }] : []),
+    ])
+  },
+})

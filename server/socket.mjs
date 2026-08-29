@@ -1,5 +1,7 @@
+// @ts-check
 import { createServer } from 'http'
 import { Server } from 'socket.io'
+import { config } from '../src/lib/config.ts'
 import { logger } from '../src/lib/logger.ts'
 import { getLiveSnapshot } from '../src/lib/db.ts'
 import { cacheData } from '../src/lib/data-cache.ts'
@@ -10,13 +12,7 @@ import { runEnergyAlerts } from '../src/lib/energy-alerts.ts'
 import { getScheduledUtilityBillTypes, runUtilityBillAlerts } from '../src/lib/utility-bill-alerts.ts'
 
 const PORT = parseInt(process.env.SOCKET_PORT ?? '3000')
-const intervalEnv = (name, fallback, minimum) => {
-  const value = Number(process.env[name])
-  return Number.isFinite(value) ? Math.max(value, minimum) : fallback
-}
-const SOCKET_POLL_MS = intervalEnv('SOCKET_POLL_MS', 60_000, 10_000)
-const ENERGY_ALERT_POLL_MS = intervalEnv('ENERGY_ALERT_POLL_MS', 5 * 60_000, 60_000)
-const UTILITY_ALERT_POLL_MS = intervalEnv('UTILITY_ALERT_POLL_MS', 60 * 60_000, 5 * 60_000)
+const { socketMs: SOCKET_POLL_MS, energyAlertMs: ENERGY_ALERT_POLL_MS, utilityAlertMs: UTILITY_ALERT_POLL_MS } = config.poll
 const LIVE_CACHE_MS = 5_000
 
 const httpServer = createServer()
@@ -30,7 +26,8 @@ let lastChartSignature = ''
 
 const getCachedLive = () => cacheData('socket:live', LIVE_CACHE_MS, getLiveSnapshot)
 
-async function getChartPayload(live = undefined) {
+/** @param {Awaited<ReturnType<typeof getLiveSnapshot>> | undefined} [live] */
+async function getChartPayload(live) {
   const snapshot = live ?? (await getCachedLive())
   const signature = `${getBangkokISODate()}:${snapshot.lastUpdate}`
   return {
@@ -76,6 +73,7 @@ async function broadcast() {
   }
 }
 
+/** @param {import('../src/lib/socket.ts').SocketChannel} channel */
 async function getChannelPayload(channel) {
   switch (channel) {
     case SOCKET_CHANNELS.live:
@@ -89,6 +87,10 @@ async function getChannelPayload(channel) {
   }
 }
 
+/**
+ * @param {{ emit: (channel: string, payload: unknown) => unknown }} target
+ * @param {import('../src/lib/socket.ts').SocketChannel} channel
+ */
 async function emitChannel(target, channel) {
   const payload = await getChannelPayload(channel)
   if (payload) target.emit(channel, payload)
@@ -129,6 +131,12 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => logger.info(`client: ${socket.id}, disconnected`))
 })
 
+// bind ล้มเหลว (เช่น EADDRINUSE) ต้องออกด้วย exit code ที่ไม่ใช่ 0
+// ไม่งั้น process ค้างอยู่แบบไม่ฟัง port และ alert ทั้งหมดตายเงียบ
+httpServer.on('error', (err) => {
+  logger.fatal({ err, port: PORT }, 'socket server failed to start')
+  process.exit(1)
+})
 httpServer.listen(PORT, () => logger.info(`socket.io server port:${PORT} started`))
 
 const runScheduledUtilityBillAlerts = () => {
@@ -140,6 +148,27 @@ void broadcast()
 void runEnergyAlerts()
 // Startup check catches bills collected while this process was offline.
 void runUtilityBillAlerts()
-setInterval(() => void broadcast(), SOCKET_POLL_MS)
-setInterval(() => void runEnergyAlerts(), ENERGY_ALERT_POLL_MS)
-setInterval(() => void runScheduledUtilityBillAlerts(), UTILITY_ALERT_POLL_MS)
+const timers = [
+  setInterval(() => void broadcast(), SOCKET_POLL_MS),
+  setInterval(() => void runEnergyAlerts(), ENERGY_ALERT_POLL_MS),
+  setInterval(() => void runScheduledUtilityBillAlerts(), UTILITY_ALERT_POLL_MS),
+]
+
+process.on('unhandledRejection', (err) => logger.error({ err }, 'unhandled rejection'))
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err }, 'uncaught exception')
+  process.exit(1)
+})
+
+let shuttingDown = false
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.on(signal, () => {
+    if (shuttingDown) return
+    shuttingDown = true
+    logger.info({ signal }, 'shutting down socket server')
+    for (const timer of timers) clearInterval(timer)
+    io.close(() => process.exit(0))
+    // เผื่อ client ค้าง ไม่ให้ deploy รอจน SIGKILL
+    setTimeout(() => process.exit(0), 5_000).unref()
+  })
+}

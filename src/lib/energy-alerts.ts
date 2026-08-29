@@ -1,23 +1,19 @@
+import { createAlertWorker, runAlertChecks } from './alert-worker'
+import { config } from './config'
+import { cacheData } from './data-cache'
 import { formatBangkokDateTime, getBangkokISODate } from './date'
 import { getBatteryMorningSocPeak, getLiveSnapshot, getPvMorningBaseline, getPvMorningEnergy, type PvMorningBaseline, type PvMorningEnergy } from './db'
 import { getAlertState, setAlertState } from './alert-state'
-import { sendEnergyNotice, type EnergyNotice } from './line-notice'
-import { logger } from './logger'
+import { num } from './electricity'
+import { sendEnergyNotice, sendEnergyTextNotice, type EnergyNotice } from './line-notice'
 
 const MORNING_ALERT_MINUTE = 9 * 60
 const EVENING_ALERT_MINUTE = 18 * 60
+/** ฐาน MPPT เป็นค่าเฉลี่ยของเดือนที่ปิดแล้ว — cache สั้นๆ พอให้ backfill มีผลโดยไม่ต้อง restart */
+const BASELINE_CACHE_MS = 6 * 60 * 60_000
 
-let running = false
-let missingConfigLogged = false
-let baselineCache: PvMorningBaseline | null = null
-
-const numberEnv = (name: string, fallback: number, min: number, max: number) => {
-  const value = Number(process.env[name])
-  return Number.isFinite(value) ? Math.min(Math.max(value, min), max) : fallback
-}
-
-const oneDecimal = (value: number) => value.toLocaleString('th-TH', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
-const twoDecimals = (value: number) => value.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+const oneDecimal = (value: number) => num(value, 1)
+const twoDecimals = (value: number) => num(value, 2)
 
 export function getBangkokClock(now = new Date()) {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -38,11 +34,16 @@ export function getDefaultSolarBaselineMonth(day: string) {
   return `${month >= 7 ? year : year - 1}-07`
 }
 
-export function getUnderperformingMppts(current: PvMorningEnergy, baseline: PvMorningBaseline, minimumRatio: number) {
+/** จับคู่ค่าที่ผลิตได้เช้านี้กับค่าฐานของแต่ละ MPPT */
+function mpptPairs(current: PvMorningEnergy, baseline: Pick<PvMorningBaseline, 'pv1Kwh' | 'pv2Kwh'>) {
   return [
     { name: 'MPPT 1', currentKwh: current.pv1Kwh, baselineKwh: baseline.pv1Kwh },
     { name: 'MPPT 2', currentKwh: current.pv2Kwh, baselineKwh: baseline.pv2Kwh },
-  ].filter((mppt) => mppt.baselineKwh > 0 && mppt.currentKwh < mppt.baselineKwh * minimumRatio)
+  ]
+}
+
+export function getUnderperformingMppts(current: PvMorningEnergy, baseline: PvMorningBaseline, minimumRatio: number) {
+  return mpptPairs(current, baseline).filter((mppt) => mppt.baselineKwh > 0 && mppt.currentKwh < mppt.baselineKwh * minimumRatio)
 }
 
 export function shouldAlertEveningBattery(batterySoc: number, maximumPct: number) {
@@ -93,25 +94,12 @@ async function checkDeviceConnection(live: Awaited<ReturnType<typeof getLiveSnap
     return
   }
 
-  const notice: EnergyNotice = live.isOnline
-    ? {
-        tone: 'success',
-        title: 'อุปกรณ์กลับมาออนไลน์แล้ว',
-        fields: [
-          { label: 'อุปกรณ์', value: process.env.SOLAR_DEVICE_ID ?? '-' },
-          { label: 'ข้อมูลล่าสุด', value: formatBangkokDateTime(live.lastUpdate) },
-        ],
-      }
-    : {
-        tone: 'danger',
-        title: 'อุปกรณ์ออฟไลน์',
-        fields: [
-          { label: 'อุปกรณ์', value: process.env.SOLAR_DEVICE_ID ?? '-' },
-          { label: 'ข้อมูลล่าสุด', value: formatBangkokDateTime(live.lastUpdate) },
-        ],
-      }
+  // อ่านจบในบรรทัดเดียว → ส่งเป็น text ธรรมดา ไม่ต้องทำเป็น Flex card
+  // และไม่ใส่รหัสเครื่อง เพราะดูแล้วไม่รู้ว่าเลขอะไร
+  const lastUpdate = formatBangkokDateTime(live.lastUpdate)
+  const text = live.isOnline ? `อุปกรณ์กลับมาออนไลน์แล้ว · ข้อมูลล่าสุด ${lastUpdate}` : `อุปกรณ์ออฟไลน์ · ข้อมูลล่าสุด ${lastUpdate}`
 
-  await sendEnergyNotice(notice)
+  await sendEnergyTextNotice(text)
   await setAlertState({ alertKey, status, lastValue: live.lastUpdate, notified: true })
 }
 
@@ -166,15 +154,12 @@ async function checkEveningBattery(day: string, batterySoc: number, maximumPct: 
 }
 
 async function checkMorningSolar(day: string, baselineMonth: string, minimumRatio: number) {
-  if (!baselineCache || baselineCache.month !== baselineMonth) baselineCache = await getPvMorningBaseline(baselineMonth)
+  const baseline = await cacheData(`pv-morning-baseline:${baselineMonth}`, BASELINE_CACHE_MS, () => getPvMorningBaseline(baselineMonth))
 
   const current = await getPvMorningEnergy(day)
-  const affected = getUnderperformingMppts(current, baselineCache, minimumRatio)
+  const affected = getUnderperformingMppts(current, baseline, minimumRatio)
   const minimumPercent = Math.round(minimumRatio * 100)
-  const allMppts = [
-    { name: 'MPPT 1', currentKwh: current.pv1Kwh, baselineKwh: baselineCache.pv1Kwh },
-    { name: 'MPPT 2', currentKwh: current.pv2Kwh, baselineKwh: baselineCache.pv2Kwh },
-  ]
+  const allMppts = mpptPairs(current, baseline)
 
   await handleDailyCondition(
     'solar-morning',
@@ -182,7 +167,7 @@ async function checkMorningSolar(day: string, baselineMonth: string, minimumRati
     affected.length > 0,
     {
       tone: 'danger',
-      title: affected.length === 1 ? `${affected[0].name} ผลิตไฟต่ำผิดปกติ` : 'ชุดแผงโซลาร์ผลิตไฟต่ำผิดปกติ',
+      title: affected.length === 1 ? `${affected[0]!.name} ผลิตไฟต่ำผิดปกติ` : 'ชุดแผงโซลาร์ผลิตไฟต่ำผิดปกติ',
       fields: [
         ...affected.map((mppt) => ({
           label: mppt.name,
@@ -202,43 +187,33 @@ async function checkMorningSolar(day: string, baselineMonth: string, minimumRati
   )
 }
 
-async function runCycle(now: Date) {
-  const noticeUrl = process.env.LINE_NOTICE_URL?.trim()
-  const apiKey = process.env.LINE_NOTICE_API_KEY?.trim()
-  if (!noticeUrl || !apiKey) {
-    if (!missingConfigLogged) logger.warn('Energy Lib alerts disabled: LINE_NOTICE_URL or LINE_NOTICE_API_KEY is missing')
-    missingConfigLogged = true
-    return
+/** รายการ check ที่ควรรันในรอบนี้ ตามเวลาและสถานะออนไลน์ */
+function scheduledChecks(clock: { day: string; minuteOfDay: number }, live: Awaited<ReturnType<typeof getLiveSnapshot>>) {
+  const { batteryReservePct, batteryEveningMaxPct, minSolarRatio, baselineMonth } = config.energyAlert
+  const month = baselineMonth || getDefaultSolarBaselineMonth(clock.day)
+
+  const checks = [{ name: 'device-connection', run: () => checkDeviceConnection(live) }]
+  if (!live.isOnline) return checks
+
+  if (clock.minuteOfDay >= MORNING_ALERT_MINUTE) {
+    checks.push(
+      { name: 'battery-morning', run: () => checkMorningBattery(clock.day, live.batterySoc, batteryReservePct) },
+      { name: 'solar-morning', run: () => checkMorningSolar(clock.day, month, minSolarRatio) },
+    )
   }
-  missingConfigLogged = false
-
-  const clock = getBangkokClock(now)
-  const reservePct = numberEnv('ENERGY_ALERT_BATTERY_RESERVE_PCT', 15, 0, 100)
-  const eveningMaximumPct = numberEnv('ENERGY_ALERT_BATTERY_EVENING_MAX_PCT', 95, 0, 100)
-  const minimumSolarRatio = numberEnv('ENERGY_ALERT_SOLAR_MIN_RATIO', 0.2, 0, 1)
-  const baselineMonth = process.env.ENERGY_ALERT_SOLAR_BASELINE_MONTH?.trim() || getDefaultSolarBaselineMonth(clock.day)
-  const live = await getLiveSnapshot()
-
-  await checkDeviceConnection(live)
-
-  if (live.isOnline && clock.minuteOfDay >= MORNING_ALERT_MINUTE) {
-    await checkMorningBattery(clock.day, live.batterySoc, reservePct)
-    await checkMorningSolar(clock.day, baselineMonth, minimumSolarRatio)
+  if (clock.minuteOfDay >= EVENING_ALERT_MINUTE) {
+    checks.push({ name: 'battery-evening', run: () => checkEveningBattery(clock.day, live.batterySoc, batteryEveningMaxPct) })
   }
 
-  if (live.isOnline && clock.minuteOfDay >= EVENING_ALERT_MINUTE) {
-    await checkEveningBattery(clock.day, live.batterySoc, eveningMaximumPct)
-  }
+  return checks
 }
 
-export async function runEnergyAlerts(now = new Date()) {
-  if (running) return
-  running = true
-  try {
-    await runCycle(now)
-  } catch (err) {
-    logger.error({ err }, 'Energy Lib alert cycle failed')
-  } finally {
-    running = false
-  }
-}
+export const runEnergyAlerts = createAlertWorker<[Date?]>({
+  name: 'energy-alerts',
+  requiresLineNotice: true,
+  run: async (now = new Date()) => {
+    const clock = getBangkokClock(now)
+    const live = await getLiveSnapshot()
+    await runAlertChecks('energy-alerts', scheduledChecks(clock, live))
+  },
+})

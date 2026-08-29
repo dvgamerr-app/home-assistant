@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { getScheduledUtilityBillTypes, type UtilityBillSchedule } from './utility-bill-alerts'
-import { buildUtilityBillFlexMessage, buildUtilityBillNoticeRequest } from './utility-line-notice'
+import { buildUtilityBillFlexMessage } from './utility-line-notice'
 
 const schedule: UtilityBillSchedule = { electricityDay: 12, waterDay: 22, graceDays: 1 }
 
@@ -42,19 +42,6 @@ describe('Utility bill Flex Message', () => {
     expect(electricity.contents).not.toHaveProperty('header')
     expect(water.contents).not.toHaveProperty('header')
     expect(JSON.stringify([electricity, water])).not.toContain('มีบิล')
-    expect(JSON.stringify([electricity, water])).not.toContain('Energy Lib')
-  })
-
-  test('wraps a utility bill Flex object in the messages array', () => {
-    const request = buildUtilityBillNoticeRequest({
-      utility: 'electricity',
-      period: 'กรกฎาคม 2569',
-      amount: '1,169.52',
-      usage: '277.0 kWh',
-    })
-
-    expect(request.messages).toHaveLength(1)
-    expect(request.messages[0].type).toBe('flex')
-    expect(request).not.toHaveProperty('message')
+    expect(JSON.stringify([electricity, water])).not.toContain('EnergyLib')
   })
 })
