@@ -1,6 +1,7 @@
 ---
 import ChartCard from '@/components/ui/ChartCard.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
+import type { BatteryConnectionState } from '@/lib/battery'
 import { svgPathFromPoints } from '@/lib/chart'
 import { num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
@@ -12,7 +13,15 @@ type BatteryPoint = {
   gridImport: number
 }
 
-const { fiveMin: points, dayFlow } = Astro.props as Pick<SolarData, 'fiveMin' | 'dayFlow'>
+const {
+  fiveMin: points,
+  dayFlow,
+  currentBatteryConnection = null,
+} = Astro.props as Pick<SolarData, 'fiveMin' | 'dayFlow'> & {
+  currentBatteryConnection?: BatteryConnectionState | null
+}
+const batteryReadingReliable = currentBatteryConnection === null || currentBatteryConnection === 'connected'
+const batteryReadingMessage = currentBatteryConnection === 'disconnected' ? 'แบตเตอรี่ไม่ได้เชื่อมต่อ ค่า SOC ที่อินเวอร์เตอร์รายงานอาจเป็นค่าค้าง' : 'ข้อมูลสถานะแบตเตอรี่ไม่เป็นปัจจุบัน'
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value))
 const fmtMinute = (minuteOfDay: number) => `${String(Math.floor(minuteOfDay / 60)).padStart(2, '0')}:${String(minuteOfDay % 60).padStart(2, '0')}`
@@ -103,7 +112,9 @@ const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
   <div class="grid gap-4 border-b border-border/60 pb-4 sm:grid-cols-2 sm:pb-5 md:grid-cols-4">
     <div class="space-y-1">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">SOC ล่าสุด</p>
-      <p class="font-serif text-4xl font-light leading-none text-foreground">{num(points.at(-1)?.soc ?? 0, 0)}<span class="ml-1 text-base text-muted-foreground">%</span></p>
+      <p class="font-serif text-4xl font-light leading-none text-foreground">
+        {batteryReadingReliable ? num(points.at(-1)?.soc ?? 0, 0) : '—'}{batteryReadingReliable && <span class="ml-1 text-base text-muted-foreground">%</span>}
+      </p>
     </div>
     <div class="hidden space-y-1 sm:block">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">จ่ายออกสูงสุด</p>
@@ -121,6 +132,8 @@ const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
       <p class="text-sm text-muted-foreground">ชาร์จอยู่ประมาณ {num(chargeMinutes / 60, 1)} ชม.</p>
     </div>
   </div>
+
+  {!batteryReadingReliable && <p class="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">{batteryReadingMessage}</p>}
 
   <div class="mt-4 grid gap-5 sm:mt-5 lg:grid-cols-2">
     <div>
@@ -153,8 +166,8 @@ const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
                 ))
               }
               <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
-              <path d={socArea} fill="url(#battery-soc-grad)"></path>
-              <path d={socPath} fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap={'round' as const} stroke-linejoin={'round' as const}></path>
+              {batteryReadingReliable && <path d={socArea} fill="url(#battery-soc-grad)" />}
+              {batteryReadingReliable && <path d={socPath} fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap={'round' as const} stroke-linejoin={'round' as const} />}
             </svg>
           </div>
         </div>

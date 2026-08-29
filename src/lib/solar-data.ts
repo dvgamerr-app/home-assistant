@@ -23,6 +23,7 @@ export const SYSTEM = {
   name: 'บ้าน 75/63',
   ratedPowerKw: 8,
   batteryCapacityKwh: 10,
+  batteryConnectedMinVoltage: 20,
   installDate: '2026-05-11',
   investmentTHB: 359000,
   serialNumber: 'LIBIPS08EEEAF618',
@@ -38,7 +39,7 @@ const EMPTY_LIVE: LiveSnapshot = {
   loadPowerKw: 0,
   batteryPowerKw: 0,
   batterySoc: 0,
-  batterySoh: 100,
+  batterySoh: null,
   gridPowerKw: 0,
   batteryVoltage: 0,
   batteryCurrent: 0,
@@ -46,11 +47,16 @@ const EMPTY_LIVE: LiveSnapshot = {
   pv1: { power: 0, voltage: 0, current: 0 },
   pv2: { power: 0, voltage: 0, current: 0 },
   gridVoltage: 0,
+  gridFrequencyHz: null,
   totalGenerationTime: 0,
   powerRating: 0,
   offGridPowerKw: 0,
   isOnline: false,
   lastUpdate: new Date(0).toISOString(),
+  batteryStatus: null,
+  firmwareVersion: null,
+  serialNumber: null,
+  activeAlarms: [],
 }
 
 export type SolarDataScope = 'all' | 'overview' | 'load' | 'load-history' | 'solar' | 'bill'
@@ -98,7 +104,14 @@ function formatMonthDays(monthDays: DayPoint[], year: number, month: number) {
   const rate = marginalRate(monthlyGridKwh || 320)
 
   return Array.from({ length: daysInMonth }, (_, index) => {
-    const dayPoint = dayMap.get(index + 1) ?? { day: index + 1, generated: 0, consumed: 0, gridImport: 0 }
+    const dayPoint = dayMap.get(index + 1) ?? {
+      day: index + 1,
+      generated: 0,
+      consumed: 0,
+      gridImport: 0,
+      hasGenerationData: false,
+      hasUsageData: false,
+    }
     const selfUse = clampZero(dayPoint.consumed - dayPoint.gridImport)
 
     return {
@@ -108,6 +121,8 @@ function formatMonthDays(monthDays: DayPoint[], year: number, month: number) {
       selfUse,
       gridImport: dayPoint.gridImport,
       saved: +(selfUse * rate).toFixed(1),
+      hasGenerationData: dayPoint.hasGenerationData,
+      hasUsageData: dayPoint.hasUsageData,
     }
   })
 }
@@ -132,6 +147,8 @@ function summarizeMonth(monthPoint: MonthPoint, selfUseOverride?: number) {
       gridCostTHB: billActual.total,
       wouldHaveCostTHB: billNoSolar.total,
       selfSufficiency: monthPoint.consumed > 0 ? (selfUse / monthPoint.consumed) * 100 : 0,
+      hasGenerationData: monthPoint.hasGenerationData,
+      hasUsageData: monthPoint.hasUsageData,
     },
   }
 }
@@ -171,11 +188,11 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
     needsDayComparison ? cacheData(`solar:recent-daily:${selectedISO}:8`, dayTtl, () => getRecentDailyTotals(selectedDate, 8)) : Promise.resolve(null),
   ])
   const live = liveResult ?? EMPTY_LIVE
-  const today = todayResult ?? { generated: 0, consumed: 0, gridImport: 0 }
+  const today = todayResult ?? { generated: 0, consumed: 0, gridImport: 0, hasGenerationData: false, hasUsageData: false }
   const monthDays = monthDaysResult ?? []
   const hourly = hourlyResult ?? []
   const fiveMinRaw = fiveMinResult ?? []
-  const lifetime = lifetimeResult ?? { generated: 0, gridImport: 0, generationTime: 0, co2ReductionKg: 0 }
+  const lifetime = lifetimeResult ?? { generated: 0, gridImport: 0, generationTime: 0, co2ReductionKg: 0, hasGenerationData: false }
   const bills = billsResult ?? []
   const histBatteryCharge = histBatteryChargeResult ?? 0
   const pvPeak = pvPeakResult ?? { pv1: 0, pv2: 0 }
@@ -221,6 +238,8 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
       billWithSolar,
       billWithoutSolar,
       saved: billWithoutSolar - billWithSolar,
+      hasGenerationData: monthPoint.hasGenerationData,
+      hasUsageData: monthPoint.hasUsageData,
     }
   })
 
@@ -259,13 +278,23 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
     peakPvKw,
     peakLoadKw,
     peakBatteryDischargeKw,
+    hasGenerationData: today.hasGenerationData,
+    hasUsageData: today.hasUsageData,
+    hasPowerSeries: fiveMinRaw.length > 0,
   }
 
   const recentDailyMap = new Map(recentDailyRows.map((row) => [row.date, row]))
   const recentDaily = Array.from({ length: 8 }, (_, index) => {
     const dateValue = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate() - (7 - index))
     const iso = formatISODate(dateValue)
-    const row = recentDailyMap.get(iso) ?? { date: iso, generated: 0, consumed: 0, gridImport: 0 }
+    const row = recentDailyMap.get(iso) ?? {
+      date: iso,
+      generated: 0,
+      consumed: 0,
+      gridImport: 0,
+      hasGenerationData: false,
+      hasUsageData: false,
+    }
     const selfPowered = clampZero(row.consumed - row.gridImport)
 
     return {
@@ -276,45 +305,51 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
       selfPowered,
       selfSufficiencyPct: pct(selfPowered, row.consumed),
       gridDependencyPct: pct(row.gridImport, row.consumed),
+      hasGenerationData: row.hasGenerationData,
+      hasUsageData: row.hasUsageData,
     }
   })
 
   const previousDay = recentDaily.at(-2)
   const baselineDays = recentDaily.slice(0, -1)
+  const generationBaselineDays = baselineDays.filter((entry) => entry.hasGenerationData)
+  const usageBaselineDays = baselineDays.filter((entry) => entry.hasUsageData)
   const trailing7Avg = {
     generated: average(
-      baselineDays.map((entry) => entry.generated),
+      generationBaselineDays.map((entry) => entry.generated),
       1,
     ),
     consumed: average(
-      baselineDays.map((entry) => entry.consumed),
+      usageBaselineDays.map((entry) => entry.consumed),
       1,
     ),
     gridImport: average(
-      baselineDays.map((entry) => entry.gridImport),
+      usageBaselineDays.map((entry) => entry.gridImport),
       1,
     ),
     selfPowered: average(
-      baselineDays.map((entry) => entry.selfPowered),
+      usageBaselineDays.map((entry) => entry.selfPowered),
       1,
     ),
     selfSufficiencyPct: average(
-      baselineDays.map((entry) => entry.selfSufficiencyPct),
+      usageBaselineDays.map((entry) => entry.selfSufficiencyPct),
       0,
     ),
     gridDependencyPct: average(
-      baselineDays.map((entry) => entry.gridDependencyPct),
+      usageBaselineDays.map((entry) => entry.gridDependencyPct),
       0,
     ),
+    generationDays: generationBaselineDays.length,
+    usageDays: usageBaselineDays.length,
   }
 
   const dayComparison = {
     previousDay,
     trailing7Avg,
     deltaFromPrevious: previousDay && {
-      generated: changeFrom(dayFlow.generated, previousDay.generated),
-      gridImport: changeFrom(dayFlow.gridImport, previousDay.gridImport),
-      selfSufficiencyPct: changeFrom(dayFlow.selfSufficiencyPct, previousDay.selfSufficiencyPct),
+      generated: dayFlow.hasGenerationData && previousDay.hasGenerationData ? changeFrom(dayFlow.generated, previousDay.generated) : undefined,
+      gridImport: dayFlow.hasUsageData && previousDay.hasUsageData ? changeFrom(dayFlow.gridImport, previousDay.gridImport) : undefined,
+      selfSufficiencyPct: dayFlow.hasUsageData && previousDay.hasUsageData ? changeFrom(dayFlow.selfSufficiencyPct, previousDay.selfSufficiencyPct) : undefined,
     },
   }
 
@@ -387,6 +422,7 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
     gridOverview,
     fiveMin: full5Min,
     energyDistribution,
+    lifetime,
     payback,
     bills: billsEnhanced,
   }
@@ -426,6 +462,8 @@ export async function getMonthLoad(year: number, month: number) {
       generated: raw.generated,
       consumed: raw.consumed,
       gridImport: raw.gridImport,
+      hasGenerationData: monthDays.some((dayPoint) => dayPoint.hasGenerationData),
+      hasUsageData: monthDays.some((dayPoint) => dayPoint.hasUsageData),
     },
     raw.selfUse,
   )

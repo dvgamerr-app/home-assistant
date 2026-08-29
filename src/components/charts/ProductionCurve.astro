@@ -9,6 +9,7 @@ import { getBangkokISODate } from '@/lib/date'
 import { SYSTEM } from '@/lib/solar-data'
 
 const { fiveMin: POINTS, date, isToday, socketUrl } = Astro.props as Pick<SolarData, 'fiveMin'> & { date: string; isToday: boolean; socketUrl: string }
+const hasData = POINTS.length > 0
 
 const [VW, ML, MR] = [560, 4, 8]
 
@@ -42,13 +43,13 @@ const chartJson = JSON.stringify({
 })
 ---
 
-<div class="production-chart-root" data-production-chart={chartJson}>
-  <ChartCard eyebrow="พลังงาน" title="กำลังผลิตวันนี้" class="flex flex-col overflow-hidden">
+<div class="production-chart-root" data-production-chart={hasData ? chartJson : undefined}>
+  <ChartCard eyebrow="พลังงาน" title={isToday ? 'กำลังผลิตวันนี้' : 'กำลังผลิตตามวันที่เลือก'} class="flex flex-col overflow-hidden">
     <div class="flex flex-wrap items-end gap-4 border-b border-border/60 pb-4 sm:gap-6 sm:pb-5">
       <div class="space-y-1">
         <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">พีคโซลาร์</p>
         <p class="font-serif text-4xl font-light leading-none">
-          <span id="pv-peak-pv" class="pv-peak-pv">{num(peakPv, 2)}</span><span class="ml-1 text-base text-muted-foreground">kW</span>
+          <span id="pv-peak-pv" class="pv-peak-pv">{hasData ? num(peakPv, 2) : '—'}</span><span class="ml-1 text-base text-muted-foreground">kW</span>
         </p>
       </div>
       <div class="hidden space-y-1 sm:block">
@@ -78,13 +79,21 @@ const chartJson = JSON.stringify({
         }
       </div>
       <div class="min-w-0 flex-1">
-        <div class="pv-chart-wrapper h-48 w-full sm:h-56 md:h-60">
+        <div class="pv-chart-wrapper relative h-48 w-full sm:h-56 md:h-60">
           <svg
             width="100%"
             height="100%"
             role={'img' as const}
             aria-label="กราฟกำลังผลิต ซูมและเลื่อนดูข้อมูลย้อนหลังได้"
+            class:list={[!hasData && 'opacity-0']}
             style="cursor:grab;touch-action:none;user-select:none;overscroll-behavior:contain"></svg>
+          {
+            !hasData && (
+              <div class="absolute inset-0 flex items-center justify-center px-6 text-center">
+                <p class="text-sm text-muted-foreground">ไม่มี telemetry สำหรับวันที่เลือก</p>
+              </div>
+            )
+          }
         </div>
         <div id="pv-x-axis" class="pv-x-axis relative mt-1 flex h-4 justify-between text-[9px] text-muted-foreground" style={`padding-left:${padLeft}%;padding-right:${padRight}%`}>
           {xLabels.map((label, index) => <span class:list={[index % 6 === 0 || index === xLabels.length - 1 ? 'text-muted-foreground' : 'text-transparent sm:text-muted-foreground']}>{label}</span>)}

@@ -1,0 +1,44 @@
+---
+import ChartCard from '@/components/ui/ChartCard.astro'
+import { num } from '@/lib/electricity'
+import type { SolarData } from '@/lib/solar-data'
+
+const { lifetime, months, system } = Astro.props as Pick<SolarData, 'lifetime' | 'months' | 'system'>
+const latestMonth = months.find((month) => month.hasGenerationData)
+const installDate = new Intl.DateTimeFormat('th-TH', {
+  dateStyle: 'long',
+  timeZone: 'Asia/Bangkok',
+}).format(new Date(`${system.installDate}T00:00:00+07:00`))
+---
+
+<ChartCard eyebrow="พลังงานสะสม" title="ผลผลิตตั้งแต่เริ่มบันทึก" subtitle={`ระบบเริ่มบันทึกข้อมูลเมื่อ ${installDate}`}>
+  <div class="border-b border-border/60 pb-5">
+    <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ผลิตได้ทั้งหมด</p>
+    <p class="mt-2 font-serif text-5xl font-light leading-none text-foreground">
+      {lifetime.hasGenerationData ? num(lifetime.generated, 1) : '—'}<span class="ml-2 text-base text-muted-foreground">kWh</span>
+    </p>
+    <p class="mt-3 text-sm text-muted-foreground">ยอดสะสมจาก station summary ของอินเวอร์เตอร์ จึงไม่ใช้การประมาณจากผลต่างมิเตอร์</p>
+  </div>
+
+  <div class="grid grid-cols-2 gap-4 pt-5 sm:grid-cols-3">
+    <div>
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">เดือนล่าสุด</p>
+      <p class="mt-1 font-serif text-2xl font-light text-foreground">{latestMonth ? num(latestMonth.generated, 1) : '—'}<span class="ml-1 text-sm text-muted-foreground">kWh</span></p>
+      <p class="mt-1 text-xs text-muted-foreground">{latestMonth?.month ?? 'ยังไม่มีข้อมูล'}</p>
+    </div>
+    <div>
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">เวลาผลิตสะสม</p>
+      <p class="mt-1 font-serif text-2xl font-light text-foreground">
+        {lifetime.generationTime > 0 ? num(lifetime.generationTime, 0) : '—'}<span class="ml-1 text-sm text-muted-foreground">ชม.</span>
+      </p>
+      <p class="mt-1 text-xs text-muted-foreground">จากตัวนับของอินเวอร์เตอร์</p>
+    </div>
+    <div class="col-span-2 sm:col-span-1">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ลดคาร์บอนโดยประมาณ</p>
+      <p class="mt-1 font-serif text-2xl font-light text-foreground">
+        {lifetime.hasGenerationData ? num(lifetime.co2ReductionKg, 0) : '—'}<span class="ml-1 text-sm text-muted-foreground">กก. CO₂e</span>
+      </p>
+      <p class="mt-1 text-xs text-muted-foreground">คำนวณจากค่า emission factor ของโครงข่าย</p>
+    </div>
+  </div>
+</ChartCard>

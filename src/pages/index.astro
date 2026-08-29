@@ -99,7 +99,7 @@ const waterPayment = !latestWaterBill ? undefined : latestWaterBill.isPaid ? 'à¸
         <PaybackCard system={data.system} payback={data.payback} />
       </div>
       <div class="lg:col-span-1">
-        <EnergyFlow live={data.live} socketUrl={socketUrl} client:load />
+        <EnergyFlow live={data.live} system={data.system} socketUrl={socketUrl} client:load />
       </div>
     </div>
 
