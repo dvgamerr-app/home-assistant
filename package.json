@@ -28,7 +28,7 @@
   "dependencies": {
     "@astrojs/node": "^11.1.4",
     "@better-auth/kysely-adapter": "^1.7.2",
-    "@lucide/svelte": "^1.35.0",
+    "@lucide/svelte": "^1.37.0",
     "better-auth": "^1.7.2",
     "kysely": "^0.29.5",
     "pino": "^10.3.1",
