@@ -2,7 +2,7 @@ import { createAlertWorker, runAlertChecks } from './alert-worker'
 import { config } from './config'
 import { cacheData } from './data-cache'
 import { formatBangkokDateTime, getBangkokISODate } from './date'
-import { getBatteryMorningSocPeak, getLiveSnapshot, getPvMorningBaseline, getPvMorningEnergy, type PvMorningBaseline, type PvMorningEnergy } from './db'
+import { getBatteryMorningSocPeak, getLiveSnapshot, getPvMorningBaseline, getPvMorningEnergy, type PvMorningBaseline, type PvMorningEnergy, type SolarAlarm } from './db'
 import { getAlertState, setAlertState } from './alert-state'
 import { num } from './electricity'
 import { sendEnergyNotice, sendEnergyTextNotice, type EnergyNotice } from './line-notice'
@@ -56,6 +56,21 @@ export function getDailyConditionTransition(state: { status: string; lastValue: 
   return state?.lastValue === day ? 'none' : 'record-normal'
 }
 
+/** ลายเซ็นของ alarm ที่ยังไม่เคลียร์ — ใช้เทียบว่าชุด alarm เปลี่ยนไปหรือยัง */
+export function getAlarmSignature(alarms: Pick<SolarAlarm, 'key'>[]) {
+  return alarms
+    .map((alarm) => alarm.key)
+    .sort()
+    .join(',')
+}
+
+/** แจ้งเมื่อชุด alarm เปลี่ยน (alarm ใหม่โผล่) และแจ้ง recovery เมื่อเคลียร์ครบ */
+export function getAlarmTransition(state: { status: string; lastValue: string | null } | null, signature: string) {
+  if (signature !== '') return state?.status === 'alert' && state.lastValue === signature ? 'none' : 'alert'
+  if (state?.status === 'alert') return 'recovery'
+  return state ? 'none' : 'record-normal'
+}
+
 export function getConnectionTransition(previousStatus: string | null, currentStatus: 'online' | 'offline') {
   if (previousStatus === currentStatus) return 'none'
   if (previousStatus === null && currentStatus === 'online') return 'record-online'
@@ -101,6 +116,49 @@ async function checkDeviceConnection(live: Awaited<ReturnType<typeof getLiveSnap
 
   await sendEnergyTextNotice(text)
   await setAlertState({ alertKey, status, lastValue: live.lastUpdate, notified: true })
+}
+
+/** alarm หนึ่งตัวต่อหนึ่งแถว — ชื่อกับคำอธิบายมาจากอินเวอร์เตอร์ ไม่มีก็ใช้รหัสแทน */
+function alarmField(alarm: SolarAlarm) {
+  return {
+    label: alarm.name ?? alarm.key,
+    value: [alarm.description, formatBangkokDateTime(alarm.firedAt)].filter(Boolean).join(' · '),
+  }
+}
+
+/**
+ * alarm ของอินเวอร์เตอร์ไม่แสดงบนหน้าเว็บแล้ว — ส่งเข้า LINE ทางเดียว
+ * ตรวจทุก tick เพราะเป็นเหตุการณ์ ไม่ผูกกับช่วงเวลาเหมือน check อื่น
+ */
+async function checkInverterAlarms(live: Awaited<ReturnType<typeof getLiveSnapshot>>) {
+  const alertKey = 'inverter-alarm'
+  const alarms = live.activeAlarms
+  const signature = getAlarmSignature(alarms)
+  const state = await getAlertState(alertKey)
+  const transition = getAlarmTransition(state, signature)
+  if (transition === 'none') return
+
+  if (transition === 'record-normal') {
+    await setAlertState({ alertKey, status: 'normal', lastValue: signature })
+    return
+  }
+
+  if (transition === 'recovery') {
+    await sendEnergyNotice({
+      tone: 'success',
+      title: 'การแจ้งเตือนของอินเวอร์เตอร์สิ้นสุดแล้ว',
+      fields: [{ label: 'สถานะ', value: 'ไม่มีการแจ้งเตือนค้างอยู่' }],
+    })
+    await setAlertState({ alertKey, status: 'normal', lastValue: signature, notified: true })
+    return
+  }
+
+  await sendEnergyNotice({
+    tone: 'danger',
+    title: alarms.length === 1 ? `อินเวอร์เตอร์แจ้งเตือน · ${alarms[0]!.name ?? alarms[0]!.key}` : `อินเวอร์เตอร์แจ้งเตือน ${alarms.length} รายการ`,
+    fields: alarms.map(alarmField),
+  })
+  await setAlertState({ alertKey, status: 'alert', lastValue: signature, notified: true })
 }
 
 async function checkMorningBattery(day: string, batterySoc: number, reservePct: number) {
@@ -195,6 +253,7 @@ function scheduledChecks(clock: { day: string; minuteOfDay: number }, live: Awai
   const checks = [{ name: 'device-connection', run: () => checkDeviceConnection(live) }]
   if (!live.isOnline) return checks
 
+  checks.push({ name: 'inverter-alarm', run: () => checkInverterAlarms(live) })
   if (clock.minuteOfDay >= MORNING_ALERT_MINUTE) {
     checks.push(
       { name: 'battery-morning', run: () => checkMorningBattery(clock.day, live.batterySoc, batteryReservePct) },

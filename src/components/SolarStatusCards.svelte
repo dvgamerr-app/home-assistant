@@ -9,7 +9,6 @@
   import Clock from '@lucide/svelte/icons/clock'
   import Heart from '@lucide/svelte/icons/heart'
   import Activity from '@lucide/svelte/icons/activity'
-  import CircleAlert from '@lucide/svelte/icons/circle-alert'
   import Gauge from '@lucide/svelte/icons/gauge'
   import Plug from '@lucide/svelte/icons/plug'
   import Timer from '@lucide/svelte/icons/timer'
@@ -102,20 +101,6 @@
     </span>
     <span>ข้อมูลล่าสุด {lastUpdateLabel} น.</span>
   </div>
-
-  {#if live.activeAlarms.length > 0}
-    <section class="rounded-lg border border-destructive/40 bg-destructive/5 p-4 text-destructive">
-      <div class="flex items-start gap-3">
-        <CircleAlert class="mt-0.5 shrink-0" size={18} strokeWidth={1.25} />
-        <div>
-          <p class="font-medium">พบการแจ้งเตือนที่ยังไม่สิ้นสุด {live.activeAlarms.length} รายการ</p>
-          {#each live.activeAlarms as alarm (alarm.key)}
-            <p class="mt-1 text-sm text-foreground">{alarm.name ?? alarm.key}{alarm.description ? ` · ${alarm.description}` : ''}</p>
-          {/each}
-        </div>
-      </div>
-    </section>
-  {/if}
 
   <div class="grid gap-6 lg:grid-cols-3">
     <!-- ── Battery Card ── -->

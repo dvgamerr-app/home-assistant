@@ -1,5 +1,14 @@
 import { describe, expect, test } from 'bun:test'
-import { getBangkokClock, getConnectionTransition, getDailyConditionTransition, getDefaultSolarBaselineMonth, getUnderperformingMppts, shouldAlertEveningBattery } from './energy-alerts'
+import {
+  getAlarmSignature,
+  getAlarmTransition,
+  getBangkokClock,
+  getConnectionTransition,
+  getDailyConditionTransition,
+  getDefaultSolarBaselineMonth,
+  getUnderperformingMppts,
+  shouldAlertEveningBattery,
+} from './energy-alerts'
 import { buildEnergyFlexMessage, buildEnergyTextMessage } from './line-notice'
 
 describe('Energy Lib alert rules', () => {
@@ -31,6 +40,21 @@ describe('Energy Lib alert rules', () => {
     expect(getDailyConditionTransition({ status: 'normal', lastValue: '2026-08-16' }, '2026-08-16', true)).toBe('alert')
     expect(getDailyConditionTransition({ status: 'alert', lastValue: '2026-08-15' }, '2026-08-16', false)).toBe('recovery')
     expect(getDailyConditionTransition({ status: 'normal', lastValue: '2026-08-15' }, '2026-08-16', false)).toBe('record-normal')
+  })
+
+  test('treats the active alarm set as an order-independent signature', () => {
+    expect(getAlarmSignature([{ key: 'pvOverVoltage' }, { key: 'batteryNoConnected' }])).toBe('batteryNoConnected,pvOverVoltage')
+    expect(getAlarmSignature([{ key: 'batteryNoConnected' }, { key: 'pvOverVoltage' }])).toBe('batteryNoConnected,pvOverVoltage')
+    expect(getAlarmSignature([])).toBe('')
+  })
+
+  test('notifies inverter alarms once per alarm set and recovers when cleared', () => {
+    expect(getAlarmTransition(null, 'batteryNoConnected')).toBe('alert')
+    expect(getAlarmTransition({ status: 'alert', lastValue: 'batteryNoConnected' }, 'batteryNoConnected')).toBe('none')
+    expect(getAlarmTransition({ status: 'alert', lastValue: 'batteryNoConnected' }, 'batteryNoConnected,pvOverVoltage')).toBe('alert')
+    expect(getAlarmTransition({ status: 'alert', lastValue: 'batteryNoConnected' }, '')).toBe('recovery')
+    expect(getAlarmTransition(null, '')).toBe('record-normal')
+    expect(getAlarmTransition({ status: 'normal', lastValue: '' }, '')).toBe('none')
   })
 
   test('sends online recovery only after an offline state', () => {
