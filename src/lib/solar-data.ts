@@ -26,6 +26,8 @@ export const SYSTEM = {
   batteryCapacityKwh: 10,
   batteryConnectedMinVoltage: 20,
   installDate: '2026-05-11',
+  /** วันจัดสายแผงล่าสุด: MPPT 1 = 10 แผง · MPPT 2 = 5 แผง (เดิม 11/4) — ใช้ตัด peak ของ layout เก่าออก */
+  stringLayoutSince: '2026-09-17',
   investmentTHB: 359000,
   serialNumber: 'LIBIPS08EEEAF618',
 }
@@ -204,7 +206,7 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
     needsFiveMin ? cacheData(fiveMinCacheKey(selectedISO), dayTtl, () => get5Min(selectedDate)) : Promise.resolve(null),
     needsSolarHistory ? cacheData('solar:lifetime', CACHE.slowMoving, getLifetime) : Promise.resolve(null),
     needsBills ? cacheData('utility:bills:36', CACHE.slowMoving, () => getBills(36)) : Promise.resolve(null),
-    needsSolarHistory ? cacheData('solar:pv-peak', CACHE.slowMoving, getPvPeak) : Promise.resolve(null),
+    needsSolarHistory ? cacheData(`solar:pv-peak:${SYSTEM.stringLayoutSince}`, CACHE.slowMoving, () => getPvPeak(SYSTEM.stringLayoutSince)) : Promise.resolve(null),
     needsDayComparison ? cacheData(`solar:recent-daily:${selectedISO}:8`, dayTtl, () => getRecentDailyTotals(selectedDate, 8)) : Promise.resolve(null),
   ])
 

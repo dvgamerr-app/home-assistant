@@ -431,12 +431,19 @@ export async function getHourly(date?: Date): Promise<HourlyPoint[]> {
   }))
 }
 
-/** peak all-time สำหรับแต่ละ MPPT string */
-export async function getPvPeak(): Promise<{ pv1: number; pv2: number }> {
+/**
+ * peak ของแต่ละ MPPT string นับจาก `since` (วันที่จัดสายแผงครั้งล่าสุด)
+ *
+ * ย้ายแผงข้าม string แล้ว peak เดิมจะไม่มีวันถึงอีก (เช่น 11 แผง → 10 แผง)
+ * ทำให้ % เทียบค่าสูงสุดค้างเพดานตลอด — จึงตัดข้อมูลก่อนวันจัดสายทิ้ง
+ */
+export async function getPvPeak(since: string): Promise<{ pv1: number; pv2: number }> {
   const rows = await sql<{ attr: string; value: string }[]>`
     SELECT attr, MAX(value::numeric) as value
     FROM stash.solar_record
-    WHERE device_id = ${DEVICE} AND attr IN ('pv1Power', 'pv2Power')
+    WHERE device_id = ${DEVICE}
+      AND attr IN ('pv1Power', 'pv2Power')
+      AND recorded_at >= (${since} || ' 00:00 ' || ${TZ})::timestamptz
     GROUP BY attr
   `
   const m = Object.fromEntries(rows.map((r) => [r.attr, n(r.value)]))
