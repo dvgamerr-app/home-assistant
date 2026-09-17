@@ -4,7 +4,6 @@ import Nav from '@/components/Nav.astro'
 import ElectricityNav from '@/components/ElectricityNav.astro'
 import PageHeader from '@/components/ui/PageHeader.astro'
 import SolarStatusCards from '@/components/SolarStatusCards.svelte'
-import SolarDaySummary from '@/components/SolarDaySummary.astro'
 import SolarLifetimeSummary from '@/components/SolarLifetimeSummary.astro'
 import BatteryBehaviorChart from '@/components/charts/BatteryBehaviorChart.astro'
 import GridDependencyChart from '@/components/charts/GridDependencyChart.astro'
@@ -36,15 +35,20 @@ const socketUrl = getSocketUrl(Astro.request.url)
     <div class="grid gap-6">
       <ProductionCurve fiveMin={data.fiveMin} date={selectedISO} isToday={isToday} socketUrl={socketUrl} />
 
-      <SolarDaySummary dayFlow={data.dayFlow} dayComparison={data.dayComparison} isToday={isToday} />
-
       {isToday && <SolarStatusCards live={data.live} pvStrings={data.pvStrings} system={data.system} socketUrl={socketUrl} client:load />}
 
       {
         data.fiveMin.length > 0 && (
           <div class="grid gap-6 lg:grid-cols-2">
             <BatteryBehaviorChart fiveMin={data.fiveMin} dayFlow={data.dayFlow} currentBatteryConnection={currentBatteryConnection} />
-            <SolarProductionRateCurve fiveMin={data.fiveMin} isToday={isToday} pv1MaxKw={data.pvStrings[0]?.peakKw ?? 0} pv2MaxKw={data.pvStrings[1]?.peakKw ?? 0} socketUrl={socketUrl} />
+            <SolarProductionRateCurve
+              fiveMin={data.fiveMin}
+              date={selectedISO}
+              isToday={isToday}
+              pv1MaxKw={data.pvStrings[0]?.peakKw ?? 0}
+              pv2MaxKw={data.pvStrings[1]?.peakKw ?? 0}
+              socketUrl={socketUrl}
+            />
           </div>
         )
       }
