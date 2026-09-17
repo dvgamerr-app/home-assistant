@@ -82,6 +82,31 @@ export function svgArea(values: number[], xMin: number, yMin: number, xMax: numb
   return `${svgLine(values, xMin, yMin, xMax, yMax, tension)} L ${xMax},${yMax} L ${xMin},${yMax} Z`
 }
 
+/**
+ * แตกอนุกรมเวลาเป็นหลาย path เมื่อข้อมูลขาดช่วงเกิน `gapMs` — ไม่งั้นเส้นจะลากพาดข้ามช่วงที่ไม่มีข้อมูล
+ * และ downsample ให้เหลือไม่เกิน `maxPoints` จุด เพื่อไม่ให้ path ยาวเกินจำเป็นตอนซูมออก
+ */
+export function splitSeriesPaths<T>(
+  points: T[],
+  maxPoints: number,
+  timestamp: (point: T) => number,
+  value: (point: T) => number,
+  x: (timestamp: number) => number,
+  y: (value: number) => number,
+  gapMs: number,
+): ChartPoint[][] {
+  const groups: T[][] = []
+  for (const point of points) {
+    const previous = groups.at(-1)?.at(-1)
+    if (!previous || timestamp(point) - timestamp(previous) > gapMs) groups.push([])
+    groups.at(-1)!.push(point)
+  }
+  const step = Math.max(1, Math.ceil(points.length / maxPoints))
+  return groups
+    .map((group) => group.filter((_, index) => index % step === 0 || index === group.length - 1).map((point) => ({ x: x(timestamp(point)), y: y(value(point)) })))
+    .filter((group) => group.length >= 2)
+}
+
 export type BarSegment = { x: number; y: number; w: number; h: number; value: number; rx: number }
 
 /**

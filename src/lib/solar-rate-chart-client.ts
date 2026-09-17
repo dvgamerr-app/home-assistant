@@ -1,78 +1,48 @@
+// กราฟ "กำลังผลิตเทียบค่าสูงสุด" — ซูม/เลื่อน/โหลดย้อนหลังด้วยกลไกเดียวกับ production-chart-client
+// ต่างกันที่แกน Y เป็นเปอร์เซ็นต์ของค่าสูงสุดรายชุด ไม่ใช่ kW
+
 import { io, type Socket } from 'socket.io-client'
 import { splitSeriesPaths, svgPathFromPoints } from './chart'
 import { formatPointTime, formatVisibleRange, timeAxisTicks } from './chart-time-axis'
 import { DAY_MS, MINUTE_MS, bangkokDayStart, clampTimeRange, datesInRange, panTimeRange, zoomTimeRange, type TimeRange } from './chart-viewport'
 import type { FiveMinChartPayload } from './solar-fivemin'
+import type { SolarRateChartConfig } from './solar-rate-chart'
 import { SOCKET_CHANNELS } from './socket'
 
-type ChartConfig = FiveMinChartPayload & {
-  selectedDate: string
-  today: string
-  historyStart: string
-  isToday: boolean
-  socketUrl: string
-}
-
-type PowerPoint = {
+type RatePoint = {
   timestamp: number
-  pv: number
-  load: number
-  batt: number
-  grid: number
-}
-
-type Scale = {
-  min: number
-  max: number
-  ticks: number[]
+  pv1: number
+  pv2: number
 }
 
 const MIN_VIEW_MS = 5 * MINUTE_MS
 const MAX_VIEW_MS = DAY_MS
 const PATH_MARGIN_MS = 15 * MINUTE_MS
 const GAP_MS = 20 * MINUTE_MS
-const numberFormat = new Intl.NumberFormat('th-TH', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const INSET = { left: 4, top: 18, right: 8, bottom: 28 } as const
 
-function pointsFromPayload(date: string, payload: FiveMinChartPayload): PowerPoint[] {
+function pointsFromPayload(date: string, payload: Pick<FiveMinChartPayload, 'times' | 'pv1' | 'pv2'>): RatePoint[] {
   const dayStart = bangkokDayStart(date)
   return payload.times.map((minuteOfDay, index) => ({
     timestamp: dayStart + minuteOfDay * MINUTE_MS,
-    pv: payload.pv[index] ?? 0,
-    load: payload.load[index] ?? 0,
-    batt: payload.batt[index] ?? 0,
-    grid: payload.grid[index] ?? 0,
+    pv1: payload.pv1[index] ?? 0,
+    pv2: payload.pv2[index] ?? 0,
   }))
 }
 
-function computeScale(points: PowerPoint[]): Scale {
-  const dataMax = Math.max(...points.map((point) => Math.max(point.pv, point.load)), 1)
-  const dataMin = Math.min(0, ...points.map((point) => Math.min(point.batt, point.grid)))
-  const rawStep = dataMax / 4
-  const magnitude = 10 ** Math.floor(Math.log10(rawStep))
-  const step = Math.ceil(rawStep / magnitude) * magnitude
-  const positiveTicks = Math.ceil(dataMax / step)
-  const negativeTicks = dataMin < -0.05 ? Math.ceil(Math.abs(dataMin) / step) : 0
-  const max = positiveTicks * step
-  const min = -negativeTicks * step
-
-  return {
-    min,
-    max,
-    ticks: [...Array.from({ length: positiveTicks }, (_, index) => (positiveTicks - index) * step), 0, ...Array.from({ length: negativeTicks }, (_, index) => -(index + 1) * step)],
-  }
+/** เพดานแกน Y ปัดขึ้นทีละ 25% และไม่ต่ำกว่า 100% เพื่อให้เส้น 100% เป็นหลักอ้างอิงเสมอ */
+function scaleTopForPeak(peakPercent: number) {
+  return Math.max(100, Math.ceil(Math.max(peakPercent, 1) / 25) * 25)
 }
 
-const splitPaths = (points: PowerPoint[], maxPoints: number, value: (point: PowerPoint) => number, x: (timestamp: number) => number, y: (value: number) => number) =>
-  splitSeriesPaths(points, maxPoints, (point) => point.timestamp, value, x, y, GAP_MS)
-
-export function initProductionChart(root: HTMLElement) {
-  const wrapNullable = root.querySelector<HTMLElement>('.pv-chart-wrapper')
+export function initSolarRateChart(root: HTMLElement) {
+  const wrapNullable = root.querySelector<HTMLElement>('.solar-rate-chart-wrapper')
   const svgNullable = wrapNullable?.querySelector<SVGSVGElement>('svg')
-  const tipNullable = root.querySelector<HTMLElement>('.pv-chart-tip')
-  const xAxisNullable = root.querySelector<HTMLElement>('.pv-x-axis')
-  const yAxisNullable = root.querySelector<HTMLElement>('.pv-y-axis')
-  const visibleRangeNullable = root.querySelector<HTMLElement>('.pv-visible-range')
-  const loadStateNullable = root.querySelector<HTMLElement>('.pv-load-state')
+  const tipNullable = root.querySelector<HTMLElement>('.solar-rate-tip')
+  const xAxisNullable = root.querySelector<HTMLElement>('.solar-rate-x-axis')
+  const yAxisNullable = root.querySelector<HTMLElement>('.solar-rate-y-axis')
+  const visibleRangeNullable = root.querySelector<HTMLElement>('.solar-rate-visible-range')
+  const loadStateNullable = root.querySelector<HTMLElement>('.solar-rate-load-state')
   if (!wrapNullable || !svgNullable || !tipNullable || !xAxisNullable || !yAxisNullable || !visibleRangeNullable || !loadStateNullable) return
   const wrap = wrapNullable
   const svg = svgNullable
@@ -82,21 +52,20 @@ export function initProductionChart(root: HTMLElement) {
   const visibleRange = visibleRangeNullable
   const loadState = loadStateNullable
 
-  const config = JSON.parse(root.dataset.productionChart ?? '{}') as ChartConfig
-  const historyStart = bangkokDayStart(config.historyStart)
-  const historyEnd = bangkokDayStart(config.today) + DAY_MS
-  const bounds = { min: historyStart, max: historyEnd }
+  const config = JSON.parse(root.dataset.solarRateChart ?? '{}') as SolarRateChartConfig
+  const { pv1MaxKw, pv2MaxKw } = config
+  const bounds = { min: bangkokDayStart(config.historyStart), max: bangkokDayStart(config.today) + DAY_MS }
   const selectedStart = bangkokDayStart(config.selectedDate)
   let viewport = clampTimeRange({ start: selectedStart, end: selectedStart + DAY_MS }, bounds, MIN_VIEW_MS, MAX_VIEW_MS)
 
-  const dayCache = new Map<string, PowerPoint[]>()
+  const dayCache = new Map<string, RatePoint[]>()
   const loading = new Map<string, Promise<void>>()
   dayCache.set(config.selectedDate, pointsFromPayload(config.selectedDate, config))
 
   let plotLeft = 0
   let plotRight = 0
   let svgWidth = 0
-  let visiblePoints: PowerPoint[] = []
+  let visiblePoints: RatePoint[] = []
   let crosshair: SVGLineElement | null = null
   let animationFrame = 0
   let socket: Socket | null = null
@@ -105,6 +74,8 @@ export function initProductionChart(root: HTMLElement) {
   const pointers = new Map<number, { x: number; y: number }>()
   let dragDistance = 0
   let pinchStart: { range: TimeRange; distance: number; anchorTime: number } | null = null
+
+  const toPct = (kw: number, maxKw: number) => (maxKw > 0 ? (kw / maxKw) * 100 : 0)
 
   const hideTooltip = () => {
     tip.classList.add('hidden')
@@ -170,27 +141,27 @@ export function initProductionChart(root: HTMLElement) {
     for (const date of missing) void loadDate(date)
   }
 
-  function updateSummary(points: PowerPoint[]) {
-    const peakPv = Math.max(...points.map((point) => point.pv), 0)
-    const peakLoad = Math.max(...points.map((point) => point.load), 0)
-    const peakBatt = Math.max(...points.map((point) => point.batt), 0)
-    const pvEl = root.querySelector<HTMLElement>('.pv-peak-pv')
-    const loadEl = root.querySelector<HTMLElement>('.pv-peak-load')
-    const battEl = root.querySelector<HTMLElement>('.pv-peak-batt')
-    if (pvEl) pvEl.textContent = peakPv.toFixed(2)
-    if (loadEl) loadEl.textContent = peakLoad.toFixed(2)
-    if (battEl) battEl.textContent = peakBatt.toFixed(2)
+  /** ตัวเลขหัวการ์ดผูกกับช่วงที่มองเห็น ไม่ใช่ทั้งวัน — ซูมแล้วตัวเลขจึงตรงกับเส้นที่เห็น */
+  function updateSummary(points: RatePoint[]) {
+    const peakPv1Kw = Math.max(...points.map((point) => point.pv1), 0)
+    const peakPv2Kw = Math.max(...points.map((point) => point.pv2), 0)
+    const set = (selector: string, text: string) => {
+      const element = root.querySelector<HTMLElement>(selector)
+      if (element) element.textContent = text
+    }
+    set('.solar-rate-pv1-pct', toPct(peakPv1Kw, pv1MaxKw).toFixed(0))
+    set('.solar-rate-pv1-kw', peakPv1Kw.toFixed(2))
+    set('.solar-rate-pv2-pct', toPct(peakPv2Kw, pv2MaxKw).toFixed(0))
+    set('.solar-rate-pv2-kw', peakPv2Kw.toFixed(2))
   }
 
-  function updateAxes(scale: Scale, chartHeight: number, top: number, bottom: number) {
-    const range = scale.max - scale.min || 1
+  function updateAxes(scaleTop: number, chartHeight: number, top: number, bottom: number) {
     const plotHeight = bottom - top
-    yAxis.innerHTML = scale.ticks
+    yAxis.innerHTML = Array.from({ length: 5 }, (_, index) => scaleTop - (scaleTop / 4) * index)
       .map((value, index) => {
-        const y = top + (1 - (value - scale.min) / range) * plotHeight
+        const y = top + (1 - value / scaleTop) * plotHeight
         const cls = index === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground'
-        const label = `${value < 0 ? '−' : ''}${numberFormat.format(Math.abs(value))}`
-        return `<span class="absolute right-0 text-right text-[9px] leading-none ${cls}" style="top:${((y / chartHeight) * 100).toFixed(2)}%;transform:translateY(-50%)">${label}</span>`
+        return `<span class="absolute right-0 text-right text-[9px] leading-none ${cls}" style="top:${((y / chartHeight) * 100).toFixed(2)}%;transform:translateY(-50%)">${value.toFixed(0)}%</span>`
       })
       .join('')
 
@@ -200,8 +171,6 @@ export function initProductionChart(root: HTMLElement) {
         return `<span class="absolute ${translate} whitespace-nowrap" style="left:${(ratio * 100).toFixed(2)}%">${label}</span>`
       })
       .join('')
-    xAxis.style.paddingLeft = '0'
-    xAxis.style.paddingRight = '0'
     xAxis.style.marginLeft = `${plotLeft}px`
     xAxis.style.marginRight = `${Math.max(svgWidth - plotRight, 0)}px`
     visibleRange.textContent = formatVisibleRange(viewport)
@@ -212,53 +181,51 @@ export function initProductionChart(root: HTMLElement) {
     const height = wrap.clientHeight
     if (width <= 0 || height <= 0) return
 
-    const [left, top, rightInset, bottomInset] = [4, 18, 8, 28]
-    const right = width - rightInset
-    const bottom = height - bottomInset
+    const left = INSET.left
+    const top = INSET.top
+    const right = width - INSET.right
+    const bottom = height - INSET.bottom
     const plotHeight = bottom - top
     svgWidth = width
     plotLeft = left
     plotRight = right
     visiblePoints = cachedPoints(viewport, PATH_MARGIN_MS)
     const summaryPoints = visiblePoints.filter((point) => point.timestamp >= viewport.start && point.timestamp <= viewport.end)
-    const scale = computeScale(summaryPoints)
-    const scaleRange = scale.max - scale.min || 1
+    const peakPct = Math.max(...summaryPoints.map((point) => Math.max(toPct(point.pv1, pv1MaxKw), toPct(point.pv2, pv2MaxKw))), 0)
+    const scaleTop = scaleTopForPeak(peakPct)
     const span = viewport.end - viewport.start
     const x = (timestamp: number) => left + ((timestamp - viewport.start) / span) * (right - left)
-    const y = (value: number) => top + (1 - Math.max(0, Math.min(1, (value - scale.min) / scaleRange))) * plotHeight
+    const y = (value: number) => top + (1 - Math.max(0, Math.min(1, value / scaleTop))) * plotHeight
     const maxRenderPoints = Math.max(Math.floor((right - left) * 2), 240)
 
-    const pvPaths = splitPaths(visiblePoints, maxRenderPoints, (point) => point.pv, x, y)
-    const loadPaths = splitPaths(visiblePoints, maxRenderPoints, (point) => point.load, x, y)
-    const battPaths = splitPaths(visiblePoints, maxRenderPoints, (point) => point.batt, x, y)
-    const gridPaths = splitPaths(visiblePoints, maxRenderPoints, (point) => point.grid, x, y)
-    const lineMarkup = (paths: { x: number; y: number }[][], attributes: string) => paths.map((path) => `<path d="${svgPathFromPoints(path)}" ${attributes}/>`).join('')
-    const areaMarkup = (paths: { x: number; y: number }[][], fill: string) =>
-      paths.map((path) => `<path d="${svgPathFromPoints(path)} L ${path.at(-1)!.x.toFixed(1)},${bottom} L ${path[0].x.toFixed(1)},${bottom} Z" fill="${fill}"/>`).join('')
-    const gridLines = scale.ticks.map((value) => y(value).toFixed(1))
+    const paths = (value: (point: RatePoint) => number) => splitSeriesPaths(visiblePoints, maxRenderPoints, (point) => point.timestamp, value, x, y, GAP_MS)
+    const mppt1Paths = paths((point) => toPct(point.pv1, pv1MaxKw))
+    const mppt2Paths = paths((point) => toPct(point.pv2, pv2MaxKw))
+    const lineMarkup = (groups: { x: number; y: number }[][], attributes: string) => groups.map((group) => `<path d="${svgPathFromPoints(group)}" ${attributes}/>`).join('')
+    const areaMarkup = (groups: { x: number; y: number }[][], fill: string) =>
+      groups.map((group) => `<path d="${svgPathFromPoints(group)} L ${group.at(-1)!.x.toFixed(1)},${bottom} L ${group[0]!.x.toFixed(1)},${bottom} Z" fill="${fill}"/>`).join('')
+    const gridLines = Array.from({ length: 5 }, (_, index) => (top + (plotHeight * index) / 4).toFixed(1))
 
     svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
     svg.innerHTML = `
       <defs>
-        <linearGradient id="pv-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--chart-2)" stop-opacity="0.35"/><stop offset="100%" stop-color="var(--chart-2)" stop-opacity="0"/></linearGradient>
-        <linearGradient id="load-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--destructive)" stop-opacity="0.2"/><stop offset="100%" stop-color="var(--destructive)" stop-opacity="0"/></linearGradient>
-        <clipPath id="pv-clip"><rect x="${left}" y="${top}" width="${right - left}" height="${plotHeight}"/></clipPath>
+        <linearGradient id="solar-rate-mppt1-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--chart-4)" stop-opacity="0.28"/><stop offset="100%" stop-color="var(--chart-4)" stop-opacity="0.04"/></linearGradient>
+        <linearGradient id="solar-rate-mppt2-grad" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--chart-1)" stop-opacity="0.24"/><stop offset="100%" stop-color="var(--chart-1)" stop-opacity="0.04"/></linearGradient>
+        <clipPath id="solar-rate-clip"><rect x="${left}" y="${top}" width="${right - left}" height="${plotHeight}"/></clipPath>
       </defs>
       <line x1="${left}" x2="${right}" y1="${bottom}" y2="${bottom}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"/>
       ${gridLines.map((gridY) => `<line x1="${left}" x2="${right}" y1="${gridY}" y2="${gridY}" stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4"/>`).join('')}
-      <g clip-path="url(#pv-clip)">
-        ${areaMarkup(pvPaths, 'url(#pv-grad)')}
-        ${lineMarkup(pvPaths, 'fill="none" stroke="var(--chart-2)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"')}
-        ${areaMarkup(loadPaths, 'url(#load-grad)')}
-        ${lineMarkup(loadPaths, 'fill="none" stroke="var(--destructive)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"')}
-        ${lineMarkup(battPaths, 'fill="none" stroke="var(--chart-3)" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"')}
-        ${lineMarkup(gridPaths, 'class="mobile-chart-detail" fill="none" stroke="var(--chart-4)" stroke-width="0.75" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 2" stroke-opacity="0.7"')}
+      <g clip-path="url(#solar-rate-clip)">
+        ${areaMarkup(mppt1Paths, 'url(#solar-rate-mppt1-grad)')}
+        ${areaMarkup(mppt2Paths, 'url(#solar-rate-mppt2-grad)')}
+        ${lineMarkup(mppt1Paths, 'fill="none" stroke="var(--chart-4)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"')}
+        ${lineMarkup(mppt2Paths, 'fill="none" stroke="var(--chart-1)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3"')}
       </g>
-      <line class="pv-crosshair" x1="0" x2="0" y1="${top}" y2="${bottom}" stroke="var(--foreground)" stroke-opacity="0.2" stroke-width="0.5" visibility="hidden"/>
+      <line class="solar-rate-crosshair" x1="0" x2="0" y1="${top}" y2="${bottom}" stroke="var(--foreground)" stroke-opacity="0.2" stroke-width="0.5" visibility="hidden"/>
       <rect x="${left}" y="${top}" width="${right - left}" height="${plotHeight}" fill="transparent"/>`
 
-    crosshair = svg.querySelector('.pv-crosshair')
-    updateAxes(scale, height, top, bottom)
+    crosshair = svg.querySelector('.solar-rate-crosshair')
+    updateAxes(scaleTop, height, top, bottom)
     updateSummary(summaryPoints)
   }
 
@@ -282,13 +249,11 @@ export function initProductionChart(root: HTMLElement) {
     crosshair.setAttribute('x1', crosshairX.toFixed(1))
     crosshair.setAttribute('x2', crosshairX.toFixed(1))
     crosshair.setAttribute('visibility', 'visible')
-    tip.querySelector<HTMLElement>('.pv-tip-hour')!.textContent = formatPointTime(point.timestamp)
-    tip.querySelector<HTMLElement>('.pv-tip-pv')!.textContent = `${point.pv.toFixed(2)} kW`
-    tip.querySelector<HTMLElement>('.pv-tip-load')!.textContent = `${point.load.toFixed(2)} kW`
-    tip.querySelector<HTMLElement>('.pv-tip-batt')!.textContent = point.batt > 0.05 ? `+${point.batt.toFixed(2)} kW` : point.batt < -0.05 ? `−${Math.abs(point.batt).toFixed(2)} kW` : '0.00 kW'
-    tip.querySelector<HTMLElement>('.pv-tip-grid')!.textContent = point.grid < -0.01 ? `${Math.abs(point.grid).toFixed(2)} kW` : 'ไม่ซื้อ'
+    tip.querySelector<HTMLElement>('.solar-rate-tip-hour')!.textContent = formatPointTime(point.timestamp)
+    tip.querySelector<HTMLElement>('.solar-rate-tip-pv1')!.textContent = `${toPct(point.pv1, pv1MaxKw).toFixed(0)}% • ${point.pv1.toFixed(2)} kW`
+    tip.querySelector<HTMLElement>('.solar-rate-tip-pv2')!.textContent = `${toPct(point.pv2, pv2MaxKw).toFixed(0)}% • ${point.pv2.toFixed(2)} kW`
     tip.classList.remove('hidden')
-    tip.style.left = `${Math.min(clientX + 14, window.innerWidth - 180)}px`
+    tip.style.left = `${Math.min(clientX + 14, window.innerWidth - 204)}px`
     tip.style.top = `${Math.max(clientY - 90, 8)}px`
   }
 
