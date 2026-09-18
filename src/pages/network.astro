@@ -1,0 +1,172 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import Nav from '@/components/Nav.astro'
+import PageHeader from '@/components/ui/PageHeader.astro'
+import StatCard from '@/components/StatCard.astro'
+import NetworkPath from '@/components/NetworkPath.astro'
+import NetworkLatencyChart from '@/components/charts/NetworkLatencyChart.astro'
+import NetworkStabilityChart from '@/components/charts/NetworkStabilityChart.astro'
+import Wifi from '@lucide/svelte/icons/wifi'
+import Activity from '@lucide/svelte/icons/activity'
+import Signal from '@lucide/svelte/icons/signal'
+import History from '@lucide/svelte/icons/history'
+import Smartphone from '@lucide/svelte/icons/smartphone'
+import TriangleAlert from '@lucide/svelte/icons/triangle-alert'
+import CircleX from '@lucide/svelte/icons/circle-x'
+import { getNetworkSnapshot } from '@/lib/network-mock'
+import { num } from '@/lib/electricity'
+import { formatBangkokDateTime } from '@/lib/date'
+
+const data = getNetworkSnapshot()
+const { overview, hops, incidents } = data
+
+const latencyDelta = overview.latencyMs - overview.baselineMs
+const latencyNote = Math.abs(latencyDelta) < 0.5 ? 'เท่ากับค่าปกติ 7 วัน' : `${latencyDelta > 0 ? 'ช้ากว่า' : 'เร็วกว่า'}ค่าปกติ ${num(Math.abs(latencyDelta), 1)} ms`
+
+const formatDuration = (seconds: number) => (seconds >= 3600 ? `${num(seconds / 3600, 1)} ชม.` : `${num(seconds / 60, 0)} นาที`)
+
+const statusLabel = { good: 'ปกติ', warn: 'หน่วงกว่าปกติ', down: 'มีช่วงไม่ตอบ' } as const
+const statusTone = { good: 'text-chart-1', warn: 'text-chart-2', down: 'text-destructive' } as const
+---
+
+<Layout title="เครือข่ายในบ้าน — สถานะอินเทอร์เน็ต">
+  <Nav />
+  <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
+    <PageHeader
+      eyebrow="เครือข่ายในบ้าน"
+      title="อินเทอร์เน็ตและสัญญาณ"
+      description={`ตรวจสัญญาณจากในบ้านออกสู่อินเทอร์เน็ตทุก ${num(data.sampleIntervalSec, 1)} วินาที เพื่อบอกได้ว่าเน็ตช้าเพราะอะไร และปัญหาอยู่ในบ้านหรือฝั่งผู้ให้บริการ`}
+    />
+
+    <p class="flex items-start gap-2.5 rounded-lg border border-accent/40 bg-accent/5 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+      <TriangleAlert class="mt-0.5 shrink-0 text-accent-foreground" size={16} strokeWidth={1.5} />
+      <span>
+        <span class="text-foreground">หน้านี้เป็นตัวอย่างโครงหน้า (mock)</span> — ตัวเลขทั้งหมดเป็นค่าจำลองที่อิงช่วงค่าจริง ยังไม่ได้ต่อกับฐานข้อมูล
+        <code class="rounded bg-muted px-1 py-0.5 font-mono text-xs">stash.pingstats</code>
+      </span>
+    </p>
+
+    <section class="space-y-4">
+      <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          label="สถานะอินเทอร์เน็ต"
+          value={overview.online ? 'ใช้งานได้' : 'ขัดข้อง'}
+          sub={overview.downSecToday > 0 ? `วันนี้เน็ตหลุดรวม ${formatDuration(overview.downSecToday)}` : 'วันนี้ยังไม่มีช่วงที่เน็ตหลุด'}
+          trend={`ใช้งานได้ ${num(overview.uptimePctToday, 2)}%`}
+          accent="sage"
+        >
+          <Wifi slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard label="ความหน่วงออกเน็ต" value={`${num(overview.latencyMs, 1)} ms`} sub={latencyNote} trend="วัดล่าสุด" accent="brass">
+          <Activity slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard label="ความนิ่งของสัญญาณ" value={`±${num(overview.jitterMs, 2)} ms`} sub="ยิ่งน้อยยิ่งดี · แกว่งมากทำให้แชทวิดีโอกระตุก" accent="blue">
+          <Signal slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+        <StatCard
+          label="แพ็กเก็ตหาย 24 ชม."
+          value={`${num(overview.lossPct24h, 2)}%`}
+          sub={`จากการตรวจ ${num(overview.samples24h / 1000, 0)} พันครั้ง`}
+          trend={overview.lossPct24h > 0.5 ? 'ควรจับตา' : 'อยู่ในเกณฑ์ดี'}
+          accent="terracotta"
+        >
+          <History slot="icon" size={18} strokeWidth={1.25} />
+        </StatCard>
+      </div>
+    </section>
+
+    <div class="grid items-start gap-4 lg:grid-cols-3">
+      <div class="flex flex-col gap-4 lg:col-span-2">
+        <NetworkLatencyChart series={data.series} />
+        <NetworkStabilityChart hourly={data.hourly} />
+      </div>
+      <div class="lg:col-span-1">
+        <NetworkPath hops={hops} probeHost={data.probeHost} />
+      </div>
+    </div>
+
+    <section class="rounded-lg border border-border/70 bg-card">
+      <div class="border-b border-border/60 px-6 py-4">
+        <h2 class="font-serif text-lg font-light text-foreground">จุดตรวจทั้งหมด</h2>
+        <p class="mt-1 text-sm text-muted-foreground">สรุปค่าย้อนหลัง 24 ชั่วโมงของแต่ละปลายทาง · อัปเดตล่าสุด {formatBangkokDateTime(data.updatedAt)}</p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-border/40 text-left text-[10px] uppercase tracking-luxury text-muted-foreground">
+              <th class="px-6 py-3">จุดตรวจ</th>
+              <th class="px-4 py-3 text-right">ล่าสุด</th>
+              <th class="px-4 py-3 text-right">เฉลี่ย</th>
+              <th class="px-4 py-3 text-right">ช้าสุด 95%</th>
+              <th class="px-4 py-3 text-right">สูงสุด</th>
+              <th class="px-4 py-3 text-right">แพ็กเก็ตหาย</th>
+              <th class="px-6 py-3 text-right">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {
+              hops.map((hop) => (
+                <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
+                  <td class="px-6 py-3">
+                    <span class="flex items-center gap-2 text-foreground">
+                      <span class="legend-dot" style={`background:${hop.color}`} />
+                      {hop.label}
+                    </span>
+                    <span class="mt-0.5 block font-mono text-xs text-muted-foreground">{hop.target}</span>
+                  </td>
+                  <td class="px-4 py-3 text-right tabular-nums text-foreground">{num(hop.latencyMs, 2)} ms</td>
+                  <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{num(hop.avgMs, 2)} ms</td>
+                  <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{num(hop.p95Ms, 2)} ms</td>
+                  <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{num(hop.maxMs, 2)} ms</td>
+                  <td class:list={['px-4 py-3 text-right tabular-nums', hop.lossPct > 0 ? 'text-destructive' : 'text-muted-foreground']}>{num(hop.lossPct, 2)}%</td>
+                  <td class:list={['px-6 py-3 text-right text-xs', statusTone[hop.status]]}>{statusLabel[hop.status]}</td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="grid gap-4 lg:grid-cols-2">
+      <section class="rounded-lg border border-border/70 bg-card p-5 sm:p-6">
+        <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">บันทึกเหตุการณ์</p>
+        <h2 class="mt-1 font-serif text-lg font-light text-foreground">เน็ตสะดุดเมื่อไหร่บ้าง</h2>
+        <ul class="mt-5 space-y-4">
+          {
+            incidents.map((incident) => (
+              <li class="flex gap-3 border-b border-border/50 pb-4 last:border-0 last:pb-0">
+                <span class:list={['mt-0.5 shrink-0', incident.severity === 'down' ? 'text-destructive' : 'text-chart-2']}>
+                  {incident.severity === 'down' ? <CircleX size={16} strokeWidth={1.5} /> : <TriangleAlert size={16} strokeWidth={1.5} />}
+                </span>
+                <div class="min-w-0">
+                  <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <p class="text-sm text-foreground">{incident.title}</p>
+                    <p class="text-xs text-muted-foreground">นาน {formatDuration(incident.durationSec)}</p>
+                  </div>
+                  <p class="mt-1 text-xs leading-relaxed text-muted-foreground">{incident.detail}</p>
+                  <p class="mt-1.5 text-xs text-muted-foreground/80">{formatBangkokDateTime(incident.startedAt)}</p>
+                </div>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+
+      <section class="flex flex-col rounded-lg border border-dashed border-border bg-card p-5 sm:p-6">
+        <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ขั้นถัดไป</p>
+        <h2 class="mt-1 font-serif text-lg font-light text-foreground">อุปกรณ์ที่ต่ออยู่ในบ้าน</h2>
+        <div class="mt-5 flex flex-1 flex-col items-center justify-center gap-3 py-6 text-center">
+          <Smartphone class="text-muted-foreground/60" size={28} strokeWidth={1} />
+          <p class="max-w-sm text-sm leading-relaxed text-muted-foreground">
+            ยังไม่มีข้อมูลรายชื่ออุปกรณ์ ต้องให้ collector ดึงตาราง DHCP/ARP จากเราเตอร์เข้ามาเก็บก่อน จึงจะแสดงได้ว่าใครใช้เน็ตอยู่บ้างและอุปกรณ์ไหนกินแบนด์วิดท์
+          </p>
+        </div>
+      </section>
+    </div>
+
+    <p class="text-pretty pb-4 text-center text-xs leading-relaxed text-muted-foreground">
+      ข้อมูลจริงมาจาก <code class="font-mono">stash.pingstats</code> ที่เครื่อง {data.probeHost} ยิง ping ไปยัง 4 ปลายทางทุก {num(data.sampleIntervalSec, 1)} วินาที และแบ่งตารางเก็บรายสัปดาห์
+    </p>
+  </main>
+</Layout>

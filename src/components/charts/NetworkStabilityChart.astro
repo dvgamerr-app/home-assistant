@@ -1,0 +1,89 @@
+---
+// ความเสถียรรายชั่วโมง — ตอบคำถาม "ช่วงไหนของวันที่เน็ตใช้งานไม่ดี"
+import ChartCard from '@/components/ui/ChartCard.astro'
+import ChartYAxis from '@/components/ui/ChartYAxis.astro'
+import LegendRow from '@/components/ui/LegendRow.astro'
+import { svgStackedBars } from '@/lib/chart'
+import { num } from '@/lib/electricity'
+import type { NetworkHour } from '@/lib/network-mock'
+
+interface Props {
+  hourly: NetworkHour[]
+}
+
+const { hourly } = Astro.props
+
+const [VW, VH, ML, MT, MR, MB] = [560, 200, 4, 12, 8, 24]
+const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
+
+const { bars, maxTotal } = svgStackedBars(
+  hourly.map((item) => [item.wanMs]),
+  px0,
+  py0,
+  px1,
+  py1,
+  0.3,
+)
+
+const ticks = [maxTotal, maxTotal / 2, 0]
+const axisTicks = ticks.map((tick) => ({ label: num(tick, 0), topPct: ((py1 - (tick / maxTotal) * (py1 - py0)) / VH) * 100, emphasis: tick === maxTotal }))
+const busiest = [...hourly].sort((a, b) => b.wanMs - a.wanMs)[0]
+const troubled = hourly.filter((item) => item.lossPct > 0)
+---
+
+<ChartCard eyebrow="รายชั่วโมง" title="ช่วงเวลาที่เน็ตหน่วง" subtitle="ความหน่วงเฉลี่ยของทางออกอินเทอร์เน็ต แยกรายชั่วโมง">
+  <div class="flex items-start gap-1">
+    <ChartYAxis ticks={axisTicks} class="h-40 sm:h-44" />
+    <div class="min-w-0 flex-1">
+      <div class="h-40 w-full sm:h-44">
+        <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%" role={'img' as const} aria-label="กราฟความหน่วงอินเทอร์เน็ตเฉลี่ยรายชั่วโมง">
+          {
+            ticks.map((tick) => (
+              <line
+                x1={px0}
+                x2={px1}
+                y1={py1 - (tick / maxTotal) * (py1 - py0)}
+                y2={py1 - (tick / maxTotal) * (py1 - py0)}
+                stroke="var(--border)"
+                stroke-opacity="0.8"
+                stroke-width="0.5"
+                stroke-dasharray="2 4"
+              />
+            ))
+          }
+          {
+            bars.map((stack, index) =>
+              stack.map((bar) => (
+                <rect
+                  x={bar.x}
+                  y={bar.y}
+                  width={bar.w}
+                  height={bar.h}
+                  rx={bar.rx}
+                  fill={hourly[index].lossPct > 0 ? 'var(--destructive)' : 'var(--chart-2)'}
+                  opacity={hourly[index].lossPct > 0 ? '0.85' : '0.7'}
+                />
+              )),
+            )
+          }
+          <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
+        </svg>
+      </div>
+      <div class="mt-1 grid grid-cols-8 text-[9px] text-muted-foreground">
+        {['00', '03', '06', '09', '12', '15', '18', '21'].map((label) => <span class="text-left">{label}</span>)}
+      </div>
+    </div>
+  </div>
+
+  <LegendRow
+    class="mt-4"
+    items={[
+      { label: 'ความหน่วงเฉลี่ย (ms)', color: 'var(--chart-2)' },
+      { label: 'ชั่วโมงที่มีแพ็กเก็ตหาย', color: 'var(--destructive)' },
+    ]}
+  />
+  <p class="mt-3 text-xs leading-relaxed text-muted-foreground">
+    หน่วงที่สุดช่วง {String(busiest.hour).padStart(2, '0')}:00 ({num(busiest.wanMs, 1)} ms)
+    {troubled.length > 0 ? ` · มีแพ็กเก็ตหาย ${troubled.length} ชั่วโมง` : ' · ไม่มีแพ็กเก็ตหายตลอดวัน'}
+  </p>
+</ChartCard>
