@@ -1,0 +1,142 @@
+---
+// เส้นทางสัญญาณจากในบ้านออกสู่อินเทอร์เน็ต — ภาพหลักของหน้าเครือข่าย
+// อ่านจากบนลงล่างตามลำดับจริงของ hop เพื่อให้ชี้ได้ทันทีว่า "ช้าตรงไหน"
+import ChartCard from '@/components/ui/ChartCard.astro'
+import { svgPathFromPoints, clamp01 } from '@/lib/chart'
+import { num } from '@/lib/electricity'
+import type { NetworkHop, NetworkStatus } from '@/lib/network-mock'
+import Router from '@lucide/svelte/icons/router'
+import RadioTower from '@lucide/svelte/icons/radio-tower'
+import Server from '@lucide/svelte/icons/server'
+import Globe from '@lucide/svelte/icons/globe'
+import Smartphone from '@lucide/svelte/icons/smartphone'
+import CircleCheck from '@lucide/svelte/icons/circle-check'
+import TriangleAlert from '@lucide/svelte/icons/triangle-alert'
+import CircleX from '@lucide/svelte/icons/circle-x'
+
+interface Props {
+  hops: NetworkHop[]
+  probeHost: string
+}
+
+const { hops, probeHost } = Astro.props
+
+const HOP_ICON = { local: Router, wan: RadioTower, dns: Server, intl: Globe } as const
+
+// สถานะไม่พึ่งสีอย่างเดียว — มีทั้งไอคอนและข้อความกำกับ
+const STATUS: Record<NetworkStatus, { label: string; tone: string; ring: string; Icon: typeof CircleCheck }> = {
+  good: { label: 'ปกติ', tone: 'text-chart-1', ring: 'border-chart-1/40', Icon: CircleCheck },
+  warn: { label: 'หน่วงกว่าปกติ', tone: 'text-chart-2', ring: 'border-chart-2/50', Icon: TriangleAlert },
+  down: { label: 'มีช่วงไม่ตอบ', tone: 'text-destructive', ring: 'border-destructive/50', Icon: CircleX },
+}
+
+const [SW, SH] = [240, 30]
+const sparkPath = (values: number[]) => svgPathFromPoints(values.map((value, index) => ({ x: (index / (values.length - 1)) * SW, y: SH - 2 - clamp01(value) * (SH - 4) })))
+
+/** ช่วงที่ ping ไม่ตอบ (ค่า 0) — วาดเป็นแถบเพื่อให้เห็นว่าเน็ตหายตอนไหนของวัน */
+function gaps(values: number[]) {
+  const spans: { x: number; w: number }[] = []
+  let start = -1
+  values.forEach((value, index) => {
+    if (value === 0 && start === -1) start = index
+    if (value !== 0 && start !== -1) {
+      spans.push({ x: (start / values.length) * SW, w: ((index - start) / values.length) * SW })
+      start = -1
+    }
+  })
+  if (start !== -1) spans.push({ x: (start / values.length) * SW, w: ((values.length - start) / values.length) * SW })
+  return spans
+}
+---
+
+<ChartCard eyebrow="เส้นทางสัญญาณ" title="จากในบ้านออกสู่อินเทอร์เน็ต" subtitle={`วัดจากเครื่อง ${probeHost} · เรียงตามลำดับจริงของเส้นทาง`}>
+  <ol class="space-y-0">
+    <li class="grid grid-cols-[2.25rem_1fr] gap-x-3">
+      <div class="relative flex justify-center">
+        <span aria-hidden={true} class="absolute bottom-0 top-9 w-px bg-border/70"></span>
+        <span class="flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-card text-muted-foreground">
+          <Smartphone size={16} strokeWidth={1.25} />
+        </span>
+      </div>
+      <div class="pb-5 pt-2">
+        <p class="text-sm text-foreground">อุปกรณ์ในบ้าน</p>
+        <p class="mt-0.5 text-xs text-muted-foreground">จุดเริ่มต้นของการวัด · {probeHost}</p>
+      </div>
+    </li>
+
+    {
+      hops.map((hop, index) => {
+        const status = STATUS[hop.status]
+        const Icon = HOP_ICON[hop.id]
+        const ratio = clamp01(hop.avgMs / hop.goodMs)
+        const isLast = index === hops.length - 1
+        return (
+          <li class="grid grid-cols-[2.25rem_1fr] gap-x-3">
+            <div class="relative flex justify-center">
+              {!isLast && <span aria-hidden={true} class="absolute bottom-0 top-9 w-px bg-border/70" />}
+              <span class:list={['flex h-9 w-9 items-center justify-center rounded-full border bg-card', status.ring, status.tone]}>
+                <Icon size={16} strokeWidth={1.25} />
+              </span>
+            </div>
+
+            <div class:list={['min-w-0', isLast ? 'pb-1 pt-1.5' : 'border-b border-border/50 pb-5 pt-1.5']}>
+              <div class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <div class="min-w-0">
+                  <p class="truncate text-sm text-foreground">{hop.label}</p>
+                  <p class="mt-0.5 text-xs leading-relaxed text-muted-foreground">{hop.meaning}</p>
+                </div>
+                <p class="shrink-0 font-serif text-2xl font-light leading-none text-foreground">
+                  {num(hop.latencyMs, hop.latencyMs < 10 ? 1 : 0)}
+                  <span class="ml-1 text-sm text-muted-foreground">ms</span>
+                </p>
+              </div>
+
+              <div class="mt-3 flex items-center gap-3">
+                <div class="h-1 min-w-0 flex-1 overflow-hidden rounded-full bg-muted">
+                  <div class="h-full rounded-full" style={`width:${Math.max(ratio * 100, 2).toFixed(1)}%;background:${hop.color}`} />
+                </div>
+                <span class:list={['flex shrink-0 items-center gap-1.5 text-[11px]', status.tone]}>
+                  <status.Icon size={13} strokeWidth={1.5} />
+                  {status.label}
+                </span>
+              </div>
+
+              <div class="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2">
+                <svg
+                  viewBox={`0 0 ${SW} ${SH}`}
+                  preserveAspectRatio="none"
+                  class="hidden h-7 w-40 shrink-0 sm:block"
+                  role={'img' as const}
+                  aria-label={`แนวโน้มความหน่วง ${hop.label} ย้อนหลัง 24 ชั่วโมง`}
+                >
+                  {gaps(hop.spark).map((span) => (
+                    <rect x={span.x} y="0" width={Math.max(span.w, 1)} height={SH} fill="var(--destructive)" opacity="0.18" />
+                  ))}
+                  <path d={sparkPath(hop.spark)} fill="none" stroke={hop.color} stroke-width="1.2" stroke-linecap={'round' as const} stroke-linejoin={'round' as const} />
+                </svg>
+                <dl class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted-foreground">
+                  <div class="flex gap-1.5">
+                    <dt>เฉลี่ย</dt>
+                    <dd class="tabular-nums text-foreground">{num(hop.avgMs, hop.avgMs < 10 ? 2 : 1)} ms</dd>
+                  </div>
+                  <div class="flex gap-1.5">
+                    <dt>ช้าสุด 95%</dt>
+                    <dd class="tabular-nums text-foreground">{num(hop.p95Ms, hop.p95Ms < 10 ? 2 : 1)} ms</dd>
+                  </div>
+                  <div class="flex gap-1.5">
+                    <dt>แกว่ง</dt>
+                    <dd class="tabular-nums text-foreground">±{num(hop.jitterMs, 2)} ms</dd>
+                  </div>
+                  <div class="flex gap-1.5">
+                    <dt>หาย</dt>
+                    <dd class:list={['tabular-nums', hop.lossPct > 0 ? 'text-destructive' : 'text-foreground']}>{num(hop.lossPct, 2)}%</dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+          </li>
+        )
+      })
+    }
+  </ol>
+</ChartCard>

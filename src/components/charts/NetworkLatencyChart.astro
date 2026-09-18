@@ -1,0 +1,89 @@
+---
+// ความหน่วงของแต่ละ hop ตลอด 24 ชม. — เส้นขาดตรงไหนคือ ping ไม่ตอบช่วงนั้น
+import ChartCard from '@/components/ui/ChartCard.astro'
+import ChartYAxis from '@/components/ui/ChartYAxis.astro'
+import LegendRow from '@/components/ui/LegendRow.astro'
+import { splitSeriesPaths, svgPathFromPoints } from '@/lib/chart'
+import { num } from '@/lib/electricity'
+import type { NetworkSeries } from '@/lib/network-mock'
+
+interface Props {
+  series: NetworkSeries[]
+}
+
+const { series } = Astro.props
+
+const [VW, VH, ML, MT, MR, MB] = [560, 220, 4, 16, 8, 28]
+const [px0, py0, px1, py1] = [ML, MT, VW - MR, VH - MB]
+const ph = py1 - py0
+
+const bucketCount = series[0]?.points.length ?? 1
+const bucketMs = 10 * 60 * 1000
+const peak = Math.max(...series.flatMap((item) => item.points.filter((point): point is number => point !== null)))
+const scaleMax = Math.ceil(peak / 10) * 10
+
+const xForIndex = (timestamp: number) => px0 + (timestamp / bucketMs / (bucketCount - 1)) * (px1 - px0)
+const yForMs = (value: number) => py0 + (1 - Math.min(value / scaleMax, 1)) * ph
+
+const paths = series.map((item) => ({
+  ...item,
+  segments: splitSeriesPaths(
+    item.points.map((value, index) => ({ index, value })).filter((point): point is { index: number; value: number } => point.value !== null),
+    200,
+    (point) => point.index * bucketMs,
+    (point) => point.value,
+    xForIndex,
+    yForMs,
+    bucketMs * 1.5,
+  ).map((points) => svgPathFromPoints(points)),
+}))
+
+// ช่วงที่ทุกปลายทางนอกบ้านไม่ตอบพร้อมกัน = อินเทอร์เน็ตหลุดจริง ไม่ใช่ปลายทางเดียวมีปัญหา
+const outageSpans: { x: number; w: number }[] = []
+let outageStart = -1
+for (let index = 0; index < bucketCount; index++) {
+  const offline = series.filter((item) => item.id !== 'local').every((item) => item.points[index] === null)
+  if (offline && outageStart === -1) outageStart = index
+  if (!offline && outageStart !== -1) {
+    outageSpans.push({ x: xForIndex(outageStart * bucketMs), w: xForIndex(index * bucketMs) - xForIndex(outageStart * bucketMs) })
+    outageStart = -1
+  }
+}
+
+const ticks = [scaleMax, scaleMax / 2, 0]
+const axisTicks = ticks.map((tick) => ({ label: `${num(tick, 0)}`, topPct: (yForMs(tick) / VH) * 100, emphasis: tick === scaleMax }))
+const xLabels = ['00:00', '06:00', '12:00', '18:00', '24:00']
+---
+
+<ChartCard eyebrow="ย้อนหลัง 24 ชั่วโมง" title="ความหน่วงตลอดวัน" subtitle="ยิ่งเส้นต่ำยิ่งตอบไว · แถบแดงคือช่วงที่ออกอินเทอร์เน็ตไม่ได้">
+  <div class="flex items-start gap-1">
+    <ChartYAxis ticks={axisTicks} class="h-48 sm:h-56" />
+    <div class="min-w-0 flex-1">
+      <div class="h-48 w-full sm:h-56">
+        <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%" role={'img' as const} aria-label="กราฟความหน่วงของเครือข่ายย้อนหลัง 24 ชั่วโมง">
+          {ticks.map((tick) => <line x1={px0} x2={px1} y1={yForMs(tick)} y2={yForMs(tick)} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
+          <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
+          {outageSpans.map((span) => <rect x={span.x} y={py0} width={Math.max(span.w, 1.5)} height={ph} fill="var(--destructive)" opacity="0.14" />)}
+          {
+            paths.map((item) =>
+              item.segments.map((path) => (
+                <path d={path} fill="none" stroke={item.color} stroke-width={item.id === 'local' ? '1.1' : '1.4'} stroke-linecap={'round' as const} stroke-linejoin={'round' as const} />
+              )),
+            )
+          }
+        </svg>
+      </div>
+      <div class="mt-1 grid grid-cols-5 text-[9px] text-muted-foreground">
+        {xLabels.map((label, index) => <span class:list={['text-center', index === 0 ? 'text-left' : index === xLabels.length - 1 ? 'text-right' : '']}>{label}</span>)}
+      </div>
+    </div>
+  </div>
+
+  <LegendRow class="mt-4" items={series.map((item) => ({ label: item.label, color: item.color }))}>
+    <span class="flex items-center gap-2 text-xs text-muted-foreground">
+      <span class="legend-dot" style="background:var(--destructive);opacity:0.35"></span>
+      ช่วงที่เน็ตหลุด
+    </span>
+  </LegendRow>
+  <p class="mt-3 text-xs leading-relaxed text-muted-foreground">หน่วยเป็นมิลลิวินาที · ค่าที่วัดได้สูงสุดวันนี้ {num(peak, 1)} ms</p>
+</ChartCard>
