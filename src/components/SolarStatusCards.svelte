@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte'
-  import { io } from 'socket.io-client'
+  import { createLiveSocket } from '@/lib/live-socket'
   import { num } from '@/lib/electricity'
   import { getBatteryConnectionState } from '@/lib/battery'
   import BatteryCharging from '@lucide/svelte/icons/battery-charging'
@@ -65,14 +65,12 @@
   const totalPower = $derived(live.pv1.power + live.pv2.power)
 
   onMount(() => {
-    const socket = io(socketUrl, { transports: ['websocket'] })
-    socket.on('connect', () => {
-      socket.emit('subscribe', SOCKET_CHANNELS.live)
+    const handle = createLiveSocket(socketUrl, [SOCKET_CHANNELS.live], (socket) => {
+      socket.on(SOCKET_CHANNELS.live, (d: LiveSnapshot) => {
+        live = d
+      })
     })
-    socket.on(SOCKET_CHANNELS.live, (d) => {
-      live = d
-    })
-    return () => socket.disconnect()
+    return handle.dispose
   })
 
   function pvLive(i: number) {

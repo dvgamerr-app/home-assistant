@@ -4,9 +4,9 @@ import Nav from '@/components/Nav.astro'
 import PageHeader from '@/components/ui/PageHeader.astro'
 import StatCard from '@/components/StatCard.astro'
 import NetworkPath from '@/components/NetworkPath.astro'
+import InternetStatusCard from '@/components/InternetStatusCard.svelte'
 import NetworkLatencyChart from '@/components/charts/NetworkLatencyChart.astro'
 import NetworkStabilityChart from '@/components/charts/NetworkStabilityChart.astro'
-import Wifi from '@lucide/svelte/icons/wifi'
 import Activity from '@lucide/svelte/icons/activity'
 import Signal from '@lucide/svelte/icons/signal'
 import History from '@lucide/svelte/icons/history'
@@ -48,15 +48,7 @@ const statusTone = { good: 'text-chart-1', warn: 'text-chart-2', down: 'text-des
 
     <section class="space-y-4">
       <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard
-          label="สถานะอินเทอร์เน็ต"
-          value={overview.online ? 'ใช้งานได้' : 'ขัดข้อง'}
-          sub={overview.downSecToday > 0 ? `วันนี้เน็ตหลุดรวม ${formatDuration(overview.downSecToday)}` : 'วันนี้ยังไม่มีช่วงที่เน็ตหลุด'}
-          trend={`ใช้งานได้ ${num(overview.uptimePctToday, 2)}%`}
-          accent="sage"
-        >
-          <Wifi slot="icon" size={18} strokeWidth={1.25} />
-        </StatCard>
+        <InternetStatusCard client:load serverOnline={overview.online} downSecToday={overview.downSecToday} />
         <StatCard label="ความหน่วงออกเน็ต" value={`${num(overview.latencyMs, 1)} ms`} sub={latencyNote} trend="วัดล่าสุด" accent="brass">
           <Activity slot="icon" size={18} strokeWidth={1.25} />
         </StatCard>

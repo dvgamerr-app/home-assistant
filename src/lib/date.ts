@@ -14,6 +14,12 @@ const bangkokDateTimeFormatter = new Intl.DateTimeFormat('th-TH', {
   minute: '2-digit',
 })
 
+const bangkokTimeFormatter = new Intl.DateTimeFormat('th-TH', {
+  timeZone: 'Asia/Bangkok',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
 const thaiDateFormatter = new Intl.DateTimeFormat('th-TH', {
   timeZone: 'Asia/Bangkok',
   day: 'numeric',
@@ -55,4 +61,8 @@ export function formatThaiDate(value: Date | string) {
 
 export function isISODate(value: string | null): value is string {
   return value !== null && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
+export function formatBangkokTime(value: Date | string | number) {
+  return bangkokTimeFormatter.format(typeof value === 'string' ? new Date(value) : value)
 }

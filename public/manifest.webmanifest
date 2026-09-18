@@ -1,0 +1,28 @@
+{
+  "id": "/",
+  "name": "OurKK — แดชบอร์ดบ้าน",
+  "short_name": "OurKK",
+  "description": "ภาพรวมพลังงาน ค่าไฟ ค่าน้ำ และเครือข่ายภายในบ้าน — ใช้งานต่อได้แม้อินเทอร์เน็ตหลุด",
+  "lang": "th",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#faf6ef",
+  "theme_color": "#faf6ef",
+  "categories": ["utilities", "productivity"],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "การใช้ไฟ", "short_name": "ใช้ไฟ", "url": "/electricity/load", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "ผลิตไฟ", "short_name": "ผลิตไฟ", "url": "/electricity/solar", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "ค่าไฟ", "short_name": "ค่าไฟ", "url": "/electricity/bill", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "เครือข่าย", "short_name": "เครือข่าย", "url": "/network", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
