@@ -1,0 +1,59 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import CloudOff from '@lucide/svelte/icons/cloud-off'
+
+/**
+ * หน้าสำรองที่ service worker หยิบมาแสดงเมื่อเปิดหน้าที่ยังไม่เคยมีสำเนาในเครื่อง
+ * ห้ามพึ่งข้อมูลจาก DB หรือ session — ตอนถูกใช้งานจริงคือตอนที่ต่อเซิร์ฟเวอร์ไม่ได้
+ */
+const LINKS = [
+  { href: '/', label: 'ภาพรวมบ้าน' },
+  { href: '/electricity/load', label: 'การใช้ไฟ' },
+  { href: '/electricity/solar', label: 'ผลิตไฟ' },
+  { href: '/network', label: 'เครือข่าย' },
+]
+---
+
+<Layout title="ออฟไลน์ — แดชบอร์ดบ้าน" description="ยังไม่มีสำเนาของหน้านี้ไว้ใช้งานตอนออฟไลน์">
+  <main class="flex min-h-screen flex-col items-center justify-center px-6 py-16 text-center">
+    <span class="flex size-14 items-center justify-center rounded-full border border-border text-muted-foreground">
+      <CloudOff size={22} strokeWidth={1.25} />
+    </span>
+    <p class="mt-8 text-[10px] uppercase tracking-luxury text-muted-foreground">ออฟไลน์</p>
+    <h1 class="mt-3 font-serif text-3xl font-light text-foreground sm:text-4xl">ยังต่อกับบ้านไม่ได้</h1>
+    <p class="mt-4 max-w-md text-pretty text-sm leading-relaxed text-muted-foreground">
+      หน้านี้ยังไม่มีสำเนาเก็บไว้ในเครื่อง จึงเปิดตอนออฟไลน์ไม่ได้ — หน้าที่เคยเปิดไว้แล้วยังดูย้อนหลังได้ตามปกติ และทุกอย่างจะกลับมาอัปเดตเองเมื่ออินเทอร์เน็ตกลับมา
+    </p>
+
+    <div class="mt-8 flex flex-wrap items-center justify-center gap-2">
+      {
+        LINKS.map((link) => (
+          <a
+            href={link.href}
+            class="rounded-full border border-border/70 px-4 py-2 text-[11px] uppercase tracking-luxury text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            {link.label}
+          </a>
+        ))
+      }
+    </div>
+
+    <p id="offline-hint" class="mt-10 text-xs text-muted-foreground/80">จะลองเชื่อมต่อใหม่ให้อัตโนมัติ</p>
+  </main>
+</Layout>
+
+<script>
+  // หน้านี้ไม่มี socket และไม่มีข้อมูล — พอเน็ตกลับมาก็พากลับเข้าหน้าที่ผู้ใช้ตั้งใจเปิด
+  import { subscribeConnectivity, startConnectivity } from '@/lib/connectivity'
+
+  startConnectivity()
+  let wasOffline = false
+  subscribeConnectivity((state) => {
+    if (!state.settled) return
+    if (!state.online) {
+      wasOffline = true
+      return
+    }
+    if (wasOffline) location.reload()
+  })
+</script>

@@ -1,5 +1,6 @@
 <script>
   import LogOut from '@lucide/svelte/icons/log-out'
+  import { clearOfflineCaches } from '@/lib/connectivity'
 
   let loading = $state(false)
 
@@ -7,6 +8,8 @@
     loading = true
     try {
       await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      // HTML ที่ service worker เก็บไว้เป็นข้อมูลของบ้าน — ออกจากระบบแล้วต้องไม่เหลือค้างในเครื่อง
+      await clearOfflineCaches()
     } finally {
       window.location.href = '/login'
     }

@@ -14,6 +14,7 @@ Home-assistant dashboard — รวบรวมข้อมูลในบ้า
 - **pg v8** — Postgres dialect ให้ Kysely (auth tables เท่านั้น)
 - **postgres.js v3** — query ข้อมูล solar/MEA จาก collector DB (`src/lib/db.ts`)
 - **socket.io v4** — realtime server (`server/socket.mjs`) port จาก `SOCKET_PORT`, channel `live` + `solar:fivemin` (นิยามใน `src/lib/socket.ts`). ฝั่ง client: `EnergyFlow.svelte` · `SolarStatusCards.svelte` · `production-chart-client.ts` · `solar-rate-chart-client.ts`
+- **PWA** — ติดตั้งเป็นแอปได้ + ใช้งานต่อได้ตอนเน็ตบ้านล่ม. service worker ประกอบตอน build จาก `src/pwa/` · manifest `public/manifest.webmanifest` · **อ่าน `docs/pwa-offline.md` ก่อนแตะเรื่องออฟไลน์/cache ทุกครั้ง**
 - **pino + pino-pretty** — logging (`src/lib/logger.ts`)
 
 แพ็กเกจ/รันด้วย **bun** เสมอ
@@ -55,9 +56,10 @@ bun run preview   # bun ./dist/server/entry.mjs  (รันผลลัพธ์
 bun run check     # astro check (typecheck .astro/.svelte/.ts)
 bun run lint      # eslint .
 bun run format    # prettier --check .  (format:fix = เขียนทับ)
-bun test          # bun test (chart / chart-viewport / battery / energy-alerts / utility-bill-alerts / line-transport)
+bun test          # bun test (chart / chart-viewport / battery / energy-alerts / utility-bill-alerts / line-transport / offline-log / connectivity / service-worker)
 bun run migration:run   # รัน Kysely migrations สำหรับ auth DB
 bun run dev:socket      # รัน socket.io server แยก process (ใช้คู่กับ preview)
+bun scripts/generate-icons.mjs  # สร้างไอคอน PNG ของ PWA ใหม่จาก public/icon.svg (รันเมื่อแก้ SVG เท่านั้น)
 ```
 
 ## DB Schema (collector DB — `stash` schema)
@@ -74,15 +76,17 @@ pivot EAV: `DISTINCT ON (attr) ORDER BY attr, recorded_at DESC` ดึงค่�
 
 ## โครงสร้าง
 
-- `src/pages/` — `index.astro` (ภาพรวม slim) · `electricity/` (`load` การใช้ไฟ / `solar` ผลิตไฟ / `bill` ค่าไฟ / `water` การใช้น้ำ, สลับด้วย `ElectricityNav`; `index` redirect ไป `load`) · `settings.astro` · `two-factor.astro` · `login.astro` · `no-permission.astro` · `api/auth/[...all].ts`
-- `src/middleware.ts` — ตรวจ session + allowlist ทุก request ยกเว้น `/login`, `/no-permission`, `/api/auth`
+- `src/pages/` — `index.astro` (ภาพรวม slim) · `electricity/` (`load` การใช้ไฟ / `solar` ผลิตไฟ / `bill` ค่าไฟ / `water` การใช้น้ำ, สลับด้วย `ElectricityNav`; `index` redirect ไป `load`) · `settings.astro` · `two-factor.astro` · `login.astro` · `no-permission.astro` · `offline.astro` (หน้าสำรองของ service worker) · `api/auth/[...all].ts` · `api/health.ts` (probe ว่าเซิร์ฟเวอร์ยังตอบ — public, ไม่แตะ DB)
+- `src/middleware.ts` — ตรวจ session + allowlist ทุก request ยกเว้น `/login`, `/two-factor`, `/no-permission`, `/api/auth`, `/api/qr`, `/api/health`, `/offline`
 - `src/layouts/Layout.astro` — shell, โหลดฟอนต์ + script set theme กัน flash
-- `src/components/` — `.astro` static เป็นหลัก, Svelte islands: `LiveClock.svelte` · `ThemeToggle.svelte` · `LogoutButton.svelte` · `LoginForm.svelte` · `EnergyFlow.svelte` (socket.io) · `SolarStatusCards.svelte` (socket.io) · `ui/DatePicker.svelte`. กราฟอยู่ใน `components/charts/`
-- `src/lib/` — `config.ts` (**อ่าน ENV ที่เดียว** — LINE / poll interval / เกณฑ์ alert / allowlist; อย่าอ่าน `process.env` ตรงๆ ในไฟล์อื่น), `solar-data.ts` (async `getAll()`/`getMonthLoad()` ดึงข้อมูลจาก db + `dayCacheTtl()`/`fiveMinCacheKey()`), `db.ts` (postgres.js queries), `solar-fivemin.ts` (payload กราฟ 5 นาที + `toFiveMinChartPoints()` ใช้ร่วมกับ socket server/API), `alert-worker.ts` (`createAlertWorker()` + `runAlertChecks()` — โครง cycle ที่แยก error ต่อ check), `energy-alerts.ts` (เฉพาะ Energy Lib: device/battery/solar/alarm อินเวอร์เตอร์ — alarm ไม่แสดงบนหน้าเว็บ ส่งเข้า LINE อย่างเดียว), `utility-bill-alerts.ts` (เฉพาะบิลค่าไฟ/ค่าน้ำ), `line-flex.ts` (token + primitive ของ LINE Flex card), `line-transport.ts` (`sendLineMessages()` + `LineNoticeError` แยก retryable), `auth.ts` (better-auth config), `electricity.ts` (MEA bill formula + `thb()`/`num()`/`formatBillMonth()` + ชื่อเดือนไทย), `payment-status.ts` (`classifyMeaPayment()`/`classifyMwaPayment()` — ตีความสถานะชำระที่เดียว), `chart.ts` (`svgPathFromPoints`/`svgLine`/`svgArea`/`svgAreaFromPoints`/`svgStackedBars`/`splitSeriesPaths`/`clamp01`), `chart-viewport.ts` + `chart-time-axis.ts` (viewport ซูม/เลื่อน + ป้ายแกนเวลา ใช้ร่วมกันทุกกราฟที่ซูมได้), `date.ts` (วันที่ Bangkok), `socket.ts` (channel + `getSocketUrl`), `logger.ts` (pino)
+- `src/components/` — `.astro` static เป็นหลัก, Svelte islands: `LiveClock.svelte` · `ThemeToggle.svelte` · `LogoutButton.svelte` · `LoginForm.svelte` · `EnergyFlow.svelte` (socket.io) · `SolarStatusCards.svelte` (socket.io) · `OfflineIndicator.svelte` (แถบสถานะออฟไลน์ อยู่ใน Layout ทุกหน้า) · `InternetStatusCard.svelte` · `ui/DatePicker.svelte`. กราฟอยู่ใน `components/charts/`
+- `src/lib/` — `config.ts` (**อ่าน ENV ที่เดียว** — LINE / poll interval / เกณฑ์ alert / allowlist; อย่าอ่าน `process.env` ตรงๆ ในไฟล์อื่น), `solar-data.ts` (async `getAll()`/`getMonthLoad()` ดึงข้อมูลจาก db + `dayCacheTtl()`/`fiveMinCacheKey()`), `db.ts` (postgres.js queries), `solar-fivemin.ts` (payload กราฟ 5 นาที + `toFiveMinChartPoints()` ใช้ร่วมกับ socket server/API), `alert-worker.ts` (`createAlertWorker()` + `runAlertChecks()` — โครง cycle ที่แยก error ต่อ check), `energy-alerts.ts` (เฉพาะ Energy Lib: device/battery/solar/alarm อินเวอร์เตอร์ — alarm ไม่แสดงบนหน้าเว็บ ส่งเข้า LINE อย่างเดียว), `utility-bill-alerts.ts` (เฉพาะบิลค่าไฟ/ค่าน้ำ), `line-flex.ts` (token + primitive ของ LINE Flex card), `line-transport.ts` (`sendLineMessages()` + `LineNoticeError` แยก retryable), `auth.ts` (better-auth config), `electricity.ts` (MEA bill formula + `thb()`/`num()`/`formatBillMonth()` + ชื่อเดือนไทย), `payment-status.ts` (`classifyMeaPayment()`/`classifyMwaPayment()` — ตีความสถานะชำระที่เดียว), `chart.ts` (`svgPathFromPoints`/`svgLine`/`svgArea`/`svgAreaFromPoints`/`svgStackedBars`/`splitSeriesPaths`/`clamp01`), `chart-viewport.ts` + `chart-time-axis.ts` (viewport ซูม/เลื่อน + ป้ายแกนเวลา ใช้ร่วมกันทุกกราฟที่ซูมได้), `date.ts` (วันที่ Bangkok), `socket.ts` (channel + `getSocketUrl`), `connectivity.ts` (**แหล่งความจริงเดียวว่าออนไลน์อยู่ไหม** + ลงทะเบียน service worker), `offline-log.ts` (นับเวลาเน็ตหลุดที่เครื่องนี้เห็น แยกตามวัน), `live-socket.ts` (`createLiveSocket()` — socket ที่ตัดตอนออฟไลน์/ต่อกลับตอนออนไลน์), `logger.ts` (pino)
+- `src/pwa/` — `service-worker.js` (**เทมเพลต** ไม่ได้รันตรงๆ) · `integration.mjs` (Astro integration ที่แทน `__SW_VERSION__`/`__SW_PRECACHE__` แล้วเขียน `dist/client/sw.js` ตอน build)
 - `src/db/` — `auth-db.ts` (Kysely instance) · `migrate.ts` · `migrations/`
 - `server/socket.mjs` — socket.io server, poll ทุก 60s แล้ว broadcast ตาม channel ที่ client subscribe (`live`, `solar:fivemin`) พร้อมรัน Energy Lib worker และ utility bill worker แยกกัน
 - `src/styles/global.css` — design tokens (oklch, light/dark), font, tracking-luxury, `.legend-dot`
 - `docs/design-system.html` — design-system reference เปิดในเบราว์เซอร์ได้เลย, token sync กับ global.css
+- `docs/pwa-offline.md` — **กติกา cache / โหมดออฟไลน์ / วิธีทดสอบ PWA** อ่านก่อนแตะ service worker ทุกครั้ง
 - `docs/bill-qr.md` — **วิธีสร้าง QR จ่ายบิล MEA/MWA ที่ถูกต้อง** + วิธีหา Biller ID + ผลทดสอบสแกนจริง อ่านก่อนแตะเรื่อง QR ทุกครั้ง
 
 ## ข้อตกลง (สำคัญเวลาแก้)
@@ -98,5 +102,6 @@ pivot EAV: `DISTINCT ON (attr) ORDER BY attr, recorded_at DESC` ดึงค่�
 - **`astro dev` เท่านั้นที่ spawn socket server:** ผ่าน hook `astro:server:start` ใน `astro.config.mjs` — อย่าย้ายกลับไปใช้ vite `configureServer` เพราะ `astro check`/`astro build` ก็สร้าง vite server ทำให้ typecheck ไปยิง LINE notice จริง
 - **Lucide + Astro JSX:** Svelte 5 `Component<Props>` ทำให้ TypeScript ใช้ `ComponentInternals` เป็น props แทน `Props`. แก้ด้วย `LibraryManagedAttributes` ใน `src/env.d.ts`. HTML attr literals เช่น `type="radio"` ต้องเขียน `type={"radio" as const}` ในไฟล์ที่ error
 - **`astro check` กับ non-null assertion:** ถ้า frontmatter มี template literal ที่ลงท้ายด้วย `%` (เช่น `` `${pct}%` ``) แล้วตามด้วย `!` (เช่น `arr[i]!`) **ในบรรทัดเดียวกัน** และไฟล์นั้นมี template literal ใน attribute ด้วย (เช่น ``viewBox={`0 0 ${VW} ${VH}`}``) → compiler ของ `astro check` จะแปลงเป็น TSX พลาดแล้วพ่น error ลามทั้งไฟล์ (`unterminated template literal` / `expected a semicolon to end the class property`) ทั้งที่ `astro build` ผ่านปกติ. เลี่ยงด้วยการไม่ใช้ `!` ตรงนั้น — คำนวณค่าตรงๆ แทนการ index แล้ว assert (ดู `GridDependencyChart.astro`)
+- **ออฟไลน์:** ทุกจุดที่ต้องรู้ว่า "ตอนนี้ต่อได้ไหม" ให้ `subscribeConnectivity()` จาก `connectivity.ts` และทุก socket ให้สร้างผ่าน `createLiveSocket()` — อย่าเรียก `io()` ตรงๆ อีก ไม่งั้นเน็ตล่มแล้วบางส่วนยังไล่ reconnect รัวอยู่ ส่วนหน้าใหม่ที่ต้องเปิดได้ตอนออฟไลน์ต้องเติมใน `WARM_URLS` ของ `src/pwa/service-worker.js`
 - **ภาษา:** UI เป็นไทยสุภาพ เน้นความหมายต่อเจ้าของบ้าน ตัวเลขมาพร้อมบริบท
 - **Commit:** conventional commits (husky + commitlint บังคับ), `pre-commit` รัน lint-staged (prettier + eslint). **ห้ามใส่ `Co-Authored-By`** หรือ signature ใดๆ

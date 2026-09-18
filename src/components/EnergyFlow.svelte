@@ -1,6 +1,7 @@
 <script lang="ts">
   import { untrack, onMount } from 'svelte'
-  import { io } from 'socket.io-client'
+  import { createLiveSocket } from '@/lib/live-socket'
+  import { subscribeConnectivity } from '@/lib/connectivity'
   import { getBatteryConnectionState } from '@/lib/battery'
   import { num } from '@/lib/electricity'
   import type { LiveSnapshot } from '@/lib/db'
@@ -25,6 +26,7 @@
   let containerEl: HTMLElement | undefined
   let svgW = $state(0)
   let connected = $state(false)
+  let offline = $state(false)
   const svgH = $derived(svgW ? Math.round((svgW * 380) / 360) : 0)
 
   const timers: Record<string, ReturnType<typeof setInterval>> = {}
@@ -57,63 +59,69 @@
   const dur = (kw: number) => `${durN(kw).toFixed(1)}s`
   const begin = (kw: number, i: number) => `${((i * durN(kw)) / 3).toFixed(2)}s`
 
+  function applyLive(data: LiveSnapshot) {
+    batteryTelemetry = data
+    animateTo(
+      'pv',
+      () => pv,
+      (v) => {
+        pv = v
+      },
+      data.pvPowerKw,
+      0.01,
+    )
+    animateTo(
+      'load',
+      () => load,
+      (v) => {
+        load = v
+      },
+      data.loadPowerKw,
+      0.01,
+    )
+    animateTo(
+      'batt',
+      () => battPower,
+      (v) => {
+        battPower = v
+      },
+      data.batteryPowerKw,
+      0.01,
+    )
+    animateTo(
+      'soc',
+      () => soc,
+      (v) => {
+        soc = v
+      },
+      data.batterySoc,
+      1,
+    )
+    animateTo(
+      'grid',
+      () => grid,
+      (v) => {
+        grid = v
+      },
+      data.gridPowerKw,
+      0.01,
+    )
+  }
+
   onMount(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) svgEl?.pauseAnimations()
-    const socket = io(socketUrl, { transports: ['websocket'] })
-    socket.on('connect', () => {
-      connected = true
-      socket.emit('subscribe', SOCKET_CHANNELS.live)
+    const live = createLiveSocket(socketUrl, [SOCKET_CHANNELS.live], (socket) => {
+      socket.on('connect', () => {
+        connected = true
+      })
+      socket.on('disconnect', () => {
+        connected = false
+      })
+      socket.on(SOCKET_CHANNELS.live, applyLive)
     })
-    socket.on('disconnect', () => {
-      connected = false
-    })
-    socket.on(SOCKET_CHANNELS.live, (data: LiveSnapshot) => {
-      batteryTelemetry = data
-      animateTo(
-        'pv',
-        () => pv,
-        (v) => {
-          pv = v
-        },
-        data.pvPowerKw,
-        0.01,
-      )
-      animateTo(
-        'load',
-        () => load,
-        (v) => {
-          load = v
-        },
-        data.loadPowerKw,
-        0.01,
-      )
-      animateTo(
-        'batt',
-        () => battPower,
-        (v) => {
-          battPower = v
-        },
-        data.batteryPowerKw,
-        0.01,
-      )
-      animateTo(
-        'soc',
-        () => soc,
-        (v) => {
-          soc = v
-        },
-        data.batterySoc,
-        1,
-      )
-      animateTo(
-        'grid',
-        () => grid,
-        (v) => {
-          grid = v
-        },
-        data.gridPowerKw,
-        0.01,
-      )
+
+    const unsubscribe = subscribeConnectivity((state) => {
+      offline = state.settled && !state.online
     })
 
     let resizeTimer: ReturnType<typeof setTimeout>
@@ -128,7 +136,8 @@
     return () => {
       ro.disconnect()
       clearTimeout(resizeTimer)
-      socket.disconnect()
+      unsubscribe()
+      live.dispose()
       Object.values(timers).forEach(clearInterval)
     }
   })
@@ -168,9 +177,13 @@
       <span class="flex items-center gap-2 text-[10px] uppercase tracking-luxury text-muted-foreground">
         <span class="size-1.5 animate-pulse rounded-full bg-chart-1"></span>เรียลไทม์
       </span>
+    {:else if offline}
+      <span class="flex items-center gap-2 text-[10px] uppercase tracking-luxury text-destructive/80">
+        <span class="size-1.5 rounded-full bg-destructive/60"></span>ออฟไลน์ · ข้อมูลค้าง
+      </span>
     {:else}
       <span class="flex items-center gap-2 text-[10px] uppercase tracking-luxury text-muted-foreground/50">
-        <span class="size-1.5 rounded-full bg-muted-foreground/40"></span>offline
+        <span class="size-1.5 rounded-full bg-muted-foreground/40"></span>กำลังเชื่อมต่อ
       </span>
     {/if}
   </div>

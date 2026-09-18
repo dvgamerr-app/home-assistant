@@ -3,6 +3,7 @@ import { defineConfig } from 'astro/config'
 import tailwindcss from '@tailwindcss/vite'
 import svelte from '@astrojs/svelte'
 import node from '@astrojs/node'
+import { pwa } from './src/pwa/integration.mjs'
 import { spawn } from 'child_process'
 
 /** @type {import('child_process').ChildProcess | null} */
@@ -39,7 +40,7 @@ const socketServer = () => ({
 export default defineConfig({
   adapter: node({ mode: 'standalone' }),
   output: 'server',
-  integrations: [svelte(), socketServer()],
+  integrations: [svelte(), socketServer(), pwa()],
   vite: {
     plugins: [tailwindcss()],
   },

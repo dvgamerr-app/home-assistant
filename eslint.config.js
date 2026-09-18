@@ -23,6 +23,14 @@ export default defineConfig(
       parserOptions: { parser: ts.parser },
     },
   },
+  // เทมเพลต service worker รันในบริบท worker (self/caches/clients) ไม่ใช่ window
+  // และ `__SW_PRECACHE__` เป็น placeholder ที่ integration แทนค่าให้ตอน build
+  {
+    files: ['src/pwa/service-worker.js'],
+    languageOptions: {
+      globals: { ...globals.serviceworker, __SW_PRECACHE__: 'readonly' },
+    },
+  },
   // prettier last: turns off all stylistic rules that conflict with Prettier
   prettier,
   svelte.configs.prettier,

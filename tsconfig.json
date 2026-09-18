@@ -1,7 +1,9 @@
 {
   "extends": "astro/tsconfigs/strict",
   "include": [".astro/types.d.ts", "**/*"],
-  "exclude": ["dist", "scripts"],
+  // service-worker.js เป็นเทมเพลตที่รันในบริบท ServiceWorkerGlobalScope ไม่ใช่ window
+  // (ประกอบเป็น dist/client/sw.js ตอน build) — typecheck ด้วย lib ของหน้าเว็บจะฟ้องผิดที่
+  "exclude": ["dist", "scripts", "src/pwa/service-worker.js"],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {

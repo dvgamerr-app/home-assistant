@@ -1,7 +1,8 @@
 // กราฟ "กำลังผลิตเทียบค่าสูงสุด" — ซูม/เลื่อน/โหลดย้อนหลังด้วยกลไกเดียวกับ production-chart-client
 // ต่างกันที่แกน Y เป็นเปอร์เซ็นต์ของค่าสูงสุดรายชุด ไม่ใช่ kW
 
-import { io, type Socket } from 'socket.io-client'
+import { createLiveSocket, type LiveSocket } from './live-socket'
+import { getConnectivity } from './connectivity'
 import { splitSeriesPaths, svgPathFromPoints } from './chart'
 import { formatPointTime, formatVisibleRange, timeAxisTicks } from './chart-time-axis'
 import { DAY_MS, MINUTE_MS, bangkokDayStart, clampTimeRange, datesInRange, panTimeRange, zoomTimeRange, type TimeRange } from './chart-viewport'
@@ -68,7 +69,7 @@ export function initSolarRateChart(root: HTMLElement) {
   let visiblePoints: RatePoint[] = []
   let crosshair: SVGLineElement | null = null
   let animationFrame = 0
-  let socket: Socket | null = null
+  let live: LiveSocket | null = null
   let disposed = false
 
   const pointers = new Map<number, { x: number; y: number }>()
@@ -118,7 +119,7 @@ export function initSolarRateChart(root: HTMLElement) {
       dayCache.set(date, pointsFromPayload(date, payload))
     })()
       .catch(() => {
-        setLoadingState('โหลดข้อมูลย้อนหลังไม่สำเร็จ')
+        setLoadingState(getConnectivity().online ? 'โหลดข้อมูลย้อนหลังไม่สำเร็จ' : 'ออฟไลน์ — ไม่มีข้อมูลวันนั้นบันทึกไว้ในเครื่อง')
       })
       .finally(() => {
         loading.delete(date)
@@ -342,11 +343,11 @@ export function initSolarRateChart(root: HTMLElement) {
   ensureVisibleData()
 
   if (config.isToday) {
-    socket = io(config.socketUrl, { transports: ['websocket'] })
-    socket.on('connect', () => socket?.emit('subscribe', SOCKET_CHANNELS.solarFiveMin))
-    socket.on(SOCKET_CHANNELS.solarFiveMin, (payload: FiveMinChartPayload) => {
-      dayCache.set(config.today, pointsFromPayload(config.today, payload))
-      scheduleDraw()
+    live = createLiveSocket(config.socketUrl, [SOCKET_CHANNELS.solarFiveMin], (socket) => {
+      socket.on(SOCKET_CHANNELS.solarFiveMin, (payload: FiveMinChartPayload) => {
+        dayCache.set(config.today, pointsFromPayload(config.today, payload))
+        scheduleDraw()
+      })
     })
   }
 
@@ -355,7 +356,7 @@ export function initSolarRateChart(root: HTMLElement) {
     () => {
       disposed = true
       resizeObserver.disconnect()
-      socket?.disconnect()
+      live?.dispose()
       if (animationFrame) cancelAnimationFrame(animationFrame)
     },
     { once: true },
