@@ -5,16 +5,20 @@ import ChartCard from '@/components/ui/ChartCard.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
 import DatePicker from '@/components/ui/DatePicker.svelte'
 import { buildFiveMinChartPayload } from '@/lib/solar-fivemin'
-import { getBangkokISODate } from '@/lib/date'
+import { formatBangkokDateTime, getBangkokISODate } from '@/lib/date'
 import { SYSTEM } from '@/lib/solar-data'
 
-interface Props extends Pick<SolarData, 'fiveMin'> {
+interface Props extends Pick<SolarData, 'fiveMin' | 'live'> {
   date: string
   isToday: boolean
   socketUrl: string
 }
 
-const { fiveMin: POINTS, date, isToday, socketUrl } = Astro.props
+const { fiveMin: POINTS, live, date, isToday, socketUrl } = Astro.props
+
+// ป้าย "ข้อมูลล่าสุด" อยู่ท้ายการ์ดนี้การ์ดเดียว — ถ้าค้างจะรู้ทันทีว่าตัวเลขบนกราฟเก่าแค่ไหน
+const hasLastUpdate = new Date(live.lastUpdate).getTime() > 0
+const lastUpdateText = hasLastUpdate ? `ข้อมูลล่าสุด ${formatBangkokDateTime(live.lastUpdate)} น.` : 'ยังไม่มีข้อมูล'
 const hasData = POINTS.length > 0
 
 const [VW, ML, MR] = [560, 4, 8]
@@ -124,6 +128,9 @@ const chartJson = JSON.stringify({
       <span class="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
         <span class="inline-block h-px w-5 border-t-2 border-dashed opacity-70" style="border-color:var(--chart-4)"></span>
         กริด (kW)
+      </span>
+      <span class:list={['pv-last-update ml-auto', live.isOnline ? 'text-muted-foreground' : 'text-destructive']}>
+        {live.isOnline ? lastUpdateText : `ข้อมูลไม่เป็นปัจจุบัน · ${lastUpdateText}`}
       </span>
     </LegendRow>
   </ChartCard>

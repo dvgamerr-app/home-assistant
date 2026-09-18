@@ -12,12 +12,15 @@ import type { SolarRateChartConfig } from '@/lib/solar-rate-chart'
 interface Props extends Pick<SolarData, 'fiveMin'> {
   date: string
   isToday: boolean
+  /** กำลังติดตั้งของ MPPT 1/2 (kWp) — ใช้เป็นฐาน 100% */
   pv1MaxKw: number
   pv2MaxKw: number
+  pv1Panels: number
+  pv2Panels: number
   socketUrl: string
 }
 
-const { fiveMin: POINTS, date, isToday, pv1MaxKw, pv2MaxKw, socketUrl } = Astro.props
+const { fiveMin: POINTS, date, isToday, pv1MaxKw, pv2MaxKw, pv1Panels, pv2Panels, socketUrl } = Astro.props
 
 const now = new Date()
 const currentMinute = isToday ? now.getHours() * 60 + now.getMinutes() : 1439
@@ -34,13 +37,16 @@ const initialChart = buildFiveMinChartPayload(
   currentMinute,
 )
 
-// ค่าฐานอย่างน้อยต้องครอบข้อมูลของวันนี้ ไม่งั้นเส้นจะทะลุ 100% ตั้งแต่โหลดหน้าแรก
-const safePv1MaxKw = Math.max(pv1MaxKw, ...initialChart.pv1, 0.01)
-const safePv2MaxKw = Math.max(pv2MaxKw, ...initialChart.pv2, 0.01)
+// ฐานคือกำลังติดตั้งตามป้าย (panels × Wp) ไม่ใช่ peak ที่เคยทำได้
+// เคยใช้ peak แล้วเจอว่าวันที่จัดสายแผงใหม่ ฐาน = ค่าสูงสุดของวันนั้นเอง → ค้างที่ 100% ตลอด
+// ทะลุ 100% ได้จริงตอน cloud-edge หรือย้อนดูวันที่ layout เก่ามีแผงมากกว่า — แกน Y ขยายเป็นขั้น 25% ให้เอง
+const safePv1MaxKw = Math.max(pv1MaxKw, 0.01)
+const safePv2MaxKw = Math.max(pv2MaxKw, 0.01)
 const peakPv1Kw = Math.max(...initialChart.pv1, 0)
 const peakPv2Kw = Math.max(...initialChart.pv2, 0)
 const peakPv1Pct = (peakPv1Kw / safePv1MaxKw) * 100
 const peakPv2Pct = (peakPv2Kw / safePv2MaxKw) * 100
+const totalCapacityKw = safePv1MaxKw + safePv2MaxKw
 
 // สัญญาระหว่าง frontmatter กับฝั่ง client — ประกาศครั้งเดียวแล้วใช้ทั้งสองฝั่ง
 const chartConfig: SolarRateChartConfig = {
@@ -59,26 +65,33 @@ const chartJson = JSON.stringify(chartConfig)
 ---
 
 <div class="solar-rate-chart-root" data-solar-rate-chart={chartJson}>
-  <ChartCard eyebrow="ขีดความสามารถ" title="กำลังผลิตเทียบค่าสูงสุด" subtitle="แต่ละชุดคำนวณเปอร์เซ็นต์จากค่าสูงสุดของตัวเอง ซูมและเลื่อนดูย้อนหลังได้" class="overflow-hidden">
-    <div class="grid grid-cols-2 gap-4 border-b border-border/60 pb-4 sm:pb-5 md:grid-cols-3">
+  <ChartCard eyebrow="ขีดความสามารถ" title="กำลังผลิตเทียบค่าสูงสุด" subtitle="แต่ละชุดคิดเป็นเปอร์เซ็นต์ของกำลังติดตั้งตัวเอง ซูมและเลื่อนดูย้อนหลังได้" class="overflow-hidden">
+    <div slot="header-action" class="space-y-1 sm:text-right">
+      <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">กำลังติดตั้งรวม</p>
+      <p class="font-serif text-xl font-light leading-none text-foreground sm:text-2xl">
+        {num(totalCapacityKw, 2)}<span class="ml-1 text-sm text-muted-foreground">kWp</span>
+      </p>
+      <p class="text-[11px] text-muted-foreground">{pv1Panels} + {pv2Panels} แผง × {SYSTEM.panelWattPeak} W</p>
+    </div>
+    <div class="grid grid-cols-2 gap-4 border-b border-border/60 pb-4 sm:pb-5">
       <div class="space-y-1">
         <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">MPPT 1 สูงสุดในช่วงที่ดู</p>
         <p class="font-serif text-4xl font-light leading-none">
           <span class="solar-rate-pv1-pct">{num(peakPv1Pct, 0)}</span><span class="ml-1 text-base text-muted-foreground">%</span>
         </p>
-        <p class="text-sm text-chart-4"><span class="solar-rate-pv1-kw">{num(peakPv1Kw, 2)}</span> kW</p>
+        {/* ตัวหารติดอยู่กับตัวตั้งเลย เพื่อให้เห็นว่า % มาจากไหนโดยไม่ต้องกวาดตาไปหาการ์ดอื่น */}
+        <p class="text-sm text-chart-4">
+          <span class="solar-rate-pv1-kw">{num(peakPv1Kw, 2)}</span><span class="text-muted-foreground"> / {num(safePv1MaxKw, 2)} kWp</span>
+        </p>
       </div>
       <div class="space-y-1">
         <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">MPPT 2 สูงสุดในช่วงที่ดู</p>
         <p class="font-serif text-4xl font-light leading-none">
           <span class="solar-rate-pv2-pct">{num(peakPv2Pct, 0)}</span><span class="ml-1 text-base text-muted-foreground">%</span>
         </p>
-        <p class="text-sm text-chart-1"><span class="solar-rate-pv2-kw">{num(peakPv2Kw, 2)}</span> kW</p>
-      </div>
-      <div class="hidden space-y-1 md:block">
-        <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ค่าสูงสุดที่ใช้เป็นฐาน</p>
-        <p class="font-serif text-xl font-light leading-none text-foreground">MPPT 1 · {num(safePv1MaxKw, 2)} kW</p>
-        <p class="text-sm text-muted-foreground">MPPT 2 · {num(safePv2MaxKw, 2)} kW</p>
+        <p class="text-sm text-chart-1">
+          <span class="solar-rate-pv2-kw">{num(peakPv2Kw, 2)}</span><span class="text-muted-foreground"> / {num(safePv2MaxKw, 2)} kWp</span>
+        </p>
       </div>
     </div>
 

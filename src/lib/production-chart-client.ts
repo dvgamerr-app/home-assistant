@@ -4,6 +4,7 @@ import { formatPointTime, formatVisibleRange, timeAxisTicks } from './chart-time
 import { DAY_MS, MINUTE_MS, bangkokDayStart, clampTimeRange, datesInRange, panTimeRange, zoomTimeRange, type TimeRange } from './chart-viewport'
 import type { FiveMinChartPayload } from './solar-fivemin'
 import { SOCKET_CHANNELS } from './socket'
+import { formatBangkokDateTime } from './date'
 
 type ChartConfig = FiveMinChartPayload & {
   selectedDate: string
@@ -371,6 +372,17 @@ export function initProductionChart(root: HTMLElement) {
     if (pointers.size === 0) hideTooltip()
   })
 
+  function updateLastUpdate(snapshot: { lastUpdate?: string; isOnline?: boolean }) {
+    const element = root.querySelector<HTMLElement>('.pv-last-update')
+    if (!element || !snapshot.lastUpdate) return
+    const stamp = new Date(snapshot.lastUpdate)
+    const label = stamp.getTime() > 0 ? `ข้อมูลล่าสุด ${formatBangkokDateTime(stamp)} น.` : 'ยังไม่มีข้อมูล'
+    const online = snapshot.isOnline !== false
+    element.textContent = online ? label : `ข้อมูลไม่เป็นปัจจุบัน · ${label}`
+    element.classList.toggle('text-muted-foreground', online)
+    element.classList.toggle('text-destructive', !online)
+  }
+
   const resizeObserver = new ResizeObserver(scheduleDraw)
   resizeObserver.observe(wrap)
   draw()
@@ -378,11 +390,13 @@ export function initProductionChart(root: HTMLElement) {
 
   if (config.isToday) {
     socket = io(config.socketUrl, { transports: ['websocket'] })
-    socket.on('connect', () => socket?.emit('subscribe', SOCKET_CHANNELS.solarFiveMin))
+    // subscribe รับสองช่อง: fivemin ไว้วาดกราฟ · live ไว้ขยับป้าย "ข้อมูลล่าสุด" ท้ายการ์ด
+    socket.on('connect', () => socket?.emit('subscribe', [SOCKET_CHANNELS.solarFiveMin, SOCKET_CHANNELS.live]))
     socket.on(SOCKET_CHANNELS.solarFiveMin, (payload: FiveMinChartPayload) => {
       dayCache.set(config.today, pointsFromPayload(config.today, payload))
       scheduleDraw()
     })
+    socket.on(SOCKET_CHANNELS.live, (snapshot: { lastUpdate?: string; isOnline?: boolean }) => updateLastUpdate(snapshot))
   }
 
   window.addEventListener(
