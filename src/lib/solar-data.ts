@@ -26,11 +26,25 @@ export const SYSTEM = {
   batteryCapacityKwh: 10,
   batteryConnectedMinVoltage: 20,
   installDate: '2026-05-11',
-  /** วันจัดสายแผงล่าสุด: MPPT 1 = 10 แผง · MPPT 2 = 5 แผง (เดิม 11/4) — ใช้ตัด peak ของ layout เก่าออก */
+  /**
+   * EnergyLIB SH-PV-NB560 — 560 Wp/แผง (ตามป้ายหลังแผง: Voc 52.27 V · Vmp 42.81 V · Isc 13.27 A · Imp 13.09 A)
+   * อย่าสับสนกับ datasheet "Black Magic 2nd Gen PV570W" ของยี่ห้อเดียวกัน — นั่นคนละรุ่น (Voc 47.82 V)
+   * ซึ่งขัดกับแรงดัน string ที่วัดได้จริง 49.7–52.6 V ต่อแผง
+   */
+  panelWattPeak: 560,
+  /**
+   * จำนวนแผงต่อ MPPT ตาม layout ปัจจุบัน — รวม 15 แผง = 8.4 kWp บนอินเวอร์เตอร์ 8 kW
+   * ยืนยันด้วยแรงดัน string จริง: pv1 526 V ≈ 10 × Voc · pv2 249 V ≈ 5 × Voc
+   */
+  panelsPerString: [10, 5],
+  /** วันจัดสายแผงล่าสุด (เดิม 11/4) — ใช้ตัด peak ที่บันทึกของ layout เก่าออก */
   stringLayoutSince: '2026-09-17',
   investmentTHB: 359000,
   serialNumber: 'LIBIPS08EEEAF618',
 }
+
+/** กำลังติดตั้งของ MPPT ที่ index (kWp) — จำนวนแผง × Wp ต่อแผง */
+const stringCapacityKw = (index: number) => ((SYSTEM.panelsPerString[index] ?? 0) * SYSTEM.panelWattPeak) / 1000
 
 const thMonth = (yyyymm: string) => MONTH_SHORT_TH[parseInt(yyyymm.slice(4)) - 1] ?? yyyymm
 const round = (value: number, digits = 1) => Number(value.toFixed(digits))
@@ -221,9 +235,29 @@ export async function getAll(date?: Date, scope: SolarDataScope = 'all') {
   const pvPeak = settled(pvPeakResult, 'pvPeak') ?? { pv1: 0, pv2: 0 }
   const recentDailyRows = settled(recentDailyResult, 'recentDaily') ?? []
 
+  // `capacityKw` = กำลังติดตั้งตามป้าย (panels × Wp) ใช้เป็นฐานของ % — ไม่ใช้ `peakKw`
+  // เพราะหลังจัดสายใหม่ peak ที่เก็บได้จะเท่ากับค่าสูงสุดของวันนั้นเอง ทำให้ % ค้างที่ 100
   const pvStrings = [
-    { name: 'แผง MPPT 1', power: live.pv1.power, voltage: live.pv1.voltage, current: live.pv1.current, installed: true, peakKw: pvPeak.pv1 },
-    { name: 'แผง MPPT 2', power: live.pv2.power, voltage: live.pv2.voltage, current: live.pv2.current, installed: true, peakKw: pvPeak.pv2 },
+    {
+      name: 'แผง MPPT 1',
+      power: live.pv1.power,
+      voltage: live.pv1.voltage,
+      current: live.pv1.current,
+      installed: true,
+      peakKw: pvPeak.pv1,
+      panels: SYSTEM.panelsPerString[0] ?? 0,
+      capacityKw: stringCapacityKw(0),
+    },
+    {
+      name: 'แผง MPPT 2',
+      power: live.pv2.power,
+      voltage: live.pv2.voltage,
+      current: live.pv2.current,
+      installed: true,
+      peakKw: pvPeak.pv2,
+      panels: SYSTEM.panelsPerString[1] ?? 0,
+      capacityKw: stringCapacityKw(1),
+    },
   ]
 
   const selfUseToday = clampZero(today.consumed - today.gridImport)

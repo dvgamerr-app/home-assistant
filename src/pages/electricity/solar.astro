@@ -33,7 +33,7 @@ const socketUrl = getSocketUrl(Astro.request.url)
     <ElectricityNav active="solar" />
 
     <div class="grid gap-6">
-      <ProductionCurve fiveMin={data.fiveMin} date={selectedISO} isToday={isToday} socketUrl={socketUrl} />
+      <ProductionCurve fiveMin={data.fiveMin} live={data.live} date={selectedISO} isToday={isToday} socketUrl={socketUrl} />
 
       {isToday && <SolarStatusCards live={data.live} pvStrings={data.pvStrings} system={data.system} socketUrl={socketUrl} client:load />}
 
@@ -45,8 +45,10 @@ const socketUrl = getSocketUrl(Astro.request.url)
               fiveMin={data.fiveMin}
               date={selectedISO}
               isToday={isToday}
-              pv1MaxKw={data.pvStrings[0]?.peakKw ?? 0}
-              pv2MaxKw={data.pvStrings[1]?.peakKw ?? 0}
+              pv1MaxKw={data.pvStrings[0]?.capacityKw ?? 0}
+              pv2MaxKw={data.pvStrings[1]?.capacityKw ?? 0}
+              pv1Panels={data.pvStrings[0]?.panels ?? 0}
+              pv2Panels={data.pvStrings[1]?.panels ?? 0}
               socketUrl={socketUrl}
             />
           </div>

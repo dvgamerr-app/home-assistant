@@ -34,7 +34,9 @@ const surplusMarks = bars.map((segments, index) => ({
 
 const yTicks = [1, 0.75, 0.5, 0.25]
 const gridYs = yTicks.map((tick) => py0 + (1 - tick) * ph)
-const yAxisTicks = yTicks.map((tick, index) => ({ label: `${num(tick * maxTotal, 0)}%`, topPct: (gridYs[index]! / VH) * 100, emphasis: index === 0 }))
+// คิด topPct จากสูตรเดียวกับ gridYs ตรงๆ — เลี่ยง `gridYs[index]!` เพราะ non-null assertion หลัง
+// template literal ที่ลงท้ายด้วย % ทำให้ compiler ของ `astro check` แปลงไฟล์เป็น TSX พลาดทั้งไฟล์
+const yAxisTicks = yTicks.map((tick, index) => ({ label: `${num(tick * maxTotal, 0)}%`, topPct: ((py0 + (1 - tick) * ph) / VH) * 100, emphasis: index === 0 }))
 const padLeft = +((ML / VW) * 100).toFixed(2)
 const padRight = +((MR / VW) * 100).toFixed(2)
 const latestSelfPct = Math.max(0, Math.min(100, gridOverview.selfSufficiencyPct))
