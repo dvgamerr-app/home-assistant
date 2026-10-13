@@ -9,6 +9,30 @@ const WATER_ACCOUNT = process.env.MWA_ACCOUNT_CODE ?? ''
 const TZ = 'Asia/Bangkok'
 const CO2_KG_PER_KWH = 0.4999 // Thailand grid emission factor
 
+/** Collector stores YLG exchange_buy as usd_buy; latest timestamp uses uq_updated_at. */
+export async function getSubscriptionExchangeRate() {
+  const query = sql<{ usd_buy: string; updated_at: Date }[]>`
+    SELECT usd_buy, updated_at
+    FROM stash.gold
+    WHERE updated_at IS NOT NULL
+    ORDER BY updated_at DESC
+    LIMIT 1
+  `
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        query.cancel()
+        reject(new Error('subscription exchange rate query timed out'))
+      }, 5000)
+    })
+    const rows = await Promise.race([query, timeout])
+    return rows[0] ?? null
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type SolarAlarm = {

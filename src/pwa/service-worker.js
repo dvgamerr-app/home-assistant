@@ -27,7 +27,7 @@ const OWNED_CACHES = [SHELL_CACHE, PAGE_CACHE, DATA_CACHE, RUNTIME_CACHE]
 
 const OFFLINE_URL = '/offline'
 /** หน้าที่อุ่นเก็บไว้ล่วงหน้า เพื่อให้กดดูได้แม้ยังไม่เคยเปิดหน้านั้นตอนออนไลน์ */
-const WARM_URLS = ['/', '/electricity/load', '/electricity/solar', '/electricity/bill', '/electricity/water', '/network']
+const WARM_URLS = ['/', '/electricity/load', '/electricity/solar', '/electricity/bill', '/electricity/water', '/network', '/network/subscriptions']
 /** ไม่ warm ซ้ำถ้าสำเนาที่มีอายุน้อยกว่านี้ */
 const WARM_MAX_AGE_MS = 10 * 60 * 1000
 const PAGE_CACHE_LIMIT = 40
@@ -38,7 +38,7 @@ const DATA_TIMEOUT_MS = 8000
 const CACHED_AT_HEADER = 'x-ourkk-cached-at'
 
 /** ห้ามแตะเด็ดขาด — auth, health check, socket.io และ QR ที่ลายเซ็นหมดอายุได้ */
-const BYPASS_PREFIXES = ['/api/auth', '/api/health', '/api/qr', '/socket.io', '/@vite', '/@id', '/node_modules']
+const BYPASS_PREFIXES = ['/api/auth', '/api/health', '/api/qr', '/api/subscriptions', '/socket.io', '/@vite', '/@id', '/node_modules']
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com']
 
 /** สถานะล่าสุดที่ประกาศให้หน้าเว็บรู้ ใช้กันไม่ให้ broadcast รัวทุก request */

@@ -13,7 +13,7 @@
     "lint:fix": "bun x --bun eslint --fix .",
     "format": "bun x --bun prettier --check .",
     "format:fix": "bun x --bun prettier --write .",
-    "migration:run": "bun src/db/migrate.ts",
+    "migration:run": "bun src/db/migrate-cli.ts",
     "prepare": "bun x --bun husky",
     "test": "bun test"
   },

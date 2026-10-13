@@ -35,6 +35,8 @@
 
 **ไม่แตะเลย:** `/api/auth`, `/api/health`, `/api/qr`, `/socket.io`, ทุก request ที่ไม่ใช่ GET
 
+`/api/subscriptions` ไม่ผ่าน cache เช่นกัน เพื่อไม่ใช้ข้อมูลเก่าในการแก้ไขรายการร่วมกัน ส่วนหน้า `/network/subscriptions` เก็บสำเนา HTML ตามปกติและอยู่ใน WARM_URLS อ่านได้ตอนออฟไลน์ แต่ปิดการเพิ่ม/แก้ไขจนกว่าจะเชื่อมต่อได้ (ดู `docs/subscriptions.md`)
+
 ทำไม pages/data ต้องผูกเวอร์ชัน: HTML ที่ cache ไว้อ้างถึง chunk ที่ชื่อมี hash — ถ้า deploy ใหม่
 แล้วยังเก็บ HTML เก่าไว้ chunk ที่มันเรียกจะถูกลบไปแล้วทั้งใน cache และบนเซิร์ฟเวอร์ หน้าจะยัง
 render ได้แต่ island ไม่ hydrate ตอน `activate` (ซึ่งเกิดได้เฉพาะตอนโหลด `sw.js` ใหม่สำเร็จ =
