@@ -1,26 +1,16 @@
-import { FileMigrationProvider, Migrator } from 'kysely/migration'
-import { readdir } from 'node:fs/promises'
-import { join } from 'node:path'
+import { Migrator } from 'kysely/migration'
+import { logger } from '../lib/logger'
 import { getAuthDb } from './auth-db'
+import { migrations } from './migrations'
 
-const db = getAuthDb()
-const migrator = new Migrator({
-  db,
-  provider: new FileMigrationProvider({
-    fs: { readdir },
-    path: { join },
-    migrationFolder: join(import.meta.dirname, 'migrations'),
-  }),
-})
+/** รัน migration ที่ค้างอยู่ให้ครบ — throw ถ้าพัง (Kysely ล็อกใน DB เองจึงเรียกซ้อนจากหลาย process ได้) */
+export async function runMigrations(): Promise<void> {
+  const migrator = new Migrator({ db: getAuthDb(), provider: { getMigrations: async () => migrations } })
+  const { error, results } = await migrator.migrateToLatest()
 
-const { error, results } = await migrator.migrateToLatest()
-results?.forEach((r) => {
-  if (r.status === 'Success') console.log(`migration "${r.migrationName}" applied`)
-  else if (r.status === 'Error') console.error(`migration "${r.migrationName}" FAILED`)
-})
-if (error) {
-  console.error('migration error:', error)
-  process.exit(1)
+  for (const r of results ?? []) {
+    if (r.status === 'Success') logger.info(`migration "${r.migrationName}" applied`)
+    else if (r.status === 'Error') logger.error(`migration "${r.migrationName}" FAILED`)
+  }
+  if (error) throw error
 }
-console.log('migrations done')
-await db.destroy()

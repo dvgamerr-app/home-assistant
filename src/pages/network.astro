@@ -1,6 +1,7 @@
 ---
 import Layout from '@/layouts/Layout.astro'
 import Nav from '@/components/Nav.astro'
+import NetworkNav from '@/components/NetworkNav.astro'
 import PageHeader from '@/components/ui/PageHeader.astro'
 import StatCard from '@/components/StatCard.astro'
 import NetworkPath from '@/components/NetworkPath.astro'
@@ -32,6 +33,7 @@ const statusTone = { good: 'text-chart-1', warn: 'text-chart-2', down: 'text-des
 <Layout title="เครือข่ายในบ้าน — สถานะอินเทอร์เน็ต">
   <Nav />
   <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
+    <NetworkNav active="network" />
     <PageHeader
       eyebrow="เครือข่ายในบ้าน"
       title="อินเทอร์เน็ตและสัญญาณ"
@@ -96,25 +98,23 @@ const statusTone = { good: 'text-chart-1', warn: 'text-chart-2', down: 'text-des
             </tr>
           </thead>
           <tbody>
-            {
-              hops.map((hop) => (
-                <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
-                  <td class="px-6 py-3">
-                    <span class="flex items-center gap-2 text-foreground">
-                      <span class="legend-dot" style={`background:${hop.color}`} />
-                      {hop.label}
-                    </span>
-                    <span class="mt-0.5 block font-mono text-xs text-muted-foreground">{hop.target}</span>
-                  </td>
-                  <td class="px-4 py-3 text-right tabular-nums text-foreground">{num(hop.latencyMs, 2)} ms</td>
-                  <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{num(hop.avgMs, 2)} ms</td>
-                  <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{num(hop.p95Ms, 2)} ms</td>
-                  <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{num(hop.maxMs, 2)} ms</td>
-                  <td class:list={['px-4 py-3 text-right tabular-nums', hop.lossPct > 0 ? 'text-destructive' : 'text-muted-foreground']}>{num(hop.lossPct, 2)}%</td>
-                  <td class:list={['px-6 py-3 text-right text-xs', statusTone[hop.status]]}>{statusLabel[hop.status]}</td>
-                </tr>
-              ))
-            }
+            {hops.map((hop) => (
+              <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
+                <td class="px-6 py-3">
+                  <span class="flex items-center gap-2 text-foreground">
+                    <span class="legend-dot" style={`background:${hop.color}`} />
+                    {hop.label}
+                  </span>
+                  <span class="mt-0.5 block font-mono text-xs text-muted-foreground">{hop.target}</span>
+                </td>
+                <td class="px-4 py-3 text-right tabular-nums text-foreground">{num(hop.latencyMs, 2)} ms</td>
+                <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{num(hop.avgMs, 2)} ms</td>
+                <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{num(hop.p95Ms, 2)} ms</td>
+                <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{num(hop.maxMs, 2)} ms</td>
+                <td class:list={['px-4 py-3 text-right tabular-nums', hop.lossPct > 0 ? 'text-destructive' : 'text-muted-foreground']}>{num(hop.lossPct, 2)}%</td>
+                <td class:list={['px-6 py-3 text-right text-xs', statusTone[hop.status]]}>{statusLabel[hop.status]}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -125,23 +125,21 @@ const statusTone = { good: 'text-chart-1', warn: 'text-chart-2', down: 'text-des
         <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">บันทึกเหตุการณ์</p>
         <h2 class="mt-1 font-serif text-lg font-light text-foreground">เน็ตสะดุดเมื่อไหร่บ้าง</h2>
         <ul class="mt-5 space-y-4">
-          {
-            incidents.map((incident) => (
-              <li class="flex gap-3 border-b border-border/50 pb-4 last:border-0 last:pb-0">
-                <span class:list={['mt-0.5 shrink-0', incident.severity === 'down' ? 'text-destructive' : 'text-chart-2']}>
-                  {incident.severity === 'down' ? <CircleX size={16} strokeWidth={1.5} /> : <TriangleAlert size={16} strokeWidth={1.5} />}
-                </span>
-                <div class="min-w-0">
-                  <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <p class="text-sm text-foreground">{incident.title}</p>
-                    <p class="text-xs text-muted-foreground">นาน {formatDuration(incident.durationSec)}</p>
-                  </div>
-                  <p class="mt-1 text-xs leading-relaxed text-muted-foreground">{incident.detail}</p>
-                  <p class="mt-1.5 text-xs text-muted-foreground/80">{formatBangkokDateTime(incident.startedAt)}</p>
+          {incidents.map((incident) => (
+            <li class="flex gap-3 border-b border-border/50 pb-4 last:border-0 last:pb-0">
+              <span class:list={['mt-0.5 shrink-0', incident.severity === 'down' ? 'text-destructive' : 'text-chart-2']}>
+                {incident.severity === 'down' ? <CircleX size={16} strokeWidth={1.5} /> : <TriangleAlert size={16} strokeWidth={1.5} />}
+              </span>
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <p class="text-sm text-foreground">{incident.title}</p>
+                  <p class="text-xs text-muted-foreground">นาน {formatDuration(incident.durationSec)}</p>
                 </div>
-              </li>
-            ))
-          }
+                <p class="mt-1 text-xs leading-relaxed text-muted-foreground">{incident.detail}</p>
+                <p class="mt-1.5 text-xs text-muted-foreground/80">{formatBangkokDateTime(incident.startedAt)}</p>
+              </div>
+            </li>
+          ))}
         </ul>
       </section>
 

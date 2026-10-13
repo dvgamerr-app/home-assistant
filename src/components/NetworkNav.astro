@@ -1,0 +1,47 @@
+---
+import SlidingUnderline from './ui/SlidingUnderline.astro'
+interface Props {
+  active: 'network' | 'subscriptions'
+}
+const { active } = Astro.props
+const tabs = [
+  { id: 'network', href: '/network', label: 'อินเทอร์เน็ตและสัญญาณ' },
+  { id: 'subscriptions', href: '/network/subscriptions', label: 'Subscription' },
+]
+---
+
+<nav aria-label="ข้อมูลเครือข่ายและบริการออนไลน์" data-sliding-nav class="relative flex gap-6 overflow-x-auto border-b border-border/60 pb-1">
+  {tabs.map((tab) => (
+    <a href={tab.href} aria-current={active === tab.id ? ('page' as const) : undefined} class:list={['network-tab', { active: active === tab.id }]}>
+      {tab.label}
+    </a>
+  ))}
+  <SlidingUnderline />
+</nav>
+
+<style>
+  .network-tab {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    white-space: nowrap;
+    padding-bottom: 0.75rem;
+    margin-bottom: -1px;
+    border-bottom: 1px solid transparent;
+    font-size: 11px;
+    letter-spacing: var(--tracking-luxury);
+    color: var(--muted-foreground);
+    transition: color 0.2s;
+  }
+  .network-tab:hover,
+  .network-tab.active {
+    color: var(--foreground);
+  }
+  .network-tab:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -2px;
+  }
+  [data-sliding-nav]:not([data-underline-ready]) .network-tab.active {
+    border-bottom-color: var(--accent);
+  }
+</style>

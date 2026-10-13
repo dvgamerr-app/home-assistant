@@ -1,6 +1,8 @@
 import { defineMiddleware } from 'astro:middleware'
 import { auth } from '@/lib/auth'
 import { isEmailAllowed } from '@/lib/config'
+import { logger } from '@/lib/logger'
+import { runMigrations } from '@/db/migrate'
 
 // `/api/qr` ต้อง public เพราะ LINE fetch รูปในการ์ดเองโดยไม่มี session
 // ป้องกันด้วยลายเซ็น HMAC ใน token แทน (ดู src/lib/bill-qr.ts)
@@ -10,8 +12,19 @@ import { isEmailAllowed } from '@/lib/config'
 // service worker เก็บไว้ตั้งแต่ตอน install ซึ่งเป็นจังหวะที่ยังไม่มี session ก็ได้
 const PUBLIC = ['/login', '/two-factor', '/no-permission', '/api/auth', '/api/qr', '/api/health', '/offline']
 
+// migrate ครั้งเดียวต่อ process ตอนเริ่มแอป (request แรกรอจนเสร็จ) — ถ้าพังจะล้างแล้วลองใหม่ request ถัดไป
+let migrated: Promise<void> | null = null
+const ensureMigrated = () =>
+  (migrated ??= runMigrations().catch((error) => {
+    migrated = null
+    logger.error({ err: error }, 'auto migration failed')
+    throw error
+  }))
+
 export const onRequest = defineMiddleware(async ({ request, redirect }, next) => {
   const { pathname } = new URL(request.url)
+
+  if (!pathname.startsWith('/api/health')) await ensureMigrated()
 
   if (!PUBLIC.some((p) => pathname.startsWith(p))) {
     const session = await auth.api.getSession({ headers: request.headers })

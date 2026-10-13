@@ -1,0 +1,77 @@
+<span class="sliding-underline" aria-hidden={true}></span>
+
+<script>
+  document.querySelectorAll<HTMLElement>('[data-sliding-nav]').forEach((nav) => {
+    const indicator = nav.querySelector<HTMLElement>('.sliding-underline')
+    const links = [...nav.querySelectorAll<HTMLAnchorElement>('a[href]')]
+    if (!indicator || !links.length) return
+
+    const active = links.find((link) => link.getAttribute('aria-current') === 'page')
+    let hovered: HTMLAnchorElement | undefined
+    const focused = () => links.find((link) => link === document.activeElement)
+
+    const update = () => {
+      const target = hovered ?? focused() ?? active
+      if (!target || !nav.getClientRects().length) {
+        indicator.style.opacity = '0'
+        return
+      }
+
+      const container = nav.getBoundingClientRect()
+      const rect = target.getBoundingClientRect()
+      const x = rect.left - container.left + nav.scrollLeft - nav.clientLeft
+      const y = rect.bottom - container.top + nav.scrollTop - nav.clientTop
+      indicator.style.width = `${rect.width}px`
+      indicator.style.transform = `translate(${x}px, ${y}px)`
+      indicator.style.opacity = '1'
+    }
+
+    links.forEach((link) => {
+      link.addEventListener('pointerenter', (event) => {
+        if (event.pointerType === 'touch') return
+        hovered = link
+        update()
+      })
+      link.addEventListener('pointerleave', () => {
+        hovered = undefined
+        update()
+      })
+    })
+    nav.addEventListener('focusin', update)
+    nav.addEventListener('focusout', () => queueMicrotask(update))
+
+    const observer = new ResizeObserver(update)
+    observer.observe(nav)
+    links.forEach((link) => observer.observe(link))
+    update()
+    nav.dataset.underlineReady = ''
+    requestAnimationFrame(() => requestAnimationFrame(() => indicator.classList.add('animate')))
+  })
+</script>
+
+<style>
+  .sliding-underline {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 1px;
+    background: var(--accent);
+    pointer-events: none;
+    opacity: 0;
+    margin-top: var(--underline-offset, -1px);
+  }
+  .sliding-underline.animate {
+    transition:
+      transform 220ms ease,
+      width 220ms ease,
+      opacity 150ms ease;
+  }
+  :global([data-underline-ready] > a::after) {
+    visibility: hidden;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sliding-underline.animate {
+      transition: none;
+    }
+  }
+</style>

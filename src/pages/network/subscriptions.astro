@@ -1,0 +1,30 @@
+---
+import Layout from '@/layouts/Layout.astro'
+import Nav from '@/components/Nav.astro'
+import NetworkNav from '@/components/NetworkNav.astro'
+import PageHeader from '@/components/ui/PageHeader.astro'
+import SubscriptionDashboard from '@/components/SubscriptionDashboard.svelte'
+import { getSubscriptions } from '@/lib/subscription-store'
+import type { SubscriptionSnapshot } from '@/lib/subscriptions'
+import { logger } from '@/lib/logger'
+
+let initial: SubscriptionSnapshot = { accounts: [], subscriptions: [], exchangeRate: null, utilities: [] }
+let loadError = ''
+try {
+  initial = await getSubscriptions()
+} catch (error) {
+  logger.error({ err: error }, 'failed to load subscriptions page')
+  loadError = 'ยังโหลดข้อมูล Subscription ไม่ได้ กรุณาลองรีเฟรชข้อมูลอีกครั้ง'
+  Astro.response.status = 503
+}
+Astro.response.headers.set('Cache-Control', 'private, no-cache')
+---
+
+<Layout title="Subscription — บริการรายเดือนของบ้าน">
+  <Nav />
+  <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
+    <NetworkNav active="subscriptions" />
+    <PageHeader eyebrow="บริการออนไลน์ของบ้าน" title="ทุกบริการ ในที่เดียว" description="ดูแลค่าบริการรายเดือนของแต่ละบัญชี เห็นยอดรวมและรอบเรียกเก็บถัดไป เพื่อวางแผนค่าใช้จ่ายร่วมกัน" />
+    <SubscriptionDashboard {initial} {loadError} client:load />
+  </main>
+</Layout>
