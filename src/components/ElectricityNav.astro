@@ -1,4 +1,6 @@
 ---
+import SlidingUnderline from './ui/SlidingUnderline.astro'
+
 type Props = { active: 'load' | 'solar' | 'bill' | 'water' }
 const { active } = Astro.props
 const tabs = [
@@ -9,14 +11,13 @@ const tabs = [
 ]
 ---
 
-<div class="mb-8 flex gap-4 overflow-x-auto border-b border-border/60 pb-1">
-  {
-    tabs.map((t) => (
-      <a href={t.href} aria-current={t.id === active ? ('page' as const) : undefined} class:list={['lbl', { active: t.id === active }]}>
-        {t.label}
-      </a>
-    ))
-  }
+<div data-sliding-nav class="relative mb-8 flex gap-4 overflow-x-auto border-b border-border/60 pb-1">
+  {tabs.map((t) => (
+    <a href={t.href} aria-current={t.id === active ? ('page' as const) : undefined} class:list={['lbl', { active: t.id === active }]}>
+      {t.label}
+    </a>
+  ))}
+  <SlidingUnderline />
 </div>
 
 <style>
@@ -37,6 +38,8 @@ const tabs = [
   }
   .lbl.active {
     color: var(--foreground);
+  }
+  [data-sliding-nav]:not([data-underline-ready]) .lbl.active {
     border-bottom-color: var(--accent);
   }
 </style>
