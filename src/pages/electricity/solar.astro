@@ -28,7 +28,7 @@ const socketUrl = getSocketUrl(Astro.request.url)
 <Layout title="ผลิตไฟ — บ้าน">
   <Nav />
   <main class="space-y-8 px-6 py-10 md:px-10 md:py-12">
-    <PageHeader eyebrow="ระบบไฟฟ้า" title="การผลิตพลังงานโซลาร์" description="ดูผลผลิตจากแผง การทำงานของแบตเตอรี่ และสัดส่วนไฟที่บ้านผลิตใช้เอง โดยแยกข้อมูลจริงออกจากค่าประมาณอย่างชัดเจน" />
+    <PageHeader eyebrow="ระบบไฟฟ้า" title="การผลิตพลังงานโซลาร์" />
 
     <ElectricityNav active="solar" />
 
@@ -37,23 +37,21 @@ const socketUrl = getSocketUrl(Astro.request.url)
 
       {isToday && <SolarStatusCards live={data.live} pvStrings={data.pvStrings} system={data.system} socketUrl={socketUrl} client:load />}
 
-      {
-        data.fiveMin.length > 0 && (
-          <div class="grid gap-6 lg:grid-cols-2">
-            <BatteryBehaviorChart fiveMin={data.fiveMin} dayFlow={data.dayFlow} currentBatteryConnection={currentBatteryConnection} />
-            <SolarProductionRateCurve
-              fiveMin={data.fiveMin}
-              date={selectedISO}
-              isToday={isToday}
-              pv1MaxKw={data.pvStrings[0]?.capacityKw ?? 0}
-              pv2MaxKw={data.pvStrings[1]?.capacityKw ?? 0}
-              pv1Panels={data.pvStrings[0]?.panels ?? 0}
-              pv2Panels={data.pvStrings[1]?.panels ?? 0}
-              socketUrl={socketUrl}
-            />
-          </div>
-        )
-      }
+      {data.fiveMin.length > 0 && (
+        <div class="grid gap-6 lg:grid-cols-2">
+          <BatteryBehaviorChart fiveMin={data.fiveMin} dayFlow={data.dayFlow} currentBatteryConnection={currentBatteryConnection} />
+          <SolarProductionRateCurve
+            fiveMin={data.fiveMin}
+            date={selectedISO}
+            isToday={isToday}
+            pv1MaxKw={data.pvStrings[0]?.capacityKw ?? 0}
+            pv2MaxKw={data.pvStrings[1]?.capacityKw ?? 0}
+            pv1Panels={data.pvStrings[0]?.panels ?? 0}
+            pv2Panels={data.pvStrings[1]?.panels ?? 0}
+            socketUrl={socketUrl}
+          />
+        </div>
+      )}
 
       <div class="grid gap-6 lg:grid-cols-2">
         <GridDependencyChart months={data.months} gridOverview={data.gridOverview} />
