@@ -1,4 +1,5 @@
 import { num } from './electricity'
+import { getBangkokMinuteOfDay } from './date'
 import { get5Min, type MinutePoint } from './db'
 
 export type FiveMinChartPoint = {
@@ -94,5 +95,5 @@ export function buildFiveMinChartPayload(points: FiveMinChartPoint[], currentMin
 
 export async function getTodayFiveMinChartPayload(now = new Date()) {
   const points = toFiveMinChartPoints(await get5Min(now))
-  return buildFiveMinChartPayload(points, now.getHours() * 60 + now.getMinutes())
+  return buildFiveMinChartPayload(points, getBangkokMinuteOfDay(now))
 }

@@ -5,7 +5,7 @@ import ChartCard from '@/components/ui/ChartCard.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
 import DatePicker from '@/components/ui/DatePicker.svelte'
 import { buildFiveMinChartPayload } from '@/lib/solar-fivemin'
-import { formatBangkokDateTime, getBangkokISODate } from '@/lib/date'
+import { formatBangkokDateTime, getBangkokISODate, getBangkokMinuteOfDay } from '@/lib/date'
 import { SYSTEM } from '@/lib/solar-data'
 
 interface Props extends Pick<SolarData, 'fiveMin' | 'live'> {
@@ -23,8 +23,7 @@ const hasData = POINTS.length > 0
 
 const [VW, ML, MR] = [560, 4, 8]
 
-const now = new Date()
-const currentMinute = isToday ? now.getHours() * 60 + now.getMinutes() : 1439
+const currentMinute = isToday ? getBangkokMinuteOfDay() : 1439
 const initialChart = buildFiveMinChartPayload(
   POINTS.map((point) => ({
     minuteOfDay: point.minuteOfDay,
@@ -59,16 +58,29 @@ const chartJson = JSON.stringify({
       <div class="space-y-1">
         <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">พีคโซลาร์</p>
         <p class="font-serif text-4xl font-light leading-none">
-          <span id="pv-peak-pv" class="pv-peak-pv">{hasData ? num(peakPv, 2) : '—'}</span><span class="ml-1 text-base text-muted-foreground">kW</span>
+          <span id="pv-peak-pv" class="pv-peak-pv">
+            {hasData ? num(peakPv, 2) : '—'}
+          </span>
+          <span class="ml-1 text-base text-muted-foreground">kW</span>
         </p>
       </div>
       <div class="hidden space-y-1 sm:block">
         <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">พีคโหลด</p>
-        <p class="font-serif text-2xl font-light leading-none" style="color:var(--destructive)"><span id="pv-peak-load" class="pv-peak-load">{num(peakLoad, 2)}</span> kW</p>
+        <p class="font-serif text-2xl font-light leading-none" style="color:var(--destructive)">
+          <span id="pv-peak-load" class="pv-peak-load">
+            {num(peakLoad, 2)}
+          </span>{' '}
+          kW
+        </p>
       </div>
       <div class="hidden space-y-1 sm:block">
         <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">แบตจ่ายออกสูงสุด</p>
-        <p class="font-serif text-2xl font-light leading-none" style="color:var(--chart-3)"><span id="pv-peak-batt" class="pv-peak-batt">{num(peakBattDis, 2)}</span> kW</p>
+        <p class="font-serif text-2xl font-light leading-none" style="color:var(--chart-3)">
+          <span id="pv-peak-batt" class="pv-peak-batt">
+            {num(peakBattDis, 2)}
+          </span>{' '}
+          kW
+        </p>
       </div>
       <div class="w-full sm:ml-auto sm:flex sm:w-auto sm:items-center">
         <DatePicker selected={date} client:load />
@@ -77,16 +89,14 @@ const chartJson = JSON.stringify({
 
     <div class="mt-4 flex items-start gap-1 sm:mt-5">
       <div id="pv-y-axis" class="pv-y-axis relative hidden h-56 shrink-0 overflow-visible sm:block md:h-60" style="width:1.75rem">
-        {
-          yLabels.map((l, i) => (
-            <span
-              class:list={['absolute right-0 text-right text-[9px] leading-none', i === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
-              style={`top:${gridPct[i]}%;transform:translateY(-50%)`}
-            >
-              {l}
-            </span>
-          ))
-        }
+        {yLabels.map((l, i) => (
+          <span
+            class:list={['absolute right-0 text-right text-[9px] leading-none', i === 0 ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
+            style={`top:${gridPct[i]}%;transform:translateY(-50%)`}
+          >
+            {l}
+          </span>
+        ))}
       </div>
       <div class="min-w-0 flex-1">
         <div class="pv-chart-wrapper relative h-48 w-full sm:h-56 md:h-60">
@@ -96,17 +106,18 @@ const chartJson = JSON.stringify({
             role={'img' as const}
             aria-label="กราฟกำลังผลิต ซูมและเลื่อนดูข้อมูลย้อนหลังได้"
             class:list={[!hasData && 'opacity-0']}
-            style="cursor:grab;touch-action:none;user-select:none;overscroll-behavior:contain"></svg>
-          {
-            !hasData && (
-              <div class="absolute inset-0 flex items-center justify-center px-6 text-center">
-                <p class="text-sm text-muted-foreground">ไม่มี telemetry สำหรับวันที่เลือก</p>
-              </div>
-            )
-          }
+            style="cursor:grab;touch-action:none;user-select:none;overscroll-behavior:contain"
+          ></svg>
+          {!hasData && (
+            <div class="absolute inset-0 flex items-center justify-center px-6 text-center">
+              <p class="text-sm text-muted-foreground">ไม่มี telemetry สำหรับวันที่เลือก</p>
+            </div>
+          )}
         </div>
         <div id="pv-x-axis" class="pv-x-axis relative mt-1 flex h-4 justify-between text-[9px] text-muted-foreground" style={`padding-left:${padLeft}%;padding-right:${padRight}%`}>
-          {xLabels.map((label, index) => <span class:list={[index % 6 === 0 || index === xLabels.length - 1 ? 'text-muted-foreground' : 'text-transparent sm:text-muted-foreground']}>{label}</span>)}
+          {xLabels.map((label, index) => (
+            <span class:list={[index % 6 === 0 || index === xLabels.length - 1 ? 'text-muted-foreground' : 'text-transparent sm:text-muted-foreground']}>{label}</span>
+          ))}
         </div>
         <div class="mt-1 flex min-h-4 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[9px] text-muted-foreground">
           <span class="pv-visible-range"></span>
@@ -129,9 +140,7 @@ const chartJson = JSON.stringify({
         <span class="inline-block h-px w-5 border-t-2 border-dashed opacity-70" style="border-color:var(--chart-4)"></span>
         กริด (kW)
       </span>
-      <span class:list={['pv-last-update ml-auto', live.isOnline ? 'text-muted-foreground' : 'text-destructive']}>
-        {live.isOnline ? lastUpdateText : `ข้อมูลไม่เป็นปัจจุบัน · ${lastUpdateText}`}
-      </span>
+      <span class:list={['pv-last-update ml-auto', live.isOnline ? 'text-muted-foreground' : 'text-destructive']}>{live.isOnline ? lastUpdateText : `ข้อมูลไม่เป็นปัจจุบัน · ${lastUpdateText}`}</span>
     </LegendRow>
   </ChartCard>
 
