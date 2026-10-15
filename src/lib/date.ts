@@ -5,6 +5,13 @@ const bangkokDateFormatter = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 })
 
+const bangkokClockFormatter = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Bangkok',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
 const bangkokDateTimeFormatter = new Intl.DateTimeFormat('th-TH', {
   timeZone: 'Asia/Bangkok',
   day: 'numeric',
@@ -33,6 +40,14 @@ export function getBangkokISODate(date = new Date()) {
   const month = parts.find((part) => part.type === 'month')?.value ?? '00'
   const day = parts.find((part) => part.type === 'day')?.value ?? '00'
   return `${year}-${month}-${day}`
+}
+
+/** นาทีที่ผ่านมาของวัน (0-1439) ตามเวลา Bangkok — ไม่พึ่ง timezone ของเครื่องเซิร์ฟเวอร์ */
+export function getBangkokMinuteOfDay(date = new Date()) {
+  const parts = bangkokClockFormatter.formatToParts(date)
+  const hour = Number(parts.find((part) => part.type === 'hour')?.value ?? 0) % 24
+  const minute = Number(parts.find((part) => part.type === 'minute')?.value ?? 0)
+  return hour * 60 + minute
 }
 
 export function formatISODate(date: Date) {

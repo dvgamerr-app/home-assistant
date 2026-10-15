@@ -3,7 +3,7 @@ import { num } from '@/lib/electricity'
 import type { SolarData } from '@/lib/solar-data'
 import ChartCard from '@/components/ui/ChartCard.astro'
 import LegendRow from '@/components/ui/LegendRow.astro'
-import { getBangkokISODate } from '@/lib/date'
+import { getBangkokISODate, getBangkokMinuteOfDay } from '@/lib/date'
 import { buildFiveMinChartPayload } from '@/lib/solar-fivemin'
 import { SYSTEM } from '@/lib/solar-data'
 import type { SolarRateChartConfig } from '@/lib/solar-rate-chart'
@@ -22,8 +22,7 @@ interface Props extends Pick<SolarData, 'fiveMin'> {
 
 const { fiveMin: POINTS, date, isToday, pv1MaxKw, pv2MaxKw, pv1Panels, pv2Panels, socketUrl } = Astro.props
 
-const now = new Date()
-const currentMinute = isToday ? now.getHours() * 60 + now.getMinutes() : 1439
+const currentMinute = isToday ? getBangkokMinuteOfDay() : 1439
 const initialChart = buildFiveMinChartPayload(
   POINTS.map((point) => ({
     minuteOfDay: point.minuteOfDay,
@@ -69,28 +68,35 @@ const chartJson = JSON.stringify(chartConfig)
     <div slot="header-action" class="space-y-1 sm:text-right">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">กำลังติดตั้งรวม</p>
       <p class="font-serif text-xl font-light leading-none text-foreground sm:text-2xl">
-        {num(totalCapacityKw, 2)}<span class="ml-1 text-sm text-muted-foreground">kWp</span>
+        {num(totalCapacityKw, 2)}
+        <span class="ml-1 text-sm text-muted-foreground">kWp</span>
       </p>
-      <p class="text-[11px] text-muted-foreground">{pv1Panels} + {pv2Panels} แผง × {SYSTEM.panelWattPeak} W</p>
+      <p class="text-[11px] text-muted-foreground">
+        {pv1Panels} + {pv2Panels} แผง × {SYSTEM.panelWattPeak} W
+      </p>
     </div>
     <div class="grid grid-cols-2 gap-4 border-b border-border/60 pb-4 sm:pb-5">
       <div class="space-y-1">
         <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">MPPT 1 สูงสุดในช่วงที่ดู</p>
         <p class="font-serif text-4xl font-light leading-none">
-          <span class="solar-rate-pv1-pct">{num(peakPv1Pct, 0)}</span><span class="ml-1 text-base text-muted-foreground">%</span>
+          <span class="solar-rate-pv1-pct">{num(peakPv1Pct, 0)}</span>
+          <span class="ml-1 text-base text-muted-foreground">%</span>
         </p>
         {/* ตัวหารติดอยู่กับตัวตั้งเลย เพื่อให้เห็นว่า % มาจากไหนโดยไม่ต้องกวาดตาไปหาการ์ดอื่น */}
         <p class="text-sm text-chart-4">
-          <span class="solar-rate-pv1-kw">{num(peakPv1Kw, 2)}</span><span class="text-muted-foreground"> / {num(safePv1MaxKw, 2)} kWp</span>
+          <span class="solar-rate-pv1-kw">{num(peakPv1Kw, 2)}</span>
+          <span class="text-muted-foreground"> / {num(safePv1MaxKw, 2)} kWp</span>
         </p>
       </div>
       <div class="space-y-1">
         <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">MPPT 2 สูงสุดในช่วงที่ดู</p>
         <p class="font-serif text-4xl font-light leading-none">
-          <span class="solar-rate-pv2-pct">{num(peakPv2Pct, 0)}</span><span class="ml-1 text-base text-muted-foreground">%</span>
+          <span class="solar-rate-pv2-pct">{num(peakPv2Pct, 0)}</span>
+          <span class="ml-1 text-base text-muted-foreground">%</span>
         </p>
         <p class="text-sm text-chart-1">
-          <span class="solar-rate-pv2-kw">{num(peakPv2Kw, 2)}</span><span class="text-muted-foreground"> / {num(safePv2MaxKw, 2)} kWp</span>
+          <span class="solar-rate-pv2-kw">{num(peakPv2Kw, 2)}</span>
+          <span class="text-muted-foreground"> / {num(safePv2MaxKw, 2)} kWp</span>
         </p>
       </div>
     </div>
@@ -104,7 +110,8 @@ const chartJson = JSON.stringify(chartConfig)
             height="100%"
             role={'img' as const}
             aria-label="กราฟกำลังผลิตเทียบค่าสูงสุดของแต่ละชุด ซูมและเลื่อนดูข้อมูลย้อนหลังได้"
-            style="cursor:grab;touch-action:none;user-select:none;overscroll-behavior:contain"></svg>
+            style="cursor:grab;touch-action:none;user-select:none;overscroll-behavior:contain"
+          ></svg>
         </div>
         <div class="solar-rate-x-axis relative mt-1 h-4 text-[9px] text-muted-foreground"></div>
         <div class="mt-1 flex min-h-4 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-[9px] text-muted-foreground">
