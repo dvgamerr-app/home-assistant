@@ -1,5 +1,5 @@
 /// <reference types="bun" />
-import { afterEach, describe, expect, test } from 'bun:test'
+import { afterAll, afterEach, beforeAll, describe, expect, test } from 'bun:test'
 import { config } from './config'
 import { LineNoticeError, sendLineMessages } from './line-transport'
 
@@ -19,6 +19,19 @@ function stubFetch(responses: Array<{ status: number; body?: string }>) {
     return Promise.resolve(new Response(next.body ?? '', { status: next.status }))
   }) as typeof fetch
 }
+
+/** ไม่พึ่ง .env ของเครื่อง — CI ไม่มี LINE_NOTICE_* ตั้งไว้ */
+const line = config.line as { url: string; apiKey: string }
+const realLine = { ...line }
+
+beforeAll(() => {
+  line.url = 'https://notice.example/v1/messages'
+  line.apiKey = 'test-key'
+})
+
+afterAll(() => {
+  Object.assign(line, realLine)
+})
 
 afterEach(() => {
   globalThis.fetch = realFetch
