@@ -21,6 +21,7 @@ stop_children() {
   [ -n "$WEB_PID" ] && kill -TERM "$WEB_PID" 2>/dev/null || true
 }
 
+# shellcheck disable=SC2329 # invoked indirectly via trap
 on_signal() {
   echo "entrypoint: received signal, stopping children"
   stop_children
