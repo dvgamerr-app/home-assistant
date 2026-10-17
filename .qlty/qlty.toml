@@ -100,3 +100,7 @@ name = "osv-scanner"
 
 [[plugin]]
 name = "shellcheck"
+
+[[exclude]]
+plugins = ["actionlint"]
+file_patterns = [".github/workflows/build-ghcr.yml"]
