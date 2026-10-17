@@ -97,3 +97,6 @@ name = "zizmor"
 
 [[plugin]]
 name = "osv-scanner"
+
+[[plugin]]
+name = "shellcheck"
