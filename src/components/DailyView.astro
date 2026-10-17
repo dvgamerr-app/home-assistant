@@ -128,36 +128,34 @@ const segOpacity = [0.35, 0.85]
   </div>
 
   <ChartCard title="การใช้ไฟในแต่ละวัน" subtitle={`เดือน${monthLabel} · แบ่งเป็นไฟจากโซลาร์และไฟที่ซื้อ`}>
-    {
-      availableMonths && availableMonths.length > 0 && (
-        <label slot="header-action" class="relative flex w-full items-center sm:inline-flex sm:w-auto">
-          <select
-            onchange="location.href='?m='+this.value"
-            aria-label="เลือกเดือน"
-            class="w-full cursor-pointer appearance-none rounded border border-border/60 bg-card py-2 pl-3 pr-7 text-[10px] uppercase tracking-luxury text-muted-foreground outline-none transition-colors hover:border-foreground/30 hover:text-foreground focus:border-foreground/30 focus:text-foreground sm:min-w-28"
-          >
-            {availableMonths.map((month) => (
-              <option value={month.value} selected={month.value === selectedMonth}>
-                {month.label}
-              </option>
-            ))}
-          </select>
-          <svg
-            class="pointer-events-none absolute right-2 text-muted-foreground"
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap={'round' as const}
-            stroke-linejoin={'round' as const}
-          >
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </label>
-      )
-    }
+    {availableMonths && availableMonths.length > 0 && (
+      <label slot="header-action" class="relative flex w-full items-center sm:inline-flex sm:w-auto">
+        <select
+          onchange="location.href='?m='+this.value"
+          aria-label="เลือกเดือน"
+          class="w-full cursor-pointer appearance-none rounded border border-border/60 bg-card py-2 pl-3 pr-7 text-[10px] uppercase tracking-luxury text-muted-foreground outline-none transition-colors hover:border-foreground/30 hover:text-foreground focus:border-foreground/30 focus:text-foreground sm:min-w-28"
+        >
+          {availableMonths.map((month) => (
+            <option value={month.value} selected={month.value === selectedMonth}>
+              {month.label}
+            </option>
+          ))}
+        </select>
+        <svg
+          class="pointer-events-none absolute right-2 text-muted-foreground"
+          width="10"
+          height="10"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap={'round' as const}
+          stroke-linejoin={'round' as const}
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </label>
+    )}
 
     <div class="flex items-start gap-1">
       <ChartYAxis ticks={yAxisTicks} class="hidden h-[280px] sm:block" />
@@ -165,47 +163,39 @@ const segOpacity = [0.35, 0.85]
       <div class="min-w-0 flex-1">
         <div class="h-48 overflow-hidden sm:h-[280px]">
           <svg class="daily-chart-svg" viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
-            {
-              gridLines.map((gridLine) => (
-                <line x1={px0} x2={px1} y1={gridLine.y} y2={gridLine.y} stroke="var(--border)" stroke-opacity={gridLine.isMax ? '0.4' : '0.8'} stroke-width="0.5" stroke-dasharray="2 4" />
-              ))
-            }
-            {
-              bars.map((segments) =>
-                segments.map((segment, index) =>
-                  segment.h > 0 ? <rect x={segment.x} y={segment.y} width={segment.w} height={segment.h} rx={segment.rx} fill={segColors[index]} fill-opacity={segOpacity[index]} /> : null,
-                ),
-              )
-            }
+            {gridLines.map((gridLine) => (
+              <line x1={px0} x2={px1} y1={gridLine.y} y2={gridLine.y} stroke="var(--border)" stroke-opacity={gridLine.isMax ? '0.4' : '0.8'} stroke-width="0.5" stroke-dasharray="2 4" />
+            ))}
+            {bars.map((segments) =>
+              segments.map((segment, index) =>
+                segment.h > 0 ? <rect x={segment.x} y={segment.y} width={segment.w} height={segment.h} rx={segment.rx} fill={segColors[index]} fill-opacity={segOpacity[index]} /> : null,
+              ),
+            )}
             <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5"></line>
             <line x1={px0} x2={px0} y1={py0} y2={py1} stroke="var(--border)" stroke-opacity="0.5" stroke-width="0.5"></line>
-            {
-              bars.map((segments, index) => (
-                <rect
-                  class="bar-hit"
-                  x={segments[0].x}
-                  y={py0}
-                  width={segments[0].w}
-                  height={ph}
-                  fill="transparent"
-                  data-day={MONTH_DAYS[index].day}
-                  data-solar={num(MONTH_DAYS[index].selfUse, 1)}
-                  data-grid={num(MONTH_DAYS[index].gridImport, 1)}
-                  data-total={num(MONTH_DAYS[index].selfUse + MONTH_DAYS[index].gridImport, 1)}
-                  style="cursor:crosshair"
-                />
-              ))
-            }
+            {bars.map((segments, index) => (
+              <rect
+                class="bar-hit"
+                x={segments[0].x}
+                y={py0}
+                width={segments[0].w}
+                height={ph}
+                fill="transparent"
+                data-day={MONTH_DAYS[index].day}
+                data-solar={num(MONTH_DAYS[index].selfUse, 1)}
+                data-grid={num(MONTH_DAYS[index].gridImport, 1)}
+                data-total={num(MONTH_DAYS[index].selfUse + MONTH_DAYS[index].gridImport, 1)}
+                style="cursor:crosshair"
+              />
+            ))}
           </svg>
         </div>
         <div class="mt-1 grid text-[9px] text-muted-foreground" style={`grid-template-columns:repeat(${MONTH_DAYS.length},1fr);padding-left:${padLeft}%;padding-right:${padRight}%`}>
-          {
-            MONTH_DAYS.map((dayPoint, index) => (
-              <span class:list={['truncate text-center', index % 7 === 0 || index === MONTH_DAYS.length - 1 ? 'text-muted-foreground' : 'text-transparent sm:text-muted-foreground']}>
-                {dayPoint.day}
-              </span>
-            ))
-          }
+          {MONTH_DAYS.map((dayPoint, index) => (
+            <span class:list={['truncate text-center', index % 7 === 0 || index === MONTH_DAYS.length - 1 ? 'text-muted-foreground' : 'text-transparent sm:text-muted-foreground']}>
+              {dayPoint.day}
+            </span>
+          ))}
         </div>
       </div>
     </div>
@@ -231,16 +221,14 @@ const segOpacity = [0.35, 0.85]
     </div>
 
     <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      {
-        monthComparison.map((item) => (
-          <div class="rounded-md border border-border/60 p-4">
-            <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">{item.label}</p>
-            <p class:list={['mt-2 font-serif text-2xl font-light', item.accent]}>{item.current}</p>
-            <p class="mt-1 hidden text-xs text-muted-foreground sm:block">เดือนก่อน {item.previous}</p>
-            <p class="mt-1 text-xs text-muted-foreground">{item.delta === null ? 'ยังไม่มีค่าที่เทียบได้' : `${item.delta > 0 ? '+' : ''}${num(item.delta, 0)}% จากเดือนก่อน`}</p>
-          </div>
-        ))
-      }
+      {monthComparison.map((item) => (
+        <div class="rounded-md border border-border/60 p-4">
+          <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">{item.label}</p>
+          <p class:list={['mt-2 font-serif text-2xl font-light', item.accent]}>{item.current}</p>
+          <p class="mt-1 hidden text-xs text-muted-foreground sm:block">เดือนก่อน {item.previous}</p>
+          <p class="mt-1 text-xs text-muted-foreground">{item.delta === null ? 'ยังไม่มีค่าที่เทียบได้' : `${item.delta > 0 ? '+' : ''}${num(item.delta, 0)}% จากเดือนก่อน`}</p>
+        </div>
+      ))}
     </div>
   </section>
 

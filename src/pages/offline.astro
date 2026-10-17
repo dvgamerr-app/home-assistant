@@ -26,19 +26,19 @@ const LINKS = [
     </p>
 
     <div class="mt-8 flex flex-wrap items-center justify-center gap-2">
-      {
-        LINKS.map((link) => (
-          <a
-            href={link.href}
-            class="rounded-full border border-border/70 px-4 py-2 text-[11px] uppercase tracking-luxury text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-          >
-            {link.label}
-          </a>
-        ))
-      }
+      {LINKS.map((link) => (
+        <a
+          href={link.href}
+          class="rounded-full border border-border/70 px-4 py-2 text-[11px] uppercase tracking-luxury text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+        >
+          {link.label}
+        </a>
+      ))}
     </div>
 
-    <p id="offline-hint" class="mt-10 text-xs text-muted-foreground/80">จะลองเชื่อมต่อใหม่ให้อัตโนมัติ</p>
+    <p id="offline-hint" class="mt-10 text-xs text-muted-foreground/80">
+      จะลองเชื่อมต่อใหม่ให้อัตโนมัติ
+    </p>
   </main>
 </Layout>
 

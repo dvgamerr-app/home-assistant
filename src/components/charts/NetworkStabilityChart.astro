@@ -37,40 +37,38 @@ const troubled = hourly.filter((item) => item.lossPct > 0)
     <div class="min-w-0 flex-1">
       <div class="h-40 w-full sm:h-44">
         <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%" role={'img' as const} aria-label="กราฟความหน่วงอินเทอร์เน็ตเฉลี่ยรายชั่วโมง">
-          {
-            ticks.map((tick) => (
-              <line
-                x1={px0}
-                x2={px1}
-                y1={py1 - (tick / maxTotal) * (py1 - py0)}
-                y2={py1 - (tick / maxTotal) * (py1 - py0)}
-                stroke="var(--border)"
-                stroke-opacity="0.8"
-                stroke-width="0.5"
-                stroke-dasharray="2 4"
+          {ticks.map((tick) => (
+            <line
+              x1={px0}
+              x2={px1}
+              y1={py1 - (tick / maxTotal) * (py1 - py0)}
+              y2={py1 - (tick / maxTotal) * (py1 - py0)}
+              stroke="var(--border)"
+              stroke-opacity="0.8"
+              stroke-width="0.5"
+              stroke-dasharray="2 4"
+            />
+          ))}
+          {bars.map((stack, index) =>
+            stack.map((bar) => (
+              <rect
+                x={bar.x}
+                y={bar.y}
+                width={bar.w}
+                height={bar.h}
+                rx={bar.rx}
+                fill={hourly[index].lossPct > 0 ? 'var(--destructive)' : 'var(--chart-2)'}
+                opacity={hourly[index].lossPct > 0 ? '0.85' : '0.7'}
               />
-            ))
-          }
-          {
-            bars.map((stack, index) =>
-              stack.map((bar) => (
-                <rect
-                  x={bar.x}
-                  y={bar.y}
-                  width={bar.w}
-                  height={bar.h}
-                  rx={bar.rx}
-                  fill={hourly[index].lossPct > 0 ? 'var(--destructive)' : 'var(--chart-2)'}
-                  opacity={hourly[index].lossPct > 0 ? '0.85' : '0.7'}
-                />
-              )),
-            )
-          }
+            )),
+          )}
           <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
         </svg>
       </div>
       <div class="mt-1 grid grid-cols-8 text-[9px] text-muted-foreground">
-        {['00', '03', '06', '09', '12', '15', '18', '21'].map((label) => <span class="text-left">{label}</span>)}
+        {['00', '03', '06', '09', '12', '15', '18', '21'].map((label) => (
+          <span class="text-left">{label}</span>
+        ))}
       </div>
     </div>
   </div>

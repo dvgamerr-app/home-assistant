@@ -61,20 +61,24 @@ const xLabels = ['00:00', '06:00', '12:00', '18:00', '24:00']
     <div class="min-w-0 flex-1">
       <div class="h-48 w-full sm:h-56">
         <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%" role={'img' as const} aria-label="กราฟความหน่วงของเครือข่ายย้อนหลัง 24 ชั่วโมง">
-          {ticks.map((tick) => <line x1={px0} x2={px1} y1={yForMs(tick)} y2={yForMs(tick)} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />)}
+          {ticks.map((tick) => (
+            <line x1={px0} x2={px1} y1={yForMs(tick)} y2={yForMs(tick)} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />
+          ))}
           <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
-          {outageSpans.map((span) => <rect x={span.x} y={py0} width={Math.max(span.w, 1.5)} height={ph} fill="var(--destructive)" opacity="0.14" />)}
-          {
-            paths.map((item) =>
-              item.segments.map((path) => (
-                <path d={path} fill="none" stroke={item.color} stroke-width={item.id === 'local' ? '1.1' : '1.4'} stroke-linecap={'round' as const} stroke-linejoin={'round' as const} />
-              )),
-            )
-          }
+          {outageSpans.map((span) => (
+            <rect x={span.x} y={py0} width={Math.max(span.w, 1.5)} height={ph} fill="var(--destructive)" opacity="0.14" />
+          ))}
+          {paths.map((item) =>
+            item.segments.map((path) => (
+              <path d={path} fill="none" stroke={item.color} stroke-width={item.id === 'local' ? '1.1' : '1.4'} stroke-linecap={'round' as const} stroke-linejoin={'round' as const} />
+            )),
+          )}
         </svg>
       </div>
       <div class="mt-1 grid grid-cols-5 text-[9px] text-muted-foreground">
-        {xLabels.map((label, index) => <span class:list={['text-center', index === 0 ? 'text-left' : index === xLabels.length - 1 ? 'text-right' : '']}>{label}</span>)}
+        {xLabels.map((label, index) => (
+          <span class:list={['text-center', index === 0 ? 'text-left' : index === xLabels.length - 1 ? 'text-right' : '']}>{label}</span>
+        ))}
       </div>
     </div>
   </div>
