@@ -25,7 +25,10 @@ const metrics = [
       <TrendingUp size={16} strokeWidth={1.25} />
       <h2 class="text-[10px] uppercase tracking-luxury">ความคืบหน้าการคืนทุน</h2>
     </div>
-    <p class="mt-4 font-serif text-5xl font-light text-foreground md:text-6xl">{num(payback.progressPct, 1)}<span class="text-2xl text-muted-foreground">%</span></p>
+    <p class="mt-4 font-serif text-5xl font-light text-foreground md:text-6xl">
+      {num(payback.progressPct, 1)}
+      <span class="text-2xl text-muted-foreground">%</span>
+    </p>
     <p class="mt-2 text-sm text-muted-foreground">
       คืนทุนแล้ว {thb(payback.totalSavedToDate, 0)} จากเงินลงทุน {thb(system.investmentTHB, 0)}
     </p>
@@ -35,18 +38,16 @@ const metrics = [
   </div>
 
   <dl class="grid grid-cols-1 divide-y divide-border/60 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-    {
-      metrics.map(({ Icon, label, value, tone }) => (
-        <div class="flex items-start gap-3 p-6">
-          <span class={tone}>
-            <Icon size={18} strokeWidth={1.25} />
-          </span>
-          <div class="space-y-1">
-            <dt class="text-[10px] uppercase tracking-luxury text-muted-foreground">{label}</dt>
-            <dd class="font-serif text-xl font-light text-foreground">{value}</dd>
-          </div>
+    {metrics.map(({ Icon, label, value, tone }) => (
+      <div class="flex items-start gap-3 p-6">
+        <span class={tone}>
+          <Icon size={18} strokeWidth={1.25} />
+        </span>
+        <div class="space-y-1">
+          <dt class="text-[10px] uppercase tracking-luxury text-muted-foreground">{label}</dt>
+          <dd class="font-serif text-xl font-light text-foreground">{value}</dd>
         </div>
-      ))
-    }
+      </div>
+    ))}
   </dl>
 </section>

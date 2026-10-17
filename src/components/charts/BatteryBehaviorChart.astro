@@ -113,18 +113,23 @@ const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
     <div class="space-y-1">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">SOC ล่าสุด</p>
       <p class="font-serif text-4xl font-light leading-none text-foreground">
-        {batteryReadingReliable ? num(points.at(-1)?.soc ?? 0, 0) : '—'}{batteryReadingReliable && <span class="ml-1 text-base text-muted-foreground">%</span>}
+        {batteryReadingReliable ? num(points.at(-1)?.soc ?? 0, 0) : '—'}
+        {batteryReadingReliable && <span class="ml-1 text-base text-muted-foreground">%</span>}
       </p>
     </div>
     <div class="hidden space-y-1 sm:block">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">จ่ายออกสูงสุด</p>
       <p class="font-serif text-2xl font-light leading-none text-foreground" style="color:var(--chart-1)">
-        {num(dayFlow.peakBatteryDischargeKw, 2)}<span class="ml-1 text-base text-muted-foreground">kW</span>
+        {num(dayFlow.peakBatteryDischargeKw, 2)}
+        <span class="ml-1 text-base text-muted-foreground">kW</span>
       </p>
     </div>
     <div class="hidden space-y-1 sm:block">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ซื้อไฟสูงสุด</p>
-      <p class="font-serif text-2xl font-light leading-none text-foreground" style="color:var(--chart-4)">{num(maxGridImportKw, 2)}<span class="ml-1 text-base text-muted-foreground">kW</span></p>
+      <p class="font-serif text-2xl font-light leading-none text-foreground" style="color:var(--chart-4)">
+        {num(maxGridImportKw, 2)}
+        <span class="ml-1 text-base text-muted-foreground">kW</span>
+      </p>
     </div>
     <div class="hidden space-y-1 sm:block md:text-right">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ช่วงที่แสดง</p>
@@ -152,11 +157,9 @@ const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
                   <stop offset="100%" stop-color="var(--chart-1)" stop-opacity="0"></stop>
                 </linearGradient>
               </defs>
-              {
-                socTicks.map((tick) => (
-                  <line x1={px0} x2={px1} y1={py0 + (1 - tick / 100) * ph} y2={py0 + (1 - tick / 100) * ph} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />
-                ))
-              }
+              {socTicks.map((tick) => (
+                <line x1={px0} x2={px1} y1={py0 + (1 - tick / 100) * ph} y2={py0 + (1 - tick / 100) * ph} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="2 4" />
+              ))}
               <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
               {batteryReadingReliable && <path d={socArea} fill="url(#battery-soc-grad)" />}
               {batteryReadingReliable && <path d={socPath} fill="none" stroke="var(--chart-1)" stroke-width="1.5" stroke-linecap={'round' as const} stroke-linejoin={'round' as const} />}
@@ -165,7 +168,9 @@ const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
         </div>
       </div>
       <div class="mt-1 grid grid-cols-5 text-[9px] text-muted-foreground">
-        {xLabels.map((label, index) => <span class:list={['text-center', index === 0 ? 'text-left' : index === xLabels.length - 1 ? 'text-right' : '']}>{label}</span>)}
+        {xLabels.map((label, index) => (
+          <span class:list={['text-center', index === 0 ? 'text-left' : index === xLabels.length - 1 ? 'text-right' : '']}>{label}</span>
+        ))}
       </div>
     </div>
 
@@ -179,29 +184,33 @@ const xLabels = ['05:30', '10:00', '14:30', '19:00', '24:00']
         <div class="min-w-0 flex-1">
           <div class="h-44 w-full">
             <svg viewBox={`0 0 ${VW} ${VH}`} preserveAspectRatio="none" width="100%" height="100%">
-              {
-                powerGridYs.map((tickY, index) => (
-                  <line
-                    x1={px0}
-                    x2={px1}
-                    y1={tickY}
-                    y2={tickY}
-                    stroke="var(--border)"
-                    stroke-opacity={powerTicks[index] === 0 ? '0.6' : '0.4'}
-                    stroke-width={powerTicks[index] === 0 ? '0.8' : '0.5'}
-                    stroke-dasharray={powerTicks[index] === 0 ? undefined : '2 4'}
-                  />
-                ))
-              }
+              {powerGridYs.map((tickY, index) => (
+                <line
+                  x1={px0}
+                  x2={px1}
+                  y1={tickY}
+                  y2={tickY}
+                  stroke="var(--border)"
+                  stroke-opacity={powerTicks[index] === 0 ? '0.6' : '0.4'}
+                  stroke-width={powerTicks[index] === 0 ? '0.8' : '0.5'}
+                  stroke-dasharray={powerTicks[index] === 0 ? undefined : '2 4'}
+                />
+              ))}
               <line x1={px0} x2={px1} y1={py1} y2={py1} stroke="var(--border)" stroke-opacity="0.8" stroke-width="0.5"></line>
-              <text x={px0 + 4} y={zeroY - 6} font-size="8" fill="var(--muted-foreground)" letter-spacing="0.5">จ่ายออก / ซื้อ</text>
-              <text x={px0 + 4} y={zeroY + 12} font-size="8" fill="var(--muted-foreground)" letter-spacing="0.5">ชาร์จ / ไม่ซื้อ</text>
+              <text x={px0 + 4} y={zeroY - 6} font-size="8" fill="var(--muted-foreground)" letter-spacing="0.5">
+                จ่ายออก / ซื้อ
+              </text>
+              <text x={px0 + 4} y={zeroY + 12} font-size="8" fill="var(--muted-foreground)" letter-spacing="0.5">
+                ชาร์จ / ไม่ซื้อ
+              </text>
               <path d={gridPath} fill="none" stroke="var(--chart-4)" stroke-width="1.1" stroke-linecap={'round' as const} stroke-linejoin={'round' as const} stroke-dasharray="5 2"></path>
               <path d={battPath} fill="none" stroke="var(--chart-1)" stroke-width="1.9" stroke-linecap={'round' as const} stroke-linejoin={'round' as const}></path>
             </svg>
           </div>
           <div class="mt-1 grid grid-cols-5 text-[9px] text-muted-foreground">
-            {xLabels.map((label, index) => <span class:list={['text-center', index === 0 ? 'text-left' : index === xLabels.length - 1 ? 'text-right' : '']}>{label}</span>)}
+            {xLabels.map((label, index) => (
+              <span class:list={['text-center', index === 0 ? 'text-left' : index === xLabels.length - 1 ? 'text-right' : '']}>{label}</span>
+            ))}
           </div>
         </div>
       </div>

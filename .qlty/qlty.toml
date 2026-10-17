@@ -71,7 +71,7 @@ name = "actionlint"
 [[plugin]]
 name = "eslint"
 package_file = "package.json"
-package_filters = ["eslint", "prettier"]
+package_filters = ["eslint", "prettier", "@eslint/js", "eslint-plugin-astro", "eslint-plugin-svelte", "eslint-config-prettier", "typescript-eslint", "globals"]
 
 [[plugin]]
 name = "hadolint"
@@ -94,3 +94,13 @@ name = "trufflehog"
 
 [[plugin]]
 name = "zizmor"
+
+[[plugin]]
+name = "osv-scanner"
+
+[[plugin]]
+name = "shellcheck"
+
+[[exclude]]
+plugins = ["actionlint"]
+file_patterns = [".github/workflows/build-ghcr.yml"]

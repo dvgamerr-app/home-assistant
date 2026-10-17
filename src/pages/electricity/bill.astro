@@ -148,7 +148,10 @@ const latestVsPrevious = previousBill
               <CalendarRange size={16} strokeWidth={1.25} />
               <span class="text-[10px] uppercase tracking-luxury">คงเหลืออีก</span>
             </div>
-            <p class="font-serif text-2xl font-light text-foreground">{num(data.payback.yearsToPayback, 1)}<span class="ml-1 text-base text-muted-foreground">ปี</span></p>
+            <p class="font-serif text-2xl font-light text-foreground">
+              {num(data.payback.yearsToPayback, 1)}
+              <span class="ml-1 text-base text-muted-foreground">ปี</span>
+            </p>
             <p class="mt-1 text-xs text-muted-foreground">หรือราว {num(data.payback.monthsToPayback, 0)} เดือน หากอัตราประหยัดใกล้เคียงเดิม</p>
           </div>
           <div class="rounded-md border border-border/60 p-4">
@@ -166,13 +169,11 @@ const latestVsPrevious = previousBill
         <div class="border-b border-border/60 px-6 py-4">
           <h2 class="font-serif text-lg font-light text-foreground">บิลค่าไฟ (MEA) รายเดือน</h2>
           <p class="mt-1 text-sm text-muted-foreground">ข้อมูลจริงจากการไฟฟ้านครหลวง และเทียบกับประมาณการหากบ้านยังไม่มีโซลาร์</p>
-          {
-            latestVsPrevious && (
-              <p class="mt-2 text-xs text-muted-foreground">
-                เดือนล่าสุดมียอดค่าไฟ {latestVsPrevious.billAmount >= 0 ? 'มากขึ้น' : 'น้อยลง'} {thb(Math.abs(latestVsPrevious.billAmount), 0)} จากเดือนก่อน
-              </p>
-            )
-          }
+          {latestVsPrevious && (
+            <p class="mt-2 text-xs text-muted-foreground">
+              เดือนล่าสุดมียอดค่าไฟ {latestVsPrevious.billAmount >= 0 ? 'มากขึ้น' : 'น้อยลง'} {thb(Math.abs(latestVsPrevious.billAmount), 0)} จากเดือนก่อน
+            </p>
+          )}
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -188,38 +189,36 @@ const latestVsPrevious = previousBill
               </tr>
             </thead>
             <tbody>
-              {
-                billRows.map((row) => {
-                  const payment = paymentState(row)
-                  const paymentGroup = row.paymentKey ? paymentGroups.get(row.paymentKey) : undefined
-                  const isPrimaryPayment = !paymentGroup || paymentGroup.primaryMonth === row.month
-                  return (
-                    <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
-                      <td class="px-6 py-3 text-muted-foreground">{row.month}</td>
-                      <td class="px-4 py-3 text-right tabular-nums">{num(row.kwh, 0)}</td>
-                      <td class="px-4 py-3 text-right tabular-nums text-foreground">{thb(row.billAmount, 2)}</td>
-                      <td class="px-4 py-3 text-right tabular-nums text-foreground">
-                        {row.paymentAmount === null ? (
-                          '—'
-                        ) : isPrimaryPayment ? (
-                          <>
-                            <span class="block">{thb(row.paymentAmount, 2)}</span>
-                            {paymentGroup && paymentGroup.count > 1 && <span class="mt-0.5 block whitespace-nowrap text-xs text-muted-foreground">รวม {paymentGroup.count} บิล</span>}
-                          </>
-                        ) : (
-                          <span class="block whitespace-nowrap text-xs text-muted-foreground">รวมในรายการ {paymentGroup?.primaryMonth}</span>
-                        )}
-                      </td>
-                      <td class="px-4 py-3 text-right">
-                        <span class:list={['block whitespace-nowrap text-xs', payment.tone]}>{payment.label}</span>
-                        {payment.detail && <span class="mt-0.5 block whitespace-nowrap text-xs text-muted-foreground">{payment.detail}</span>}
-                      </td>
-                      <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(row.withoutSolar, 0)}</td>
-                      <td class="px-6 py-3 text-right tabular-nums text-chart-1">{thb(row.saved, 0)}</td>
-                    </tr>
-                  )
-                })
-              }
+              {billRows.map((row) => {
+                const payment = paymentState(row)
+                const paymentGroup = row.paymentKey ? paymentGroups.get(row.paymentKey) : undefined
+                const isPrimaryPayment = !paymentGroup || paymentGroup.primaryMonth === row.month
+                return (
+                  <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
+                    <td class="px-6 py-3 text-muted-foreground">{row.month}</td>
+                    <td class="px-4 py-3 text-right tabular-nums">{num(row.kwh, 0)}</td>
+                    <td class="px-4 py-3 text-right tabular-nums text-foreground">{thb(row.billAmount, 2)}</td>
+                    <td class="px-4 py-3 text-right tabular-nums text-foreground">
+                      {row.paymentAmount === null ? (
+                        '—'
+                      ) : isPrimaryPayment ? (
+                        <>
+                          <span class="block">{thb(row.paymentAmount, 2)}</span>
+                          {paymentGroup && paymentGroup.count > 1 && <span class="mt-0.5 block whitespace-nowrap text-xs text-muted-foreground">รวม {paymentGroup.count} บิล</span>}
+                        </>
+                      ) : (
+                        <span class="block whitespace-nowrap text-xs text-muted-foreground">รวมในรายการ {paymentGroup?.primaryMonth}</span>
+                      )}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                      <span class:list={['block whitespace-nowrap text-xs', payment.tone]}>{payment.label}</span>
+                      {payment.detail && <span class="mt-0.5 block whitespace-nowrap text-xs text-muted-foreground">{payment.detail}</span>}
+                    </td>
+                    <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(row.withoutSolar, 0)}</td>
+                    <td class="px-6 py-3 text-right tabular-nums text-chart-1">{thb(row.saved, 0)}</td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

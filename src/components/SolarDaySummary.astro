@@ -27,12 +27,15 @@ function deltaText(value: { diff: number; pct: number | null } | undefined, unit
     <div class="space-y-1">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">มุมมองรายวัน</p>
       <h2 class="font-serif text-lg font-light text-foreground">สรุปการผลิตและการพึ่งพาตัวเอง</h2>
-      <p class="text-sm text-muted-foreground">{dateLabel} · {isToday ? 'ยอดสะสมถึงข้อมูลล่าสุด' : 'ยอดสรุปของวันที่เลือก'}</p>
+      <p class="text-sm text-muted-foreground">
+        {dateLabel} · {isToday ? 'ยอดสะสมถึงข้อมูลล่าสุด' : 'ยอดสรุปของวันที่เลือก'}
+      </p>
     </div>
     <div class="text-right">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">เฉลี่ย 7 วันก่อนหน้า</p>
       <p class="mt-1 font-serif text-2xl font-light text-foreground">
-        {dayComparison.trailing7Avg.generationDays > 0 ? num(dayComparison.trailing7Avg.generated, 1) : '—'}<span class="ml-1 text-sm text-muted-foreground">kWh ผลิต</span>
+        {dayComparison.trailing7Avg.generationDays > 0 ? num(dayComparison.trailing7Avg.generated, 1) : '—'}
+        <span class="ml-1 text-sm text-muted-foreground">kWh ผลิต</span>
       </p>
       <p class="mt-1 text-xs text-muted-foreground">คำนวณจาก {dayComparison.trailing7Avg.generationDays} วันที่มีข้อมูลจริง</p>
     </div>
@@ -41,26 +44,38 @@ function deltaText(value: { diff: number; pct: number | null } | undefined, unit
   <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
     <div class="rounded-md border border-border/60 p-4">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ผลิตพลังงานได้</p>
-      <p class="mt-2 font-serif text-3xl font-light text-foreground">{dayFlow.hasGenerationData ? num(dayFlow.generated, 1) : '—'}<span class="ml-1 text-base text-muted-foreground">kWh</span></p>
+      <p class="mt-2 font-serif text-3xl font-light text-foreground">
+        {dayFlow.hasGenerationData ? num(dayFlow.generated, 1) : '—'}
+        <span class="ml-1 text-base text-muted-foreground">kWh</span>
+      </p>
       <p class="mt-2 text-xs text-muted-foreground">{deltaText(dayComparison.deltaFromPrevious?.generated, 'kWh')}</p>
     </div>
 
     <div class="rounded-md border border-border/60 p-4">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">บ้านใช้ไฟทั้งหมด</p>
-      <p class="mt-2 font-serif text-3xl font-light text-foreground">{dayFlow.hasUsageData ? num(dayFlow.consumed, 1) : '—'}<span class="ml-1 text-base text-muted-foreground">kWh</span></p>
+      <p class="mt-2 font-serif text-3xl font-light text-foreground">
+        {dayFlow.hasUsageData ? num(dayFlow.consumed, 1) : '—'}
+        <span class="ml-1 text-base text-muted-foreground">kWh</span>
+      </p>
       <p class="mt-2 text-xs text-muted-foreground">ตัวนับการใช้ไฟรายวันจากอินเวอร์เตอร์</p>
     </div>
 
     <div class="rounded-md border border-border/60 p-4">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ซื้อไฟจากกริด</p>
-      <p class="mt-2 font-serif text-3xl font-light text-foreground">{dayFlow.hasUsageData ? num(dayFlow.gridImport, 1) : '—'}<span class="ml-1 text-base text-muted-foreground">kWh</span></p>
+      <p class="mt-2 font-serif text-3xl font-light text-foreground">
+        {dayFlow.hasUsageData ? num(dayFlow.gridImport, 1) : '—'}
+        <span class="ml-1 text-base text-muted-foreground">kWh</span>
+      </p>
       <p class="mt-2 text-xs text-muted-foreground">{dayFlow.hasUsageData ? `คิดเป็น ${num(dayFlow.gridDependencyPct, 0)}% ของการใช้ไฟ` : 'ไม่มีข้อมูลการใช้ไฟ'}</p>
       <p class="mt-1 text-xs text-muted-foreground">{deltaText(dayComparison.deltaFromPrevious?.gridImport, 'kWh')}</p>
     </div>
 
     <div class="rounded-md border border-border/60 p-4">
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">บ้านพึ่งพาระบบตัวเอง</p>
-      <p class="mt-2 font-serif text-3xl font-light text-foreground">{dayFlow.hasUsageData ? num(dayFlow.selfSufficiencyPct, 0) : '—'}<span class="ml-1 text-base text-muted-foreground">%</span></p>
+      <p class="mt-2 font-serif text-3xl font-light text-foreground">
+        {dayFlow.hasUsageData ? num(dayFlow.selfSufficiencyPct, 0) : '—'}
+        <span class="ml-1 text-base text-muted-foreground">%</span>
+      </p>
       <p class="mt-2 text-xs text-muted-foreground">{dayFlow.hasUsageData ? `${num(dayFlow.selfPowered, 1)} kWh มาจากโซลาร์และแบตเตอรี่` : 'ไม่มีข้อมูลการใช้ไฟ'}</p>
       <p class="mt-1 text-xs text-muted-foreground">{deltaText(dayComparison.deltaFromPrevious?.selfSufficiencyPct, '%')}</p>
     </div>
@@ -69,18 +84,25 @@ function deltaText(value: { diff: number; pct: number | null } | undefined, unit
   <div class="mt-5 grid gap-4 border-t border-border/60 pt-5 md:grid-cols-3">
     <div>
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">ชาร์จเข้าแบตเตอรี่</p>
-      <p class="mt-1 font-serif text-2xl font-light text-foreground">{dayFlow.hasPowerSeries ? num(dayFlow.batteryChargeKwh, 1) : '—'}<span class="ml-1 text-sm text-muted-foreground">kWh</span></p>
+      <p class="mt-1 font-serif text-2xl font-light text-foreground">
+        {dayFlow.hasPowerSeries ? num(dayFlow.batteryChargeKwh, 1) : '—'}
+        <span class="ml-1 text-sm text-muted-foreground">kWh</span>
+      </p>
       <p class="mt-1 text-xs text-muted-foreground">ค่าประมาณจากการอินทิเกรตกำลังชาร์จตามเวลา</p>
     </div>
     <div>
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">จ่ายจากแบตเตอรี่</p>
-      <p class="mt-1 font-serif text-2xl font-light text-foreground">{dayFlow.hasPowerSeries ? num(dayFlow.batteryDischargeKwh, 1) : '—'}<span class="ml-1 text-sm text-muted-foreground">kWh</span></p>
+      <p class="mt-1 font-serif text-2xl font-light text-foreground">
+        {dayFlow.hasPowerSeries ? num(dayFlow.batteryDischargeKwh, 1) : '—'}
+        <span class="ml-1 text-sm text-muted-foreground">kWh</span>
+      </p>
       <p class="mt-1 text-xs text-muted-foreground">ค่าประมาณจากการอินทิเกรตกำลังจ่ายตามเวลา</p>
     </div>
     <div>
       <p class="text-[10px] uppercase tracking-luxury text-muted-foreground">อ้างอิง 7 วันก่อนหน้า</p>
       <p class="mt-1 font-serif text-2xl font-light text-foreground">
-        {dayComparison.trailing7Avg.usageDays > 0 ? num(dayComparison.trailing7Avg.gridImport, 1) : '—'}<span class="ml-1 text-sm text-muted-foreground">kWh ซื้อจากกริด</span>
+        {dayComparison.trailing7Avg.usageDays > 0 ? num(dayComparison.trailing7Avg.gridImport, 1) : '—'}
+        <span class="ml-1 text-sm text-muted-foreground">kWh ซื้อจากกริด</span>
       </p>
       <p class="mt-1 text-xs text-muted-foreground">เฉลี่ยจาก {dayComparison.trailing7Avg.usageDays} วันที่มีข้อมูลจริง</p>
     </div>

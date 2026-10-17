@@ -23,14 +23,12 @@ const { ticks, width = '1.75rem', class: className, id } = Astro.props
 ---
 
 <div id={id} class:list={['relative shrink-0 overflow-visible', className]} style={`width:${width}`}>
-  {
-    ticks.map((tick) => (
-      <span
-        class:list={['absolute right-0 text-right text-[9px] leading-none', tick.emphasis ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
-        style={`top:${tick.topPct.toFixed(2)}%;transform:translateY(-50%)`}
-      >
-        {tick.label}
-      </span>
-    ))
-  }
+  {ticks.map((tick) => (
+    <span
+      class:list={['absolute right-0 text-right text-[9px] leading-none', tick.emphasis ? 'font-medium text-foreground/60' : 'text-muted-foreground']}
+      style={`top:${tick.topPct.toFixed(2)}%;transform:translateY(-50%)`}
+    >
+      {tick.label}
+    </span>
+  ))}
 </div>

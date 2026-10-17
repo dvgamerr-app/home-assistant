@@ -85,7 +85,9 @@ const latestStatus = latest ? paymentStatus(latest) : null
       <section class="rounded-lg border border-border/70 bg-card">
         <div class="border-b border-border/60 px-6 py-4">
           <h2 class="font-serif text-lg font-light text-foreground">ประวัติค่าน้ำรายเดือน</h2>
-          <p class="mt-1 text-sm text-muted-foreground">ข้อมูลจากการประปานครหลวง · จ่ายสะสม {thb(data.totalPaid, 2)} ใน {data.months.length} รอบบิล</p>
+          <p class="mt-1 text-sm text-muted-foreground">
+            ข้อมูลจากการประปานครหลวง · จ่ายสะสม {thb(data.totalPaid, 2)} ใน {data.months.length} รอบบิล
+          </p>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
@@ -100,35 +102,33 @@ const latestStatus = latest ? paymentStatus(latest) : null
               </tr>
             </thead>
             <tbody>
-              {
-                data.months.length > 0 ? (
-                  data.months.map((row) => {
-                    const status = paymentStatus(row)
-                    return (
-                      <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
-                        <td class="px-6 py-3 text-muted-foreground">
-                          <span class="block text-foreground">{row.label}</span>
-                          {row.readDate && <span class="mt-0.5 block text-xs">อ่านมิเตอร์ {formatThaiDate(row.readDate)}</span>}
-                        </td>
-                        <td class="px-4 py-3 text-right tabular-nums text-foreground">{num(row.consumption, 0)} ลบ.ม.</td>
-                        <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(row.unitPrice, 2)}</td>
-                        <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(row.billedAmount, 2)}</td>
-                        <td class="px-4 py-3 text-right tabular-nums text-foreground">{row.paidAmount > 0 ? thb(row.paidAmount, 2) : '—'}</td>
-                        <td class="px-6 py-3 text-right">
-                          <span class:list={['block text-xs', status.tone]}>{status.label}</span>
-                          {status.detail && <span class="mt-0.5 block whitespace-nowrap text-xs text-muted-foreground">{status.detail}</span>}
-                        </td>
-                      </tr>
-                    )
-                  })
-                ) : (
-                  <tr>
-                    <td colspan="6" class="px-6 py-10 text-center text-sm text-muted-foreground">
-                      ยังไม่มีข้อมูลการใช้น้ำ
-                    </td>
-                  </tr>
-                )
-              }
+              {data.months.length > 0 ? (
+                data.months.map((row) => {
+                  const status = paymentStatus(row)
+                  return (
+                    <tr class="border-b border-border/40 last:border-0 hover:bg-muted/30">
+                      <td class="px-6 py-3 text-muted-foreground">
+                        <span class="block text-foreground">{row.label}</span>
+                        {row.readDate && <span class="mt-0.5 block text-xs">อ่านมิเตอร์ {formatThaiDate(row.readDate)}</span>}
+                      </td>
+                      <td class="px-4 py-3 text-right tabular-nums text-foreground">{num(row.consumption, 0)} ลบ.ม.</td>
+                      <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(row.unitPrice, 2)}</td>
+                      <td class="px-4 py-3 text-right tabular-nums text-muted-foreground">{thb(row.billedAmount, 2)}</td>
+                      <td class="px-4 py-3 text-right tabular-nums text-foreground">{row.paidAmount > 0 ? thb(row.paidAmount, 2) : '—'}</td>
+                      <td class="px-6 py-3 text-right">
+                        <span class:list={['block text-xs', status.tone]}>{status.label}</span>
+                        {status.detail && <span class="mt-0.5 block whitespace-nowrap text-xs text-muted-foreground">{status.detail}</span>}
+                      </td>
+                    </tr>
+                  )
+                })
+              ) : (
+                <tr>
+                  <td colspan="6" class="px-6 py-10 text-center text-sm text-muted-foreground">
+                    ยังไม่มีข้อมูลการใช้น้ำ
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

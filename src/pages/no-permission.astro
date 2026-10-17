@@ -14,7 +14,9 @@ const email = session?.user?.email ?? ''
         บัญชี <span class="text-foreground">{email}</span> ไม่ได้รับอนุญาตให้เข้าถึงระบบนี้
       </p>
       <form method="POST" action="/api/auth/sign-out">
-        <button type={'submit' as const} class="rounded-md border border-border/70 px-6 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground"> ออกจากระบบ </button>
+        <button type={'submit' as const} class="rounded-md border border-border/70 px-6 py-2.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          ออกจากระบบ
+        </button>
       </form>
     </div>
   </main>
